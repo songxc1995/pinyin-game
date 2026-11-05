@@ -3,150 +3,356 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>拼音小厨房</title>
+<title>拼音小厨房 · 奇妙料理屋</title>
 <style>
 :root{
-  --cream:#FFF7EC;
+  --cream:#FFF8EE;
   --card:#FFFFFF;
-  --ink:#3A3226;
-  --ink-soft:#8A7F6E;
-  --blue:#3B82C4;
-  --blue-soft:#E4F0FA;
-  --orange:#E8873B;
-  --orange-soft:#FDEBDC;
-  --green:#4B9E6A;
-  --green-soft:#E8F5EC;
-  --red:#D2544B;
-  --purple:#7F77DD;
-  --line:rgba(58,50,38,.12);
+  --ink:#3B2E22;
+  --ink-soft:#8A7765;
+  --blue:#3685D6;
+  --blue-soft:#E6F2FF;
+  --blue-lip:#2564A8;
+  --orange:#F07D2E;
+  --orange-soft:#FFF0E2;
+  --orange-lip:#C85D14;
+  --green:#3EA865;
+  --green-soft:#E6F7ED;
+  --green-lip:#2B7F4A;
+  --red:#E25247;
+  --red-soft:#FDECEB;
+  --purple:#7A6EE6;
+  --purple-soft:#EFEFFD;
+  --purple-lip:#564AB8;
+  --pink:#E05385;
+  --gold:#F5B82E;
+  --line:rgba(59,46,34,.11);
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;padding:0}
 body{
-  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Rounded Mplus 1c",sans-serif;
   background:
-    radial-gradient(900px 420px at 50% -140px, #FFE7C6 0%, rgba(255,231,198,.55) 45%, rgba(255,231,198,0) 72%),
-    linear-gradient(180deg,#FFFAF3 0%, #FFF4E6 60%, #FFEFDC 100%);
+    radial-gradient(950px 480px at 50% -130px, #FFE3B8 0%, rgba(255,227,184,.55) 48%, rgba(255,227,184,0) 75%),
+    radial-gradient(600px 400px at 90% 20%, rgba(255,214,228,.35) 0%, transparent 70%),
+    radial-gradient(600px 400px at 10% 70%, rgba(210,238,255,.35) 0%, transparent 70%),
+    linear-gradient(180deg,#FFFDF9 0%, #FFF5E5 55%, #FFEBD2 100%);
   background-attachment:fixed;
   color:var(--ink);
   min-height:100vh;display:flex;justify-content:center;
+  overflow-x:hidden;
 }
-#app{width:100%;max-width:680px;padding:18px 16px 40px}
+
+/* 顶部彩色遮阳棚装饰条 */
+.awning{
+  position:fixed;top:0;left:0;right:0;height:10px;z-index:90;
+  background:repeating-linear-gradient(90deg,
+    #FF7A59 0px, #FF7A59 28px,
+    #FFF7EC 28px, #FFF7EC 56px,
+    #FFB347 56px, #FFB347 84px,
+    #FFF7EC 84px, #FFF7EC 112px);
+  box-shadow:0 2px 8px rgba(180,95,30,.18);
+}
+
+#app{width:100%;max-width:700px;padding:22px 16px 48px;position:relative}
 .hidden{display:none !important}
 
-.topbar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+/* ---------- 顶部招牌与吉祥物 ---------- */
+.topbar{
+  display:flex;align-items:center;gap:12px;margin-bottom:14px;
+  background:linear-gradient(135deg,#FFFFFF 0%,#FFF8EE 100%);
+  border:2px solid rgba(240,125,46,.22);
+  border-radius:22px;padding:10px 14px;
+  box-shadow:0 4px 0 rgba(215,135,65,.14), 0 10px 24px -10px rgba(180,100,30,.22);
+  position:relative;overflow:hidden;
+}
+.topbar::after{
+  content:'✨';position:absolute;right:14px;top:8px;font-size:16px;opacity:.45;pointer-events:none;
+}
 .potlogo{
-  width:44px;height:44px;flex:none;border-radius:14px;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(180deg,#FFE7C7 0%,#FFD5A3 100%);
-  box-shadow:0 2px 0 rgba(180,110,40,.18), 0 6px 14px -8px rgba(200,120,40,.55);
+  width:54px;height:54px;flex:none;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#FFE8C2 0%,#FFC97A 100%);
+  box-shadow:0 3px 0 #D9953B, 0 6px 14px -6px rgba(200,120,40,.55);
+  cursor:pointer;transition:transform .2s cubic-bezier(.34,1.56,.64,1);
 }
-.title{font-size:21px;font-weight:700;letter-spacing:.5px}
-.title small{display:block;font-size:12px;font-weight:400;color:var(--ink-soft);letter-spacing:0;margin-top:2px}
+.potlogo:hover{transform:scale(1.07) rotate(-4deg)}
+.potlogo:active{transform:scale(.95)}
+.title{font-size:21px;font-weight:800;letter-spacing:.5px;color:#4A2E14}
+.title .badge-ver{
+  display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;
+  background:linear-gradient(90deg,#FF8A48,#FF5E62);color:#fff;vertical-align:middle;margin-left:6px;
+}
+.title small{display:block;font-size:12.5px;font-weight:500;color:var(--ink-soft);letter-spacing:0;margin-top:3px}
 .spacer{flex:1}
+
+/* 玩具感 3D 按钮 */
 .btn{
-  border:1px solid var(--line);background:var(--card);color:var(--ink);
-  border-radius:12px;padding:8px 14px;font-size:14px;cursor:pointer;font-family:inherit;
-  box-shadow:0 1px 0 rgba(58,50,38,.07);
-  transition:transform .12s, box-shadow .12s, border-color .12s;
+  border:1.5px solid rgba(59,46,34,.16);background:linear-gradient(180deg,#FFFFFF 0%,#FBF6EE 100%);
+  color:var(--ink);font-weight:700;
+  border-radius:14px;padding:8px 15px;font-size:14px;cursor:pointer;font-family:inherit;
+  box-shadow:0 3px 0 rgba(59,46,34,.12), 0 4px 10px -3px rgba(59,46,34,.12);
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s, border-color .12s, background .15s;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
 }
-.btn:hover{border-color:rgba(58,50,38,.3);box-shadow:0 3px 8px -3px rgba(58,50,38,.25)}
-.btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(58,50,38,.07)}
+.btn:hover{border-color:rgba(59,46,34,.32);transform:translateY(-1.5px);box-shadow:0 4.5px 0 rgba(59,46,34,.14), 0 8px 14px -4px rgba(59,46,34,.2)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(59,46,34,.12)}
 .btn.primary{
-  background:linear-gradient(180deg,#F19A4E 0%,var(--orange) 100%);
-  border-color:var(--orange);color:#fff;box-shadow:0 2px 0 rgba(180,100,32,.35);
+  background:linear-gradient(180deg,#FF9B44 0%,var(--orange) 100%);
+  border-color:#D46519;color:#fff;
+  box-shadow:0 3.5px 0 var(--orange-lip), 0 6px 14px -3px rgba(240,125,46,.45);
 }
-.btn.sm{padding:6px 10px;font-size:13px}
+.btn.primary:hover{box-shadow:0 5px 0 var(--orange-lip), 0 10px 18px -4px rgba(240,125,46,.55)}
+.btn.primary:active{box-shadow:0 1px 0 var(--orange-lip)}
+.btn.green{
+  background:linear-gradient(180deg,#52C27A 0%,var(--green) 100%);
+  border-color:#2F8E52;color:#fff;
+  box-shadow:0 3.5px 0 var(--green-lip), 0 6px 14px -3px rgba(62,168,101,.4);
+}
+.btn.purple{
+  background:linear-gradient(180deg,#9287F4 0%,var(--purple) 100%);
+  border-color:#5E52C8;color:#fff;
+  box-shadow:0 3.5px 0 var(--purple-lip), 0 6px 14px -3px rgba(122,110,230,.4);
+}
+.btn.sm{padding:6px 12px;font-size:13px;border-radius:12px}
 
 /* ---------- 统计条 ---------- */
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:13px}
 .stat{
-  background:linear-gradient(180deg,#fff 0%,#FFFCF6 100%);
-  border:1px solid var(--line);border-radius:16px;padding:12px 6px 10px;text-align:center;
-  box-shadow:0 2px 0 rgba(58,50,38,.045), 0 6px 14px -10px rgba(58,50,38,.25);
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFFBF4 100%);
+  border:2px solid var(--line);border-radius:18px;padding:11px 6px 10px;text-align:center;
+  box-shadow:0 3px 0 rgba(59,46,34,.06), 0 8px 16px -10px rgba(59,46,34,.22);
+  position:relative;overflow:hidden;transition:transform .16s cubic-bezier(.34,1.56,.64,1);
+  cursor:pointer;
 }
-.stat .ic{display:block;width:18px;height:18px;margin:0 auto 5px;opacity:.9}
-.stat .v{font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
-.stat .k{font-size:11px;color:var(--ink-soft);margin-top:3px}
-.stat.a .v{color:var(--orange)}
-.stat.b .v{color:var(--green)}
-.stat.c .v{color:var(--purple)}
-.stat.d .v{color:#D4537E}
-.stat.a .ic{color:var(--orange)}
-.stat.b .ic{color:var(--green)}
-.stat.c .ic{color:var(--purple)}
-.stat.d .ic{color:#D4537E}
+.stat:hover{transform:translateY(-2px)}
+.stat .ic{display:block;width:22px;height:22px;margin:0 auto 4px}
+.stat .v{font-size:24px;font-weight:800;line-height:1.1;letter-spacing:-.5px}
+.stat .k{font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-top:3px}
+.stat.a{border-color:rgba(240,125,46,.28);background:linear-gradient(180deg,#FFFDF9 0%,#FFF4E4 100%)}
+.stat.b{border-color:rgba(62,168,101,.28);background:linear-gradient(180deg,#F9FFFB 0%,#EBF9F0 100%)}
+.stat.c{border-color:rgba(122,110,230,.28);background:linear-gradient(180deg,#FBFaff 0%,#F0EEFF 100%)}
+.stat.d{border-color:rgba(224,83,133,.28);background:linear-gradient(180deg,#FFF9FB 0%,#FDECF2 100%)}
+.stat.a .v,.stat.a .ic{color:var(--orange)}
+.stat.b .v,.stat.b .ic{color:var(--green)}
+.stat.c .v,.stat.c .ic{color:var(--purple)}
+.stat.d .v,.stat.d .ic{color:var(--pink)}
+
+/* ---------- 厨艺等级 + 锅具换装区 ---------- */
+.chefbar{
+  display:flex;align-items:center;gap:11px;
+  background:linear-gradient(105deg,#FFF4DC 0%,#FFE6BE 60%,#FFDCA8 100%);
+  border:2px solid rgba(232,135,59,.35);border-radius:18px;padding:11px 14px;margin:0 0 12px;
+  box-shadow:0 3px 0 rgba(200,120,30,.14);
+}
+.chefcrown{
+  flex:none;width:40px;height:40px;border-radius:14px;
+  background:linear-gradient(180deg,#FFE27A,#F5B82E);
+  display:flex;align-items:center;justify-content:center;color:#6B4205;
+  box-shadow:0 2px 0 rgba(160,100,10,.3);
+}
+.chefcrown svg{width:24px;height:24px}
+.cheftx{flex:1;min-width:0}
+.chefnm{font-size:15.5px;font-weight:800;color:#5E3807;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chefsub{font-size:11.5px;color:#8A561B;margin-top:2px;font-weight:500}
+.chefprog{flex:none;width:72px;height:8px;border-radius:99px;background:rgba(107,74,8,.16);overflow:hidden}
+.chefprog i{display:block;height:100%;background:linear-gradient(90deg,#FF9B44,#F5B82E);border-radius:99px;transition:width .35s}
+.skinbtn{
+  flex:none;border:1.5px solid rgba(140,80,15,.3);background:#FFF9EE;color:#6B4205;
+  border-radius:12px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;
+  box-shadow:0 2px 0 rgba(140,80,15,.15);transition:transform .12s;
+}
+.skinbtn:hover{transform:scale(1.04);background:#fff}
+
+/* 锅具换装弹窗/抽屉 */
+.skinbar{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;
+  background:#FFFBF4;border:2px solid rgba(232,135,59,.28);border-radius:16px;
+  padding:10px;margin:0 0 12px;animation:fireIn .22s ease-out;
+}
+.skinitem{
+  border:2px solid var(--line);border-radius:13px;padding:7px 4px;text-align:center;
+  background:#fff;cursor:pointer;transition:transform .12s,border-color .12s;position:relative;
+}
+.skinitem:hover{transform:translateY(-2px)}
+.skinitem.on{border-color:var(--orange);background:var(--orange-soft);box-shadow:0 0 0 2px rgba(240,125,46,.2)}
+.skinitem.lock{opacity:.5;cursor:not-allowed;background:#F5F1EA}
+.skinitem .snm{font-size:11px;font-weight:700;margin-top:3px;color:var(--ink)}
+.skinitem .sreq{font-size:10px;color:var(--ink-soft)}
+
+/* ---------- 今日小厨神任务 ---------- */
+.dailybox{
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFF9F0 100%);
+  border:2px solid rgba(240,125,46,.24);border-radius:18px;padding:11px 13px;margin-bottom:13px;
+  box-shadow:0 3px 0 rgba(59,46,34,.05);
+}
+.dailyhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.dailyhd .dt{font-size:13.5px;font-weight:800;color:#6B3E12;display:flex;align-items:center;gap:5px}
+.dailyhd .ds{font-size:11px;color:var(--ink-soft)}
+.dailygrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.dq{
+  border:1.5px solid var(--line);border-radius:13px;padding:8px 8px;background:#FFFCF7;
+  display:flex;flex-direction:column;justify-content:space-between;gap:4px;
+  transition:transform .15s, border-color .15s;
+}
+.dq.done{border-color:rgba(62,168,101,.45);background:var(--green-soft)}
+.dq.claim{border-color:var(--orange);background:linear-gradient(180deg,#FFF6E5,#FFE8C2);cursor:pointer;animation:pulseCard 1.4s infinite}
+@keyframes pulseCard{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+.dq .dq-t{font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.35}
+.dq .dq-b{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--ink-soft);margin-top:2px}
+.dq .dq-tag{font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(59,46,34,.07)}
+.dq.claim .dq-tag{background:var(--orange);color:#fff}
+.dq.done .dq-tag{background:var(--green);color:#fff}
 
 /* ---------- 蝴蝶 ---------- */
-.bfly{display:block}
-.bfly .wings{animation:flap .62s ease-in-out infinite;transform-box:view-box;transform-origin:50px 52px}
-@keyframes flap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.48)}}
+.bfly{display:block;overflow:visible}
+.bfly .wings{animation:flap .58s ease-in-out infinite;transform-box:view-box;transform-origin:50px 52px}
+@keyframes flap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.46)}}
 @media (prefers-reduced-motion:reduce){.bfly .wings{animation:none}}
 .bgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.bcard{background:#FBF8F3;border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center;display:flex;flex-direction:column;align-items:center}
-.bcard.r2{border-color:rgba(212,83,126,.45)}
-.bcard.r3{border-color:rgba(232,135,59,.65);background:var(--orange-soft)}
-.bcard.lock{opacity:.45}
-.bcard .bn2{font-size:12px;font-weight:600;margin-top:4px}
-.bcard .bc{font-size:11px;color:var(--ink-soft);margin-top:1px}
-.bcard .ph{height:46px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink-soft)}
-.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;margin-top:4px}
+.bcard{
+  background:linear-gradient(180deg,#FFFFFF 0%,#FBF7F0 100%);
+  border:2px solid var(--line);border-radius:16px;padding:11px 6px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;
+  box-shadow:0 3px 0 rgba(59,46,34,.05);
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s;
+  cursor:pointer;
+}
+.bcard:not(.lock):hover{transform:translateY(-3px);box-shadow:0 6px 14px -6px rgba(59,46,34,.22)}
+.bcard.r2{border-color:rgba(212,83,126,.45);background:linear-gradient(180deg,#FFFBFD 0%,#FDF1F6 100%)}
+.bcard.r3{border-color:rgba(232,135,59,.65);background:linear-gradient(180deg,#FFFDF8 0%,#FFF1DA 100%)}
+.bcard.lock{opacity:.48;cursor:default}
+.bcard .bn2{font-size:12.5px;font-weight:700;margin-top:4px}
+.bcard .bc{font-size:11px;color:var(--ink-soft);margin-top:1px;font-weight:600}
+.bcard .ph{height:48px;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--ink-soft)}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:1.5px 6px;border-radius:6px;margin-top:4px}
+.tag.r1{background:#EEF2F6;color:#5A6878}
 .tag.r2{background:#FBEAF0;color:#993556}
 .tag.r3{background:#FAEEDA;color:#854F0B}
-.bflyaward{display:flex;gap:16px;justify-content:center;align-items:flex-end;margin:6px 0 12px;min-height:80px;flex-wrap:wrap}
-.bflyaward .one{text-align:center;animation:flyin .85s cubic-bezier(.2,1.3,.4,1) both}
-.bflyaward .one:nth-child(2){animation-delay:.25s}
-.bflyaward .cap{font-size:11px;font-weight:600;margin-top:2px}
+.bflyaward{display:flex;gap:16px;justify-content:center;align-items:flex-end;margin:8px 0 14px;min-height:86px;flex-wrap:wrap}
+.bflyaward .one{text-align:center;animation:flyin .85s cubic-bezier(.2,1.3,.4,1) both;cursor:pointer}
+.bflyaward .one:nth-child(2){animation-delay:.22s}
+.bflyaward .one:nth-child(3){animation-delay:.44s}
+.bflyaward .cap{font-size:12px;font-weight:700;margin-top:3px}
 @keyframes flyin{0%{opacity:0;transform:translateY(26px) scale(.35) rotate(-18deg)}55%{opacity:1;transform:translateY(-4px) scale(1.12) rotate(6deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
-.recent{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-.bffloat{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;min-height:40px}
-.floater{animation:drift 2.8s ease-in-out infinite}
+.recent{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}
+.bffloat{
+  display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-bottom:12px;min-height:42px;padding:6px 10px;
+  background:linear-gradient(90deg,rgba(255,255,255,.4),rgba(255,248,232,.85),rgba(255,255,255,.4));
+  border-radius:16px;
+}
+.floater{animation:drift 2.8s ease-in-out infinite;cursor:pointer;transition:transform .2s}
+.floater:hover{filter:drop-shadow(0 4px 8px rgba(240,125,46,.35))}
 @keyframes drift{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-8px) rotate(5deg)}}
 @media (prefers-reduced-motion:reduce){.floater{animation:none}}
-.notice{border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6;margin-bottom:12px;background:var(--green-soft);border:1px solid rgba(75,158,106,.4);color:#2F6B45}
+
+/* 蝴蝶生态花园互动区 */
+.garden-stage{
+  position:relative;height:155px;border-radius:18px;overflow:hidden;margin-bottom:12px;
+  background:linear-gradient(180deg,#C9ECFF 0%,#E8F8FF 52%,#B8E994 53%,#78E08F 100%);
+  border:2px solid rgba(62,168,101,.35);
+  box-shadow:inset 0 -10px 20px rgba(30,120,50,.12), 0 3px 0 rgba(59,46,34,.06);
+}
+.garden-stage .sun{
+  position:absolute;right:18px;top:12px;width:32px;height:32px;border-radius:50%;
+  background:radial-gradient(circle,#FFF59D 20%,#FFD54F 70%,#FFB300 100%);
+  box-shadow:0 0 18px rgba(255,213,79,.85);
+}
+.garden-stage .cloud{
+  position:absolute;background:rgba(255,255,255,.85);border-radius:99px;
+  height:18px;width:54px;top:20px;left:24px;animation:cloudMove 14s ease-in-out infinite alternate;
+}
+.garden-stage .cloud.c2{width:42px;height:14px;top:34px;left:45%;animation-duration:18s}
+@keyframes cloudMove{from{transform:translateX(-10px)}to{transform:translateX(24px)}}
+.garden-stage .flowers{
+  position:absolute;bottom:6px;left:12px;right:12px;display:flex;justify-content:space-around;
+  font-size:20px;pointer-events:none;opacity:.92;
+}
+.garden-actor{
+  position:absolute;cursor:pointer;transition:left 2.4s ease-in-out, top 2.4s ease-in-out, transform .25s;
+  filter:drop-shadow(0 4px 5px rgba(0,0,0,.15));
+}
+.garden-actor:active{transform:scale(1.25) rotate(12deg)}
+.garden-tip{
+  position:absolute;left:10px;top:8px;font-size:11px;font-weight:700;
+  color:#265C3A;background:rgba(255,255,255,.78);padding:3px 9px;border-radius:99px;
+  pointer-events:none;
+}
+
+.notice{border-radius:14px;padding:10px 14px;font-size:13px;line-height:1.6;margin-bottom:12px;background:var(--green-soft);border:1.5px solid rgba(75,158,106,.4);color:#2F6B45}
 .notice.warn{background:#FCEBEB;border-color:rgba(210,84,75,.4);color:#791F1F}
-.notice b{font-weight:600}
+.notice b{font-weight:700}
 
 /* ---------- tab ---------- */
-.tabs{display:flex;gap:4px;margin-bottom:14px;background:rgba(58,50,38,.055);padding:4px;border-radius:14px}
+.tabs{
+  display:flex;gap:6px;margin-bottom:14px;
+  background:rgba(59,46,34,.065);padding:5px;border-radius:16px;
+}
 .tab{
-  flex:1;border:0;background:transparent;border-radius:11px;padding:9px 0;font-size:14px;
+  flex:1;border:0;background:transparent;border-radius:12px;padding:9px 0;font-size:14px;font-weight:600;
   cursor:pointer;font-family:inherit;color:var(--ink-soft);
-  transition:background .15s,color .15s,box-shadow .15s;
+  transition:background .15s,color .15s,box-shadow .15s,transform .12s;
 }
 .tab:hover{color:var(--ink)}
-.tab.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(58,50,38,.14)}
+.tab.on{
+  background:var(--card);color:var(--ink);font-weight:800;
+  box-shadow:0 2px 0 rgba(59,46,34,.08), 0 3px 8px rgba(59,46,34,.12);
+}
+
+/* ---------- 特训营快捷横幅 ---------- */
+.special-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:12px}
+.spcard{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:17px;
+  border:2px solid var(--line);background:#fff;cursor:pointer;text-align:left;font-family:inherit;
+  box-shadow:0 3px 0 rgba(59,46,34,.06);transition:transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s;
+}
+.spcard:hover{transform:translateY(-2px);box-shadow:0 5px 14px -4px rgba(59,46,34,.18)}
+.spcard:active{transform:translateY(1px)}
+.spcard.wrong-camp{background:linear-gradient(135deg,#FFF5F2 0%,#FFE6E0 100%);border-color:rgba(226,82,71,.35)}
+.spcard.allstar-camp{background:linear-gradient(135deg,#F4F2FF 0%,#E6E2FF 100%);border-color:rgba(122,110,230,.35)}
+.spcard .sp-ic{font-size:26px;flex:none}
+.spcard .sp-t{font-size:13.5px;font-weight:800;color:var(--ink)}
+.spcard .sp-d{font-size:11px;color:var(--ink-soft);margin-top:2px}
 
 /* ---------- 关卡地图 ---------- */
-.map{display:flex;flex-direction:column;gap:10px}
+.map{display:flex;flex-direction:column;gap:11px}
 .lv{
-  display:flex;align-items:center;gap:12px;background:var(--card);
-  border:1px solid var(--line);border-radius:18px;padding:12px 14px 12px 17px;
+  display:flex;align-items:center;gap:13px;
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFFDF9 100%);
+  border:2px solid var(--line);border-radius:20px;padding:13px 15px 13px 18px;
   cursor:pointer;text-align:left;font-family:inherit;color:inherit;width:100%;
   position:relative;overflow:hidden;
-  box-shadow:0 1px 2px rgba(58,50,38,.05);
-  transition:transform .15s, box-shadow .15s, border-color .15s;
+  box-shadow:0 3px 0 rgba(59,46,34,.06), 0 6px 14px -8px rgba(59,46,34,.18);
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s, border-color .15s;
 }
-.lv::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue)}
+.lv::before{content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--blue)}
 .lv.whole::before{background:var(--purple)}
 .lv.tri::before{background:var(--orange)}
-.lv:hover{border-color:rgba(58,50,38,.24);transform:translateY(-2px);box-shadow:0 6px 16px -6px rgba(58,50,38,.22)}
-.lv.locked:hover{transform:none;box-shadow:0 1px 2px rgba(58,50,38,.05)}
+.lv:hover{border-color:rgba(59,46,34,.28);transform:translateY(-2.5px);box-shadow:0 5px 0 rgba(59,46,34,.09), 0 10px 20px -8px rgba(59,46,34,.25)}
+.lv:active{transform:translateY(1px)}
+.lv.locked:hover{transform:none;box-shadow:0 3px 0 rgba(59,46,34,.06)}
 .lv .badge{
-  width:38px;height:38px;border-radius:50%;flex:none;
+  width:42px;height:42px;border-radius:14px;flex:none;
   display:flex;align-items:center;justify-content:center;
-  font-size:16px;font-weight:600;color:#fff;background:var(--blue);
-  box-shadow:0 0 0 3px rgba(59,130,196,.16);
+  font-size:17px;font-weight:800;color:#fff;
+  background:linear-gradient(180deg,#55A0EE,var(--blue));
+  box-shadow:0 3px 0 var(--blue-lip), 0 0 0 3px rgba(54,133,214,.15);
 }
-.lv.whole .badge{background:var(--purple);box-shadow:0 0 0 3px rgba(127,119,221,.16)}
-.lv.tri .badge{background:var(--orange);box-shadow:0 0 0 3px rgba(232,135,59,.18)}
-.pbar{height:4px;border-radius:2px;background:#F0EBE2;margin:5px 0 0 auto;width:76px;overflow:hidden}
-.pbar i{display:block;height:100%;border-radius:2px;background:var(--green)}
+.lv.whole .badge{background:linear-gradient(180deg,#958AF2,var(--purple));box-shadow:0 3px 0 var(--purple-lip), 0 0 0 3px rgba(122,110,230,.15)}
+.lv.tri .badge{background:linear-gradient(180deg,#FF9B44,var(--orange));box-shadow:0 3px 0 var(--orange-lip), 0 0 0 3px rgba(240,125,46,.16)}
+.pbar{height:5px;border-radius:99px;background:#EFE8DC;margin:6px 0 0 auto;width:82px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#52C27A,var(--green))}
 .lv .info{flex:1;min-width:0}
-.lv .nm{font-size:15px;font-weight:600}
-.lv .ds{font-size:12px;color:var(--ink-soft);margin-top:2px}
-.lv .tip{font-size:11px;line-height:1.5;color:#8A5A24;background:rgba(232,135,59,.14);border-radius:8px;padding:5px 8px;margin-top:6px}
-.listenrow{display:flex;gap:8px;justify-content:center;margin-top:6px}
-.listenrow .btn.on{background:var(--orange);border-color:var(--orange);color:#fff}
+.lv .nm{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:6px}
+.lv .ds{font-size:12px;color:var(--ink-soft);margin-top:2px;font-weight:500}
+.lv .tip{font-size:11px;line-height:1.5;color:#8A5A24;background:rgba(240,125,46,.13);border-radius:9px;padding:5px 9px;margin-top:6px;font-weight:600}
+.lv .rt{text-align:right;flex:none}
+.lv .st{font-size:16px;letter-spacing:1.5px;color:#F5A623;text-shadow:0 1px 0 rgba(180,100,10,.2)}
+.lv .lk{font-size:11px;color:var(--ink-soft);margin-top:2px;font-weight:600}
+.lv.locked{opacity:.52;cursor:not-allowed;background:#FAF6F0}
+
+.listenrow{display:flex;gap:8px;justify-content:center;margin-top:9px;flex-wrap:wrap}
+.listenrow .btn.on{background:var(--orange);border-color:var(--orange-lip);color:#fff;box-shadow:0 2px 0 var(--orange-lip)}
 
 /* ---------- 蝴蝶进化全屏动画 ---------- */
 .upov{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
@@ -167,231 +373,387 @@ body{
 .upbf .bfly{animation:upFlap 1.15s ease-in-out infinite}
 @keyframes upFlap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.87)}}
 .upsparks{position:absolute;left:50%;top:130px;width:0;height:0;pointer-events:none}
-.upsparks b{position:absolute;width:7px;height:7px;border-radius:50%;background:#F5C542;
+.upsparks b{position:absolute;width:8px;height:8px;border-radius:50%;background:#F5C542;
   animation:upFly 1s ease-out forwards}
 @keyframes upFly{0%{transform:translate(0,0) scale(1);opacity:1}
                  100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
-.uptitle{font-size:25px;font-weight:700;color:#8A4B12;margin-top:12px;letter-spacing:3px;
+.uptitle{font-size:26px;font-weight:800;color:#8A4B12;margin-top:12px;letter-spacing:3px;
   text-shadow:0 2px 0 rgba(255,255,255,.75)}
 .upsub{font-size:14px;color:#8A5A24;margin-top:7px}
-.upname{font-size:13px;color:#7A4E22;margin-top:5px}
-.upbtn{margin-top:18px;padding:9px 26px}
-.lvtag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;line-height:1.5}
+.upname{font-size:13px;color:#7A4E22;margin-top:5px;font-weight:600}
+.upbtn{margin-top:18px;padding:10px 28px}
+.lvtag{display:inline-block;font-size:10px;font-weight:700;padding:1.5px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;line-height:1.5}
+.lvtag.l1{background:#F3EFE8;color:#7A6E5D}
 .lvtag.l2{background:#FFF0C2;color:#8A5A10}
-.lvtag.l3{background:linear-gradient(90deg,#F9E39B,#F5C542);color:#6B4A08;font-weight:600}
-.upbar{height:4px;background:rgba(58,50,38,.12);border-radius:3px;margin:5px 5px 0;overflow:hidden}
-.upbar i{display:block;height:100%;background:linear-gradient(90deg,#F9E39B,#F5C542);border-radius:3px}
-.uphint{font-size:10px;color:var(--ink-soft);margin-top:3px}
-.uphint.done{color:#B0781A;font-weight:600}
-.bcard.max{box-shadow:0 0 0 2px rgba(245,197,66,.5),0 4px 12px rgba(190,120,40,.18)}
-.lv .rt{text-align:right;flex:none}
-.lv .st{font-size:15px;letter-spacing:1px;color:var(--orange)}
-.lv .lk{font-size:11px;color:var(--ink-soft);margin-top:2px}
-.lv.locked{opacity:.5;cursor:not-allowed}
+.lvtag.l3{background:linear-gradient(90deg,#F9E39B,#F5C542);color:#6B4A08;font-weight:800}
+.upbar{height:5px;background:rgba(58,50,38,.11);border-radius:99px;margin:6px 5px 0;overflow:hidden;width:85%}
+.upbar i{display:block;height:100%;background:linear-gradient(90deg,#F9E39B,#F5C542);border-radius:99px}
+.uphint{font-size:10px;color:var(--ink-soft);margin-top:3px;font-weight:600}
+.uphint.done{color:#B0781A;font-weight:800}
+.bcard.max{box-shadow:0 0 0 2px rgba(245,197,66,.55),0 5px 14px rgba(190,120,40,.18)}
 
-/* ---------- 选火候：这一局做多难，孩子自己定 ---------- */
+/* ---------- 选火候弹窗 ---------- */
 .fireov{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;
-  background:rgba(58,50,38,.45);padding:20px}
+  background:rgba(45,32,20,.5);backdrop-filter:blur(3px);padding:20px}
 .fireov.on{display:flex}
-.firecard{background:var(--card);border-radius:20px;padding:20px 18px;max-width:360px;width:100%;text-align:center;
-  box-shadow:0 14px 40px rgba(58,50,38,.28);animation:fireIn .28s ease-out}
-@keyframes fireIn{from{transform:translateY(14px) scale(.96);opacity:0}to{transform:none;opacity:1}}
-.firecard .ftitle{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:3px}
-.firecard .fsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
-.firehint{font-size:11.5px;line-height:1.55;color:#8A5A24;background:rgba(232,135,59,.14);
-  border-radius:9px;padding:7px 10px;margin:0 0 11px}
-.fopts{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-.fopt{display:flex;align-items:center;gap:11px;padding:10px 13px;border:1px solid var(--line);border-radius:13px;
-  background:#fff;cursor:pointer;text-align:left;transition:transform .12s,box-shadow .12s}
-.fopt:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(58,50,38,.5)}
-.fopt .ic{flex:none;width:26px;display:flex;align-items:center;justify-content:center}
+.firecard{
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFF9F0 100%);
+  border:2px solid rgba(240,125,46,.3);
+  border-radius:24px;padding:22px 18px;max-width:380px;width:100%;text-align:center;
+  box-shadow:0 18px 44px rgba(45,32,20,.32);animation:fireIn .26s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes fireIn{from{transform:translateY(16px) scale(.94);opacity:0}to{transform:none;opacity:1}}
+.firecard .ftitle{font-size:18px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.firecard .fsub{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;font-weight:600}
+.firehint{font-size:12px;line-height:1.55;color:#8A5A24;background:rgba(240,125,46,.14);
+  border-radius:11px;padding:8px 11px;margin:0 0 12px;font-weight:600}
+.fopts{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+.fopt{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;
+  border:2px solid var(--line);border-radius:16px;
+  background:#fff;cursor:pointer;text-align:left;font-family:inherit;
+  box-shadow:0 3px 0 rgba(59,46,34,.06);
+  transition:transform .14s cubic-bezier(.34,1.56,.64,1),box-shadow .14s,border-color .14s;
+}
+.fopt:hover{transform:translateY(-2px);box-shadow:0 5px 14px -6px rgba(59,46,34,.35);border-color:rgba(240,125,46,.5)}
+.fopt .ic{flex:none;width:30px;display:flex;align-items:center;justify-content:center}
 .fopt .tx{flex:1;min-width:0}
-.fopt .nn{font-size:14.5px;font-weight:600;color:var(--ink)}
-.fopt .dd{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
-.fopt.hi{border-color:var(--orange);background:var(--orange-soft)}
+.fopt .nn{font-size:15px;font-weight:800;color:var(--ink);display:block}
+.fopt .dd{font-size:11.5px;color:var(--ink-soft);margin-top:2px;display:block;font-weight:500}
+.fopt.hi{border-color:var(--orange);background:linear-gradient(135deg,#FFF7EC,#FFE8CC)}
+
+/* 盲听挑战开关行 */
+.blind-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  background:#F8F4EC;border:1.5px solid var(--line);border-radius:13px;
+  padding:8px 12px;margin-bottom:12px;cursor:pointer;font-size:12.5px;font-weight:700;color:#5E4630;
+}
+.blind-toggle.on{background:#EFEFFD;border-color:var(--purple);color:#483AA0}
+.blind-toggle .sw{
+  padding:2px 9px;border-radius:99px;font-size:11px;background:rgba(59,46,34,.1);color:var(--ink-soft);
+}
+.blind-toggle.on .sw{background:var(--purple);color:#fff}
 
 /* 游戏内：本局火力 + 回锅次数 */
-.hudfire{display:inline-block;font-size:12px;padding:2px 9px;border-radius:9px;
-  background:var(--orange-soft);color:#8A5A24;margin-left:6px}
+.hudfire{display:inline-block;font-size:12px;font-weight:700;padding:2.5px 9px;border-radius:9px;
+  background:var(--orange-soft);color:#8A5A24;margin-left:4px}
 .hudfire.hi{background:linear-gradient(90deg,#F9E39B,#FAC775);color:#6B4A08}
-.retrydot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:2px;
-  vertical-align:middle}
-.retrydot.used{background:rgba(58,50,38,.18)}
-
-/* ---------- 厨艺等级：让「变强」这件事看得见 ---------- */
-.chefbar{display:flex;align-items:center;gap:11px;background:linear-gradient(90deg,#FFF4E0,#FFE9CC);
-  border:1px solid rgba(232,135,59,.3);border-radius:16px;padding:11px 14px;margin:0 0 12px}
-.chefcrown{flex:none;width:34px;height:34px;border-radius:50%;background:#FAC775;
-  display:flex;align-items:center;justify-content:center;color:#6B4A08}
-.chefcrown svg{width:20px;height:20px}
-.cheftx{flex:1;min-width:0}
-.chefnm{font-size:15px;font-weight:600;color:#6B4A08}
-.chefsub{font-size:11.5px;color:#8A5A24;margin-top:1px}
-.chefprog{flex:none;width:78px;height:7px;border-radius:4px;background:rgba(107,74,8,.16);overflow:hidden}
-.chefprog i{display:block;height:100%;background:linear-gradient(90deg,#F9E39B,#F5C542);border-radius:4px}
+.retrydot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-left:3px;
+  vertical-align:middle;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.retrydot.used{background:rgba(58,50,38,.18);box-shadow:none}
 
 .hintbox{
-  background:linear-gradient(180deg,#FFF3E6 0%,var(--orange-soft) 100%);
-  border:1px solid rgba(232,135,59,.28);
-  border-radius:16px;padding:14px 16px;font-size:13px;line-height:1.7;color:#7A4E22;margin:14px 0 0;
+  background:linear-gradient(180deg,#FFF5E8 0%,var(--orange-soft) 100%);
+  border:2px solid rgba(240,125,46,.26);
+  border-radius:18px;padding:14px 16px;font-size:13px;line-height:1.7;color:#7A4E22;margin:14px 0 0;
 }
 
 /* ---------- 收藏 / 记录 ---------- */
 .panel{
-  background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;
-  box-shadow:0 1px 3px rgba(58,50,38,.05);
+  background:var(--card);border:2px solid var(--line);border-radius:20px;padding:16px;
+  box-shadow:0 3px 0 rgba(59,46,34,.05);
 }
-.panel h3{font-size:15px;margin:0 0 4px;font-weight:600}
-.panel .sub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.panel h3{font-size:16px;margin:0 0 4px;font-weight:800}
+.panel .sub{font-size:12px;color:var(--ink-soft);margin-bottom:12px;font-weight:500}
+.coll-filter{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.coll-filter button{
+  border:1.5px solid var(--line);background:#FAF6F0;border-radius:99px;padding:4px 11px;
+  font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;
+}
+.coll-filter button.on{background:var(--green);border-color:var(--green-lip);color:#fff}
 .grid{display:flex;flex-wrap:wrap;gap:8px}
 .cell{
-  min-width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-size:20px;background:var(--green-soft);border:1px solid rgba(75,158,106,.35);color:#2F6B45;
-  transition:transform .12s, box-shadow .12s;
+  min-width:48px;height:48px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;background:linear-gradient(180deg,#F2FBF5,var(--green-soft));
+  border:2px solid rgba(62,168,101,.4);color:#25613B;cursor:pointer;
+  box-shadow:0 2.5px 0 rgba(62,168,101,.22);
+  transition:transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s;
+  position:relative;
 }
-.cell:not(.empty):hover{transform:translateY(-2px);box-shadow:0 5px 12px -5px rgba(75,158,106,.7)}
-.cell.empty{background:#F5F2EC;border:1px dashed rgba(58,50,38,.2);color:transparent}
-.bar{height:8px;border-radius:4px;background:#F0EBE2;overflow:hidden;margin:8px 0 14px}
-.bar i{display:block;height:100%;background:var(--green);border-radius:4px}
+.cell small{font-size:10px;line-height:1;margin-top:1px;opacity:.85}
+.cell:not(.empty):hover{transform:translateY(-3px) scale(1.05);box-shadow:0 6px 12px -4px rgba(62,168,101,.55)}
+.cell.empty{background:#F5F1EA;border:1.5px dashed rgba(59,46,34,.2);color:rgba(59,46,34,.22);box-shadow:none;cursor:default;font-size:15px}
+.bar{height:9px;border-radius:99px;background:#EFE8DC;overflow:hidden;margin:8px 0 14px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#52C27A,var(--green));border-radius:99px;transition:width .35s}
+
+/* 菜单点读展示条 */
+.dish-spotlight{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:12px;
+  background:linear-gradient(135deg,#FFF8EB 0%,#FFEBD0 100%);
+  border:2px solid rgba(240,125,46,.32);border-radius:16px;
+}
+.dish-spotlight .ds-char{
+  width:52px;height:52px;border-radius:15px;background:#fff;border:2px solid rgba(240,125,46,.35);
+  display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:var(--ink);
+  box-shadow:0 2px 0 rgba(240,125,46,.15);
+}
+.dish-spotlight .ds-info{flex:1;min-width:0}
+.dish-spotlight .ds-py{font-size:16px;font-weight:800;color:var(--orange)}
+.dish-spotlight .ds-wd{font-size:13px;font-weight:700;color:var(--ink);margin-top:2px}
 
 .row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
 .row:last-child{border-bottom:0}
 .row .t{color:var(--ink-soft)}
-.row .sc{margin-left:auto;font-weight:600}
+.row .sc{margin-left:auto;font-weight:700}
 .badges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.bg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#FBF8F3}
-.bg.got{background:var(--orange-soft);border-color:rgba(232,135,59,.4)}
-.bg .bn{font-size:13px;font-weight:600}
-.bg .bd{font-size:11px;color:var(--ink-soft);margin-top:2px}
+.bg{border:2px solid var(--line);border-radius:14px;padding:11px 12px;background:#FBF8F3;transition:transform .12s}
+.bg.got{background:linear-gradient(180deg,#FFF8EE,var(--orange-soft));border-color:rgba(240,125,46,.45);box-shadow:0 2px 0 rgba(240,125,46,.15)}
+.bg .bn{font-size:13.5px;font-weight:800}
+.bg .bd{font-size:11px;color:var(--ink-soft);margin-top:3px;font-weight:500}
 
 /* ---------- 游戏区 ---------- */
-.hud{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-soft);margin-bottom:10px}
-.hud .stars{letter-spacing:2px;font-size:16px;color:var(--orange)}
-.hud .combo{color:var(--green);font-weight:600}
+.hud{
+  display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink-soft);
+  margin-bottom:10px;flex-wrap:wrap;
+  background:rgba(255,255,255,.75);padding:7px 12px;border-radius:14px;border:1.5px solid var(--line);
+}
+.hud .stars{letter-spacing:1.5px;font-size:15px;color:#F5A623}
+.hud .combo{
+  color:#fff;background:linear-gradient(90deg,#FF8A00,#E52E71);
+  padding:2px 8px;border-radius:99px;font-size:11.5px;font-weight:800;
+  animation:popIn .25s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn{from{transform:scale(.6)}to{transform:scale(1)}}
 
 .target{
-  background:linear-gradient(180deg,#fff 0%,#FFFCF7 100%);
-  border:1px solid var(--line);border-radius:20px;padding:16px 16px 18px;text-align:center;margin-bottom:12px;
-  box-shadow:0 2px 0 rgba(58,50,38,.045), 0 10px 22px -14px rgba(58,50,38,.35);
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFFBF4 100%);
+  border:2px solid rgba(240,125,46,.22);border-radius:24px;padding:15px 16px 16px;text-align:center;margin-bottom:10px;
+  box-shadow:0 4px 0 rgba(59,46,34,.06), 0 12px 24px -14px rgba(59,46,34,.28);
+  position:relative;
 }
-.target .lbl{font-size:12px;color:var(--ink-soft);margin-bottom:8px}
-.bigchar{font-size:64px;line-height:1.1;font-weight:700}
-.foodtag{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:15px}
-.foodtag.got{color:var(--green);font-weight:600}
-.slots{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.target .lbl{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}
+.target-main{display:flex;align-items:center;justify-content:center;gap:14px;margin:4px 0}
+.bigchar{
+  font-size:66px;line-height:1.08;font-weight:800;color:#2E2115;
+  text-shadow:0 3px 0 rgba(240,125,46,.15);
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+  cursor:pointer;
+}
+.bigchar:hover{transform:scale(1.06)}
+/* 神秘锅盖（盲听模式） */
+.cloche-btn{
+  display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+  width:118px;height:78px;border-radius:60px 60px 16px 16px;
+  background:linear-gradient(180deg,#F5F7FA 0%,#D8E0EA 75%,#B8C4D4 100%);
+  border:2px solid #99A8BC;color:#445368;cursor:pointer;
+  box-shadow:0 4px 0 #8998AD, 0 8px 16px rgba(0,0,0,.12);
+  font-size:12px;font-weight:800;transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.cloche-btn:hover{transform:translateY(-3px) rotate(-2deg)}
+.cloche-btn .cl-ic{font-size:26px;line-height:1;margin-bottom:3px}
+
+/* 词语配图胶囊提示 */
+.word-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(180deg,#FFF8EB,#FFEFD4);
+  border:1.5px solid rgba(240,125,46,.32);border-radius:99px;
+  padding:4px 13px;font-size:14px;font-weight:800;color:#8A4B12;
+  margin-top:4px;cursor:pointer;box-shadow:0 2px 0 rgba(240,125,46,.12);
+  transition:transform .12s;
+}
+.word-pill:hover{transform:scale(1.04)}
+.word-pill .wp-em{font-size:17px}
+
+.foodtag{font-size:11.5px;color:var(--ink-soft);margin-top:5px;min-height:16px;font-weight:600}
+.foodtag.got{color:var(--green);font-weight:700}
+
+.slots{display:flex;justify-content:center;gap:9px;margin-top:11px;flex-wrap:wrap}
 .slot{
-  min-width:70px;height:50px;border-radius:12px;border:2px dashed rgba(58,50,38,.22);
-  display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--ink-soft);
+  min-width:74px;height:52px;border-radius:15px;border:2.5px dashed rgba(59,46,34,.22);
+  background:#FCF9F4;
+  display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:700;color:var(--ink-soft);
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), background .15s, border-color .15s;
 }
-.slot.wide{min-width:110px}
-.slot.filled{border-style:solid;border-color:var(--blue);background:var(--blue-soft);color:var(--blue);font-weight:600}
-.slot.k-m.filled{border-color:var(--purple);background:#EEEDFE;color:#534AB7}
-.slot.k-f.filled{border-color:var(--orange);background:var(--orange-soft);color:#B6621F}
-.slot.k-w.filled{border-color:var(--purple);background:#EEEDFE;color:#534AB7}
-.slot.bad{border-color:var(--red);background:#FBEAE8;color:var(--red);animation:shake .4s}
-.slot.good{border-color:var(--green);background:#E8F5EC;color:var(--green)}
+.slot.wide{min-width:118px}
+.slot.filled{
+  border-style:solid;border-color:var(--blue);background:var(--blue-soft);color:var(--blue);
+  font-weight:800;transform:scale(1.04);box-shadow:0 3px 0 rgba(54,133,214,.2);
+}
+.slot.k-m.filled{border-color:var(--purple);background:var(--purple-soft);color:#534AB7;box-shadow:0 3px 0 rgba(122,110,230,.2)}
+.slot.k-f.filled{border-color:var(--orange);background:var(--orange-soft);color:#B65916;box-shadow:0 3px 0 rgba(240,125,46,.2)}
+.slot.k-w.filled{border-color:var(--purple);background:var(--purple-soft);color:#534AB7;box-shadow:0 3px 0 rgba(122,110,230,.2)}
+.slot.bad{border-style:solid;border-color:var(--red);background:var(--red-soft);color:var(--red);animation:shake .4s}
+.slot.good{border-style:solid;border-color:var(--green);background:var(--green-soft);color:var(--green);transform:scale(1.06);box-shadow:0 3px 0 rgba(62,168,101,.25)}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 
-.stage{display:flex;flex-direction:column;align-items:center;margin:4px 0 14px;position:relative;height:152px;justify-content:flex-end}
-.pot{width:150px;height:112px;position:relative}
-.pot.shake{animation:potshake .5s}
-@keyframes potshake{0%,100%{transform:rotate(0) translateY(0)}20%{transform:rotate(-4deg) translateY(-5px)}50%{transform:rotate(4deg) translateY(-2px)}80%{transform:rotate(-2deg) translateY(0)}}
+/* ---------- 奇妙料理台（锅 + 灶火 + 厨师团团） ---------- */
+.stage{
+  display:flex;flex-direction:column;align-items:center;margin:2px 0 12px;
+  position:relative;height:164px;justify-content:flex-end;
+  background:radial-gradient(ellipse 220px 44px at 50% 92%, rgba(232,135,59,.22), transparent 70%);
+}
+.chef-helper{
+  position:absolute;left:14px;bottom:8px;display:flex;align-items:flex-end;gap:6px;pointer-events:none;
+}
+@media (max-width:460px){.chef-helper{left:2px;transform:scale(.88);transform-origin:left bottom}}
+.chef-bubble{
+  background:#fff;border:1.5px solid rgba(240,125,46,.35);border-radius:12px 12px 12px 3px;
+  padding:4px 8px;font-size:11px;font-weight:700;color:#7A4816;max-width:118px;line-height:1.35;
+  box-shadow:0 2px 6px rgba(0,0,0,.06);
+}
+.pot{width:162px;height:126px;position:relative;transition:transform .2s cubic-bezier(.34,1.56,.64,1);cursor:pointer}
+.pot.shake{animation:potshake .52s}
+@keyframes potshake{0%,100%{transform:rotate(0) translateY(0)}20%{transform:rotate(-5deg) translateY(-6px) scale(1.04)}50%{transform:rotate(5deg) translateY(-3px) scale(1.04)}80%{transform:rotate(-2deg) translateY(0)}}
 .pot.nope{animation:potshake .35s}
-.pot.hot{transform:scale(1.06)}
-.steam{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);display:flex;gap:14px;opacity:0;transition:opacity .2s}
+.pot.hot{transform:scale(1.07);filter:drop-shadow(0 0 14px rgba(255,160,40,.45))}
+.pot .lid-group{transition:transform .28s cubic-bezier(.34,1.56,.64,1);transform-origin:75px 28px}
+.pot.shake .lid-group{transform:translateY(-11px) rotate(-5deg)}
+
+/* 灶火动画 */
+.stove-flames{
+  position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
+  display:flex;gap:5px;align-items:flex-end;justify-content:center;pointer-events:none;
+}
+.stove-flames i{
+  display:block;width:12px;height:16px;border-radius:50% 50% 35% 35%;
+  background:radial-gradient(circle at 50% 70%,#FFF176 15%,#FF9800 60%,#F44336 100%);
+  animation:flameDance .45s ease-in-out infinite alternate;
+  opacity:.85;
+}
+.stove-flames i:nth-child(2){height:20px;width:14px;animation-delay:.12s}
+.stove-flames i:nth-child(3){height:22px;width:15px;animation-delay:.24s}
+.stove-flames i:nth-child(4){height:20px;width:14px;animation-delay:.08s}
+.stove-flames i:nth-child(5){height:16px;width:12px;animation-delay:.18s}
+.stove-flames.f-low i{transform:scale(.75)}
+.stove-flames.f-high i{transform:scale(1.2);filter:drop-shadow(0 0 6px rgba(255,87,34,.8))}
+.pot.hot .stove-flames i{
+  background:radial-gradient(circle at 50% 70%,#FFFFFF 20%,#FFD54F 60%,#FF5722 100%);
+  filter:drop-shadow(0 0 8px #FFD54F);
+}
+@keyframes flameDance{0%{transform:scaleY(.88) rotate(-4deg)}100%{transform:scaleY(1.16) rotate(4deg)}}
+
+.steam{position:absolute;bottom:98%;left:50%;transform:translateX(-50%);display:flex;gap:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .steam.on{opacity:1}
-.steam span{display:block;width:6px;height:26px;border-radius:3px;background:rgba(74,85,104,.35);animation:rise 1.2s infinite}
+.steam span{display:block;width:8px;height:28px;border-radius:99px;background:rgba(255,255,255,.85);box-shadow:0 0 8px rgba(240,125,46,.35);animation:rise 1.1s infinite}
 .steam span:nth-child(2){animation-delay:.2s}
 .steam span:nth-child(3){animation-delay:.4s}
 .steam span:nth-child(4){animation-delay:.6s}
-@keyframes rise{0%{transform:translateY(10px) scaleY(.6);opacity:0}40%{opacity:.9}100%{transform:translateY(-16px) scaleY(1.2);opacity:0}}
-.popup{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);font-size:40px;font-weight:600;opacity:0;pointer-events:none;white-space:nowrap}
-.popup.on{animation:pop 1.3s ease-out}
-@keyframes pop{0%{opacity:0;transform:translateX(-50%) translateY(10px) scale(.6)}25%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.15)}70%{opacity:1;transform:translateX(-50%) translateY(-8px) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.95)}}
-.praise{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);font-size:15px;font-weight:600;color:var(--orange);opacity:0;white-space:nowrap;pointer-events:none}
-.praise.on{animation:praise 1.2s ease-out}
-@keyframes praise{0%{opacity:0;transform:translateX(-50%) translateY(6px)}30%{opacity:1;transform:translateX(-50%) translateY(-4px)}100%{opacity:0;transform:translateX(-50%) translateY(-20px)}}
-.fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.fx i{position:absolute;left:50%;top:70px;width:9px;height:9px;border-radius:50%;background:var(--orange);animation:fly .85s ease-out forwards}
-@keyframes fly{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+@keyframes rise{0%{transform:translateY(10px) scale(.6);opacity:0}40%{opacity:.95}100%{transform:translateY(-20px) scale(1.25);opacity:0}}
 
-.group{margin-bottom:12px}
-.glabel{font-size:12px;color:var(--ink-soft);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.glabel i{width:8px;height:8px;border-radius:2px;display:inline-block}
-.famlab{font-size:11px;color:var(--ink-soft);width:100%;margin:6px 0 2px}
+.popup{
+  position:absolute;bottom:122px;left:50%;transform:translateX(-50%);
+  font-size:34px;font-weight:800;opacity:0;pointer-events:none;white-space:nowrap;
+  background:linear-gradient(180deg,#FFFDF9,#FFF0D6);
+  border:2.5px solid var(--orange);border-radius:99px;padding:4px 18px;
+  color:#8A3E08;box-shadow:0 6px 18px rgba(240,125,46,.35);z-index:20;
+}
+.popup.on{animation:pop 1.35s cubic-bezier(.2,1.3,.4,1)}
+@keyframes pop{0%{opacity:0;transform:translateX(-50%) translateY(14px) scale(.5)}22%{opacity:1;transform:translateX(-50%) translateY(-2px) scale(1.12)}72%{opacity:1;transform:translateX(-50%) translateY(-10px) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-24px) scale(.92)}}
+
+.praise{
+  position:absolute;bottom:76px;left:50%;transform:translateX(-50%);
+  font-size:15px;font-weight:800;color:#fff;background:linear-gradient(90deg,#FF8A00,#FF5252);
+  padding:3px 12px;border-radius:99px;opacity:0;white-space:nowrap;pointer-events:none;z-index:21;
+  box-shadow:0 3px 10px rgba(240,90,40,.35);
+}
+.praise.on{animation:praise 1.2s ease-out}
+@keyframes praise{0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.8)}28%{opacity:1;transform:translateX(-50%) translateY(-4px) scale(1.05)}100%{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.95)}}
+
+.fx{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:18}
+.fx i{position:absolute;left:50%;top:66px;width:10px;height:10px;border-radius:50%;background:var(--orange);animation:fly .85s ease-out forwards}
+@keyframes fly{0%{transform:translate(0,0) scale(1) rotate(0deg);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2) rotate(180deg);opacity:0}}
+
+/* 食材飞入锅中轨迹粒子 */
+.fly-pill{
+  position:fixed;z-index:300;pointer-events:none;
+  padding:6px 13px;border-radius:99px;font-size:20px;font-weight:800;
+  background:var(--orange);color:#fff;box-shadow:0 4px 12px rgba(240,125,46,.45);
+  transition:transform .32s cubic-bezier(.2,.8,.3,1), opacity .32s;
+}
+
+/* ---------- 拼音食材卡 ---------- */
+.group{
+  margin-bottom:11px;background:rgba(255,255,255,.62);
+  border:1.5px solid var(--line);border-radius:18px;padding:10px 12px;
+}
+.glabel{font-size:12.5px;font-weight:800;color:var(--ink-soft);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.glabel i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.famlab{font-size:11.5px;font-weight:700;color:var(--ink-soft);width:100%;margin:6px 0 2px}
 .famlab:first-child{margin-top:0}
-.flab{width:100%;font-size:11px;font-weight:600;color:#8A6A3A;margin:10px 0 2px;padding-left:7px;border-left:3px solid #E8C89A}
+.flab{width:100%;font-size:11.5px;font-weight:800;color:#8A5E2B;margin:9px 0 3px;padding-left:8px;border-left:3.5px solid #F0B26A}
 .flab:first-child{margin-top:0}
 .cards{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
 .card{
-  min-width:54px;padding:11px 14px;border-radius:14px;border:1px solid var(--line);
-  background:var(--card);font-size:23px;font-family:inherit;color:var(--ink);cursor:pointer;line-height:1.2;
-  box-shadow:0 1px 0 rgba(58,50,38,.07);
-  transition:transform .12s, box-shadow .12s, border-color .12s;
+  min-width:56px;padding:10px 14px;border-radius:15px;border:2px solid var(--line);
+  background:var(--card);font-size:23px;font-weight:800;font-family:inherit;color:var(--ink);cursor:pointer;line-height:1.2;
+  box-shadow:0 3.5px 0 rgba(59,46,34,.1), 0 4px 8px -2px rgba(59,46,34,.08);
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s, border-color .12s;
 }
-.card:hover{border-color:rgba(58,50,38,.32);transform:translateY(-2px);box-shadow:0 5px 12px -4px rgba(58,50,38,.22)}
-.card:active{transform:translateY(0) scale(.95)}
-.card.i{border-color:#C6DCF0;background:var(--blue-soft);color:#2C6BA3}
-.card.m{border-color:#CECBF6;background:#EEEDFE;color:#534AB7}
-.card.f{border-color:#F2D5B8;background:var(--orange-soft);color:#B6621F}
-.card.w{border-color:#CECBF6;background:#EEEDFE;color:#534AB7}
-.card.sel{outline:3px solid var(--blue);outline-offset:1px}
+.card:hover{transform:translateY(-2px);box-shadow:0 5px 0 rgba(59,46,34,.13), 0 8px 14px -4px rgba(59,46,34,.2)}
+.card:active{transform:translateY(2px) scale(.96);box-shadow:0 1px 0 rgba(59,46,34,.1)}
+.card.i{border-color:#A8D0F8;background:linear-gradient(180deg,#F4FAFF,var(--blue-soft));color:#1F5F9E;box-shadow:0 3.5px 0 rgba(44,107,163,.2)}
+.card.m{border-color:#C3BEF7;background:linear-gradient(180deg,#F7F6FF,var(--purple-soft));color:#4E44A8;box-shadow:0 3.5px 0 rgba(83,74,183,.2)}
+.card.f{border-color:#F6CB9F;background:linear-gradient(180deg,#FFF9F2,var(--orange-soft));color:#B25614;box-shadow:0 3.5px 0 rgba(182,98,31,.2)}
+.card.w{border-color:#C3BEF7;background:linear-gradient(180deg,#F7F6FF,var(--purple-soft));color:#4E44A8;box-shadow:0 3.5px 0 rgba(83,74,183,.2)}
+.card.sel{outline:3px solid var(--blue);outline-offset:1px;transform:translateY(-2px)}
 .card.m.sel,.card.w.sel{outline-color:var(--purple)}
 .card.f.sel{outline-color:var(--orange)}
-.card.dim{opacity:.3}
-.card.correct{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.card.dim{opacity:.28;transform:none}
+.card.correct{background:var(--green-soft);border-color:var(--green);color:var(--green);box-shadow:0 3.5px 0 rgba(62,168,101,.3)}
 
-.tip{text-align:center;font-size:13px;min-height:22px;color:var(--ink-soft);margin:2px 0 10px}
-.tip.ok{color:var(--green);font-weight:600}
+.tip{
+  text-align:center;font-size:13.5px;font-weight:700;min-height:24px;
+  color:var(--ink-soft);margin:2px 0 10px;
+}
+.tip.ok{color:var(--green)}
 .tip.no{color:var(--red)}
-.tip.note{color:#B6621F}
+.tip.note{color:#C86419}
 
 /* ---------- 结算 ---------- */
 .result{
-  background:linear-gradient(180deg,#fff 0%,#FFF8EE 100%);
-  border:1px solid var(--line);border-radius:22px;padding:26px 20px;text-align:center;
-  box-shadow:0 4px 18px -8px rgba(58,50,38,.28);
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFF7EB 100%);
+  border:2px solid rgba(240,125,46,.3);border-radius:26px;padding:26px 20px;text-align:center;
+  box-shadow:0 6px 0 rgba(215,135,65,.14), 0 14px 32px -10px rgba(59,46,34,.28);
+  animation:fireIn .32s cubic-bezier(.34,1.56,.64,1);
 }
-.result h2{font-size:20px;margin:0 0 4px;font-weight:600}
-.result .big{font-size:42px;letter-spacing:6px;color:var(--orange);margin:12px 0}
-.result p{font-size:14px;color:var(--ink-soft);margin:6px 0 14px}
-.newfood{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:16px}
-.newfood .cell{width:40px;height:40px;min-width:40px;font-size:19px}
+.result h2{font-size:22px;margin:0 0 4px;font-weight:800;color:#5E340B}
+.result .big{font-size:46px;letter-spacing:6px;color:#F5A623;margin:10px 0;text-shadow:0 3px 0 rgba(180,100,10,.2)}
+.result p{font-size:14px;font-weight:600;color:var(--ink-soft);margin:6px 0 14px}
+.newfood{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-bottom:16px}
+.newfood .cell{width:46px;height:46px;min-width:46px;font-size:19px}
 </style>
 </head>
 <body>
+<div class="awning" aria-hidden="true"></div>
 <div id="app">
 
   <!-- ============ 主页 ============ -->
   <div id="home">
     <div class="topbar">
-      <div class="potlogo">
-        <svg viewBox="0 0 150 112" width="27" height="20" aria-hidden="true">
-          <path d="M18 13 h114" stroke="#8A7F6E" stroke-width="9" stroke-linecap="round" fill="none"/>
-          <rect x="8" y="21" width="34" height="14" rx="7" fill="#8A7F6E"/>
-          <rect x="108" y="21" width="34" height="14" rx="7" fill="#8A7F6E"/>
-          <path d="M22 35 h106 l-9 52 a16 16 0 0 1 -15 12 H46 a16 16 0 0 1 -15 -12 Z" fill="#4A5568"/>
-          <rect x="14" y="31" width="122" height="12" rx="6" fill="#3B4453"/>
+      <div class="potlogo" id="logoBtn" title="点我换一口漂亮的锅！">
+        <svg viewBox="0 0 150 112" width="36" height="28" aria-hidden="true">
+          <path d="M18 15 h114" stroke="#C85A32" stroke-width="9" stroke-linecap="round" fill="none"/>
+          <circle cx="75" cy="9" r="7" fill="#F5B82E"/>
+          <rect x="6" y="24" width="32" height="13" rx="6.5" fill="#C85A32"/>
+          <rect x="112" y="24" width="32" height="13" rx="6.5" fill="#C85A32"/>
+          <path d="M20 34 h110 l-9 54 a18 18 0 0 1 -17 14 H46 a18 18 0 0 1 -17 -14 Z" fill="#E2574C"/>
+          <rect x="14" y="29" width="122" height="12" rx="6" fill="#C0392B"/>
+          <circle cx="58" cy="64" r="4.5" fill="#3B2E22"/>
+          <circle cx="92" cy="64" r="4.5" fill="#3B2E22"/>
+          <path d="M68 74 q7 7 14 0" stroke="#3B2E22" stroke-width="3.5" fill="none" stroke-linecap="round"/>
         </svg>
       </div>
-      <div class="title">拼音小厨房<small>听一听，拼一拼，锅里变出字</small></div>
+      <div class="title">
+        拼音小厨房<span class="badge-ver">料理屋</span>
+        <small id="mascLine">小熊团团：听一听，拼一拼，香喷喷的汉字出锅啦！</small>
+      </div>
     </div>
 
     <div class="stats">
-      <div class="stat a">
-        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.2.9-4.5 4.4 1.1 6.1L12 17.3l-5.5 2.9 1.1-6.1L3.1 9.7l6.2-.9z"/></svg>
+      <div class="stat a" onclick="showTab('Map')" title="去闯关攒星星">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.3.9-4.5 4.4 1.1 6.2L12 17.1l-5.7 2.9 1.1-6.2-4.5-4.4 6.3-.9z"/></svg>
         <div class="v" id="stStar">0</div><div class="k">总星星</div>
       </div>
-      <div class="stat b">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 11h17a8.5 8.5 0 0 1-8.5 8.5A8.5 8.5 0 0 1 3.5 11z"/><path d="M8.5 8c0-1.4.9-1.9.9-2.8M12 8c0-1.4.9-1.9.9-2.8M15.5 8c0-1.4.9-1.9.9-2.8"/></svg>
+      <div class="stat b" onclick="showTab('Coll')" title="查看我的菜单图鉴">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 11.5h17a8.5 8.5 0 0 1-8.5 8.5 8.5 8.5 0 0 1-8.5-8.5z"/><path d="M8.5 8c0-1.4.9-1.9.9-2.8M12 8c0-1.4.9-1.9.9-2.8M15.5 8c0-1.4.9-1.9.9-2.8"/></svg>
         <div class="v" id="stFood">0</div><div class="k">菜单收字</div>
       </div>
-      <div class="stat c">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.2" y="5" width="17.6" height="15.8" rx="3.4"/><path d="M8 3.2v3.6M16 3.2v3.6M3.2 10.2h17.6"/></svg>
+      <div class="stat c" onclick="showTab('Rec')" title="查看打卡与成就">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3.2" y="5" width="17.6" height="15.8" rx="3.4"/><path d="M8 3.2v3.6M16 3.2v3.6M3.2 10.2h17.6"/></svg>
         <div class="v" id="stDay">0</div><div class="k">连续打卡</div>
       </div>
-      <div class="stat d">
-        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7.4C10 3.8 5.4 2.8 3.9 5.4 2.5 8 6.2 11.6 12 12.6z"/><path d="M12 7.4c2-3.6 6.6-4.6 8.1-2 1.4 2.6-2.3 6.2-8.1 7.2z"/><path d="M12 12.6c-3.4 1.6-4.9 5.2-3.3 7.2 1.2 1.6 2.6.3 3.3-1.3z"/><path d="M12 12.6c3.4 1.6 4.9 5.2 3.3 7.2-1.2 1.6-2.6.3-3.3-1.3z"/></svg>
+      <div class="stat d" onclick="showTab('Bf')" title="去蝴蝶花园玩">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7.4C10 3.8 5.4 2.8 3.9 5.4 2.5 8 6.2 11.6 12 12.6z"/><path d="M12 7.4c2-3.6 6.6-4.6 8.1-2 1.4 2.6-2.3 6.2-8.1 7.2z"/><path d="M12 12.6c-3.4 1.6-4.9 5.2-3.3 7.2 1.2 1.6 2.6.3 3.3-1.3z"/><path d="M12 12.6c3.4 1.6 4.9 5.2-3.3 7.2-1.2 1.6-2.6.3-3.3-1.3z"/></svg>
         <div class="v" id="stBf">0</div><div class="k">小蝴蝶</div>
       </div>
     </div>
@@ -399,73 +761,106 @@ body{
     <div class="bffloat hidden" id="bfFloat"></div>
     <div class="notice hidden" id="notice"></div>
 
+    <!-- 厨艺头衔 + 锅具换装 -->
     <div class="chefbar">
       <div class="chefcrown">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.6 8.2l3.7 3.1 1.9-2.9 2.8 3.3 2.8-3.3 1.9 2.9 3.7-3.1v9.3a2.4 2.4 0 0 1-2.4 2.4H6a2.4 2.4 0 0 1-2.4-2.4z"/><circle cx="12" cy="4.4" r="1.7"/></svg>
       </div>
       <div class="cheftx">
-        <div class="chefnm" id="chefName">洗菜小学徒</div>
+        <div class="chefnm"><span id="chefName">洗菜小学徒</span></div>
         <div class="chefsub" id="chefSub"></div>
       </div>
       <div class="chefprog"><i id="chefBarFill"></i></div>
+      <button class="skinbtn" id="skinToggleBtn">🍲 换锅具</button>
+    </div>
+    <div class="skinbar hidden" id="skinBar"></div>
+
+    <!-- 今日小厨神任务 -->
+    <div class="dailybox" id="dailyBox">
+      <div class="dailyhd">
+        <div class="dt">📅 今日小厨神目标</div>
+        <div class="ds" id="dailySub">完成目标领神秘蝴蝶盲盒</div>
+      </div>
+      <div class="dailygrid" id="dailyGrid"></div>
     </div>
 
     <div class="tabs">
-      <button class="tab on" id="tabMap">闯关</button>
-      <button class="tab" id="tabColl">菜单</button>
-      <button class="tab" id="tabBf">蝴蝶</button>
-      <button class="tab" id="tabRec">记录</button>
+      <button class="tab on" id="tabMap">🍳 闯关</button>
+      <button class="tab" id="tabColl">📖 菜单</button>
+      <button class="tab" id="tabBf">🦋 蝴蝶</button>
+      <button class="tab" id="tabRec">🏆 记录</button>
     </div>
 
     <div id="viewMap">
+      <div class="special-row" id="specialRow"></div>
       <div class="map" id="levelMap"></div>
       <div class="hintbox">
-        玩法：听上面的字，按顺序点卡片下锅，咕嘟一声就变出汉字。<br>
-        <b>两拼</b>点声母 + 韵母；<b>三拼</b>点声母 + 介音 + 韵母；<b>整体认读</b>整块下锅，不用拼。每关 8 题，答对 4 道解锁下一关。
+        <b>🎯 趣味玩法指南：</b>听一听汉字或词语，按顺序点击拼音卡片下锅，咕嘟一声就煮出汉字啦！<br>
+        <b>两拼</b>点声母 + 韵母；<b>三拼</b>点声母 + 介音 + 韵母；<b>整体认读</b>整块下锅不用拼。点菜单里的汉字还能听点读哦！
       </div>
     </div>
 
     <div id="viewColl" class="hidden">
       <div class="panel">
-        <h3>我的菜单</h3>
+        <h3>📖 我的中华小菜谱</h3>
         <div class="sub" id="collSub"></div>
         <div class="bar"><i id="collBar" style="width:0%"></i></div>
+        <div class="dish-spotlight hidden" id="dishSpot">
+          <div class="ds-char" id="dsChar">妈</div>
+          <div class="ds-info">
+            <div class="ds-py" id="dsPy">mā</div>
+            <div class="ds-wd" id="dsWd">👩 好妈妈</div>
+          </div>
+          <button class="btn sm primary" id="dsSpeakBtn">🔊 朗读</button>
+        </div>
+        <div class="coll-filter" id="collFilter"></div>
         <div class="grid" id="collGrid"></div>
       </div>
     </div>
 
     <div id="viewBf" class="hidden">
       <div class="panel" style="margin-bottom:12px">
-        <h3>蝴蝶花园</h3>
+        <h3>🦋 奇妙蝴蝶花园</h3>
         <div class="sub" id="bfSub"></div>
         <div class="bar"><i id="bfBar" style="width:0%"></i></div>
+        <div class="garden-stage" id="gardenStage">
+          <div class="sun"></div>
+          <div class="cloud"></div>
+          <div class="cloud c2"></div>
+          <div class="garden-tip" id="gardenTip">✨ 点一点击飞舞的小蝴蝶和它打招呼吧！</div>
+          <div id="gardenActors"></div>
+          <div class="flowers"><span>🌷</span><span>🌻</span><span>🌸</span><span>🌼</span><span>🌺</span><span>🍀</span></div>
+        </div>
         <div class="bgrid" id="bfGrid"></div>
       </div>
       <div class="panel">
-        <h3>最近捉到的</h3>
-        <div class="sub">每通关一次送一只，第一次通关额外再送一只</div>
+        <h3>✨ 最近飞来的小蝴蝶</h3>
+        <div class="sub">每通关一次送一只，大火翻倍，第一次通关额外再送一只</div>
         <div class="recent" id="bfRecent"></div>
       </div>
     </div>
 
     <div id="viewRec" class="hidden">
       <div class="panel" style="margin-bottom:12px">
-        <h3>成就徽章</h3>
-        <div class="sub">解锁条件达成后自动点亮</div>
+        <h3>🏅 成就徽章</h3>
+        <div class="sub">达成目标后自动点亮金章</div>
         <div class="badges" id="badgeGrid"></div>
       </div>
       <div class="panel" style="margin-bottom:12px">
-        <h3>最近战绩</h3>
-        <div class="sub">最近 8 次闯关</div>
+        <h3>📜 最近战绩</h3>
+        <div class="sub">最近 8 次厨房闯关</div>
         <div id="recList"></div>
       </div>
       <div class="panel" style="margin-bottom:12px">
-        <h3>错题本</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <h3 style="margin:0">🔥 错题糊锅本</h3>
+          <button class="btn sm primary hidden" id="practiceWrongBtn">去消灭错题</button>
+        </div>
         <div class="sub" id="wrongSub">拼错最多的音节，可以重点练</div>
         <div id="wrongList"></div>
       </div>
       <div class="panel" style="margin-bottom:12px">
-        <h3>记录备份</h3>
+        <h3>💾 记录备份</h3>
         <div class="sub">记录存在这台设备的浏览器里。换设备、清缓存前，先导出一份留着</div>
         <div style="display:flex;gap:8px">
           <button class="btn" id="exportBtn" style="flex:1">导出记录</button>
@@ -481,66 +876,93 @@ body{
   <!-- ============ 游戏 ============ -->
   <div id="game" class="hidden">
     <div class="topbar">
-      <button class="btn" id="backBtn">返回</button>
-      <div style="min-width:0">
-        <div style="font-size:15px;font-weight:600" id="levelName"></div>
-        <div style="font-size:11px;color:var(--ink-soft)" id="levelSub"></div>
+      <button class="btn" id="backBtn">← 返回</button>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:15.5px;font-weight:800" id="levelName"></div>
+        <div style="font-size:11.5px;color:var(--ink-soft);font-weight:600" id="levelSub"></div>
       </div>
+      <button class="btn sm" id="blindInGameBtn" title="切换神秘锅盖盲听模式">🛎️ 盲听:关</button>
     </div>
     <div class="hud">
       <span>第 <b id="qNo">1</b><span id="qTotal">/8</span> 题</span>
       <span class="hudfire" id="hudFire"></span>
       <span class="stars" id="hudStars"></span>
       <span class="combo" id="hudCombo"></span>
-      <span id="hudRetry"></span>
+      <span id="hudRetry" style="margin-left:auto"></span>
     </div>
 
     <div class="target">
       <div class="lbl" id="targetLbl">听一听，把这个字的拼音拼出来</div>
-      <div class="bigchar" id="targetChar">妈</div>
+      <div class="target-main">
+        <div class="bigchar" id="targetChar" title="点击听单字发音">妈</div>
+        <button class="cloche-btn hidden" id="clocheBtn" title="点我揭开锅盖看汉字">
+          <span class="cl-ic">🛎️</span>
+          <span>点我揭锅盖</span>
+        </button>
+      </div>
+      <div>
+        <span class="word-pill" id="wordPill" title="点击听词语发音">
+          <span class="wp-em" id="wordEmoji">👩</span>
+          <span id="wordText">好妈妈</span>
+          <span style="font-size:11px;opacity:.7">🔊</span>
+        </span>
+      </div>
       <div class="foodtag" id="foodTag"></div>
       <div class="listenrow">
-        <button class="btn sm" id="playBtn">听一听</button>
-        <button class="btn sm" id="slowBtn">慢速：关</button>
+        <button class="btn sm primary" id="playBtn">🔊 读单字</button>
+        <button class="btn sm" id="playWordBtn">🗣️ 读词语</button>
+        <button class="btn sm" id="slowBtn">🐢 慢速：关</button>
       </div>
       <div class="slots" id="slots"></div>
     </div>
 
     <div class="stage">
+      <div class="chef-helper">
+        <svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true">
+          <!-- 厨师帽 -->
+          <path d="M16 22 C12 12, 24 6, 32 10 C40 6, 52 12, 48 22 Z" fill="#FFFFFF" stroke="#D9CBB8" stroke-width="2"/>
+          <rect x="18" y="20" width="28" height="6" rx="3" fill="#FFF5E6" stroke="#D9CBB8" stroke-width="1.8"/>
+          <!-- 小熊耳朵与脸 -->
+          <circle cx="17" cy="29" r="6" fill="#D48B4B"/>
+          <circle cx="47" cy="29" r="6" fill="#D48B4B"/>
+          <circle cx="32" cy="40" r="16" fill="#E89F5B"/>
+          <ellipse cx="32" cy="43" rx="7" ry="5.5" fill="#FFF0DB"/>
+          <circle cx="25.5" cy="37" r="2.2" fill="#3B2E22"/>
+          <circle cx="38.5" cy="37" r="2.2" fill="#3B2E22"/>
+          <ellipse cx="21" cy="41.5" rx="3" ry="1.8" fill="#F2786D" opacity=".65"/>
+          <ellipse cx="43" cy="41.5" rx="3" ry="1.8" fill="#F2786D" opacity=".65"/>
+          <circle cx="32" cy="41" r="2" fill="#5A3820"/>
+          <path d="M29 44 q3 3 6 0" stroke="#5A3820" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="chef-bubble" id="chefBubble">按顺序点卡片下锅吧！</div>
+      </div>
+
       <div class="fx" id="fx"></div>
       <div class="praise" id="praise"></div>
       <div class="popup" id="popup"></div>
-      <div class="pot" id="pot">
+      <div class="pot" id="pot" title="咕嘟咕嘟魔法锅">
         <div class="steam" id="steam"><span></span><span></span><span></span><span></span></div>
-        <svg viewBox="0 0 150 112" width="150" height="112">
-          <path d="M18 12 h114" stroke="#8A7F6E" stroke-width="5" stroke-linecap="round" fill="none"/>
-          <path d="M24 12 v6 M126 12 v6" stroke="#8A7F6E" stroke-width="4" stroke-linecap="round" fill="none"/>
-          <rect x="10" y="20" width="34" height="14" rx="7" fill="#8A7F6E"/>
-          <rect x="106" y="20" width="34" height="14" rx="7" fill="#8A7F6E"/>
-          <path d="M22 34 h106 l-9 52 a16 16 0 0 1 -15 12 H46 a16 16 0 0 1 -15 -12 Z" fill="#4A5568"/>
-          <rect x="14" y="30" width="122" height="12" rx="6" fill="#3B4453"/>
-          <circle cx="60" cy="66" r="4" fill="#657287"/>
-          <circle cx="90" cy="74" r="3" fill="#657287"/>
-        </svg>
+        <div id="potSvgWrap"></div>
+        <div class="stove-flames" id="stoveFlames"><i></i><i></i><i></i><i></i><i></i></div>
       </div>
     </div>
 
     <div class="tip" id="tip"></div>
 
     <div class="group hidden" id="grpI">
-      <div class="glabel"><i style="background:#3B82C4"></i>声母</div>
+      <div class="glabel"><i style="background:#3685D6"></i>第一步：选声母（蓝色食材）</div>
       <div class="cards" id="initCards"></div>
     </div>
     <div class="group hidden" id="grpM">
-      <div class="glabel"><i style="background:#7F77DD"></i>介音</div>
+      <div class="glabel"><i style="background:#7A6EE6"></i>第二步：选介音（紫色高汤）</div>
       <div class="cards" id="medCards"></div>
     </div>
     <div class="group hidden" id="grpF">
-      <div class="glabel"><i style="background:#E8873B"></i>韵母（带声调）</div>
+      <div class="glabel"><i style="background:#F07D2E"></i>选带调韵母（橙色香料）</div>
       <div class="cards" id="finalCards"></div>
     </div>
     <div class="group hidden" id="grpW">
-      <div class="glabel"><i style="background:#7F77DD"></i>整体认读音节（整块下锅，不用拼）</div>
+      <div class="glabel"><i style="background:#7A6EE6"></i>整体认读音节（整块下锅，不用拼）</div>
       <div class="cards" id="wholeCards"></div>
     </div>
   </div>
@@ -552,16 +974,18 @@ body{
       <div class="big" id="rStars"></div>
       <p id="rDesc"></p>
       <div id="rNewWrap" class="hidden">
-        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">本局新收进菜单的字</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:7px">🍲 本局新收进菜单的字（点击可听发音）</div>
         <div class="newfood" id="rNewFoods"></div>
       </div>
       <div id="rBfWrap" class="hidden">
-        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px">通关奖励</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:2px">🦋 通关蝴蝶奖励</div>
         <div class="bflyaward" id="rBf"></div>
       </div>
-      <button class="btn primary" id="againBtn">再来一次</button>
-      <button class="btn" id="nextBtn" style="margin-left:8px">下一关</button>
-      <button class="btn" id="homeBtn" style="margin-left:8px">选关</button>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px">
+        <button class="btn primary" id="againBtn">再来一次</button>
+        <button class="btn green" id="nextBtn">下一关 →</button>
+        <button class="btn" id="homeBtn">返回选关</button>
+      </div>
     </div>
   </div>
 
@@ -584,6 +1008,10 @@ body{
       <div class="ftitle" id="fireTitle">第 1 关</div>
       <div class="fsub">今天想开多大的火？</div>
       <p class="firehint" id="fireHint"></p>
+      <div class="blind-toggle" id="blindToggle">
+        <span>🛎️ 神秘锅盖模式（先听音，后揭盖看字）</span>
+        <span class="sw" id="blindToggleSw">关</span>
+      </div>
       <div class="fopts" id="fireOpts"></div>
       <button class="btn sm" id="fireCancel">先不玩</button>
     </div>
@@ -592,6 +1020,7 @@ body{
 </div>
 
 <script>
+
 /* ============================================================
    数据格式
    mode split : [声母, 带调韵母, 汉字]
@@ -734,6 +1163,118 @@ function baseOf(s){
 function toneIdx(s){for(const c of s){if(c in TMAP) return TMAP[c];} return 0;}
 const TOTAL_WORDS = LEVELS.reduce((n,l)=>n+l.words.length,0);
 
+// Kid-friendly emoji + word phrase for all 443 characters across L1-L9
+const WORD_HINTS = {
+  // L1
+  '八':['🐙','八爪鱼'],'拔':['🥕','拔萝卜'],'把':['☂️','一把伞'],'爸':['👨','好爸爸'],
+  '爬':['🐢','小龟爬'],'怕':['🙈','不害怕'],'坡':['⛰️','上山坡'],'婆':['👵','外婆家'],'破':['🎈','吹破了'],
+  '妈':['👩','好妈妈'],'麻':['🌿','小芝麻'],'马':['🐴','小木马'],'骂':['🙊','不骂人'],'摸':['🐾','摸一摸'],'磨':['🪨','石磨坊'],'米':['🍚','香大米'],'蜜':['🍯','甜蜂蜜'],
+  '发':['🌱','发芽啦'],'罚':['🟨','罚点球'],'法':['🪄','小魔法'],'佛':['🪷','笑弥勒佛'],'夫':['👨‍🌾','老农夫'],'服':['👕','新衣服'],'府':['🏯','大官府'],'父':['👨‍👧','慈祥父亲'],
+  '搭':['🧱','搭积木'],'答':['🙋','回答问题'],'打':['🥁','打小鼓'],'大':['🐘','大白象'],'低':['🙇','低下头'],'底':['🌊','大海底'],'地':['🌍','大地球'],'读':['📖','大声读书'],'堵':['🚗','堵车啦'],'度':['🌡️','温度计'],
+  '他':['👦','他是朋友'],'塔':['🗼','高宝塔'],'梯':['🪜','爬楼梯'],'提':['🧺','提篮子'],'体':['🤸','做体操'],'替':['🤝','替你帮忙'],'突':['🚂','突然出现'],'图':['🗺️','看图画'],'土':['🪴','黑泥土'],'兔':['🐰','小白兔'],
+  // L2
+  '拿':['🤲','拿苹果'],'哪':['❓','在哪里'],'那':['👉','在那边'],'泥':['🪱','小泥鳅'],'你':['👋','你好呀'],'努':['💪','最努力'],'怒':['😠','不发怒'],'女':['👧','小女孩'],
+  '拉':['🚜','拉小车'],'辣':['🌶️','红辣椒'],'梨':['🍐','大鸭梨'],'里':['🏠','屋子里'],'力':['🏋️','大力士'],'炉':['🔥','小火炉'],'鲁':['🐟','山东鲁菜'],'路':['🛣️','大马路'],'驴':['🫏','小毛驴'],'旅':['🎒','去旅行'],'绿':['🍃','绿树叶'],
+  '哥':['🧑','大哥哥'],'格':['📏','方格子'],'个':['🍎','一个果'],'姑':['👩','小姑姑'],'古':['🏺','讲古诗'],'故':['📚','讲故事'],
+  '卡':['💳','小卡片'],'科':['🔬','爱科学'],'可':['🥤','真可爱'],'课':['🔔','上课啦'],'哭':['😢','不哭鼻子'],'苦':['☕','苦瓜不苦'],'库':['🏠','大车库'],
+  '哈':['😄','笑哈哈'],'喝':['🥛','喝牛奶'],'河':['🏞️','小河水'],'呼':['🌬️','呼呼吹风'],'湖':['🦢','天鹅湖'],'虎':['🐯','大老虎'],'户':['🪟','开窗户'],
+  // L3
+  '白':['☁️','大白云'],'百':['💯','一百分'],'杯':['🥛','小水杯'],'北':['🧭','指北针'],'背':['🎒','背书包'],'包':['🥟','香包子'],'饱':['😋','吃饱啦'],'抱':['🫂','抱一抱'],
+  '拍':['🏀','拍皮球'],'排':['🦆','排好队'],'陪':['🐕','陪伴你'],'跑':['🏃','快快跑'],'泡':['🫧','吹泡泡'],
+  '买':['🛒','买东西'],'卖':['🏪','卖水果'],'没':['👐','没关系'],'美':['🌺','真美丽'],'妹':['👧','小妹妹'],'猫':['🐱','小花猫'],'毛':['🪶','软羽毛'],'帽':['🧢','小帽子'],
+  '飞':['🕊️','小鸟飞'],'肥':['🫧','肥皂泡'],'否':['🙅','是否同意'],
+  '带':['🎀','彩色丝带'],'刀':['✂️','小剪刀'],'到':['🏁','到站啦'],'都':['👨‍👩‍👧','大家都来'],'豆':['🫛','小豌豆'],'堆':['⛄','堆雪人'],
+  '抬':['🐜','抬东西'],'桃':['🍑','大仙桃'],'套':['🧤','戴手套'],'头':['🦁','狮子头'],
+  '奶':['🍼','喝牛奶'],'脑':['🧠','动脑筋'],'闹':['⏰','小闹钟'],'牛':['🐮','大黄牛'],
+  '来':['🏃','跑过来'],'累':['😮‍💨','歇一歇不累'],'老':['👴','老爷爷'],'楼':['🏢','高楼房'],'流':['💧','流水哗哗'],'六':['6️⃣','六颗星'],
+  '该':['⏰','该起床了'],'改':['✏️','改作业'],'盖':['🍲','盖锅盖'],'给':['🎁','送给你'],'高':['🦒','长颈鹿高'],'告':['📢','告诉你'],'狗':['🐶','小黄狗'],'够':['🙌','够得着'],
+  '开':['🌸','花开了'],'靠':['🛋️','靠垫子'],'口':['👄','张大口'],'扣':['🔘','系纽扣'],
+  '还':['🔄','还给你'],'海':['🐳','蔚蓝大海'],'黑':['🐈‍⬛','黑天鹅'],'好':['👍','好孩子'],'号':['🎺','吹小号'],'猴':['🐵','小猴子'],'后':['🐢','在后面'],'灰':['🐺','大灰狼'],'回':['🏡','回家啦'],
+  // L4
+  '鸡':['🐥','小黄鸡'],'极':['🐻‍❄️','北极熊'],'几':['🍎','几个果子'],'记':['📓','记日记'],'居':['🏡','好邻居'],'菊':['🌼','黄菊花'],'举':['🙋','举起手'],'句':['📝','写句子'],
+  '七':['🌈','七彩虹'],'骑':['🚲','骑单车'],'起':['🌅','早早起床'],'气':['🎈','大气球'],'区':['🏘️','小社区'],'渠':['💧','小水渠'],'取':['📦','取快递'],'去':['🚀','去太空'],
+  '西':['🍉','大西瓜'],'习':['✍️','好习惯'],'洗':['🧼','勤洗手'],'细':['🧵','细毛线'],'需':['🌱','需要阳光'],'徐':['🍃','清风徐来'],'许':['🌠','许个愿'],'续':['📖','继续加油'],
+  '接':['🤲','接住球'],'节':['🏮','过节日'],'姐':['👩','好姐姐'],'借':['📚','借图书'],
+  '茄':['🍆','紫茄子'],'切':['🍉','切水果'],
+  '些':['🍒','一些果子'],'鞋':['👟','小跑鞋'],'写':['🖌️','写毛笔字'],'谢':['💐','谢谢你'],
+  '九':['9️⃣','九朵花'],'旧':['🧸','旧玩具'],'秋':['🍂','金秋天'],'球':['⚽','踢足球'],'休':['😴','休息一下'],'秀':['🌟','太优秀'],
+  '学':['🏫','上学校'],'雪':['❄️','白雪花'],'确':['✅','真准确'],'缺':['🌙','月有圆缺'],'军':['🎖️','解放军'],'群':['🐑','一群小羊'],
+  // L5
+  '猪':['🐷','小粉猪'],'竹':['🎋','绿竹子'],'主':['👑','小公主'],'住':['🏠','住新房'],
+  '出':['🌞','日出东方'],'除':['🧹','大扫除'],'楚':['👀','看清楚'],'处':['🏞️','到处逛逛'],
+  '书':['📕','看图画书'],'熟':['🍎','果子熟了'],'数':['🔢','数星星'],'树':['🌳','大樟树'],
+  '热':['☀️','热乎乎'],'如':['💡','如果可以'],'乳':['🥛','酸牛乳'],'入':['🚪','入口处'],
+  '租':['🚲','租单车'],'足':['🦶','踢足球'],'组':['🧩','拼小组'],
+  '粗':['🪵','粗树干'],'醋':['🥟','蘸香醋'],
+  '苏':['🌿','紫苏叶'],'素':['🥬','吃蔬菜素食'],
+  '这':['👇','在这里'],'者':['🏃','奔跑者'],'车':['🚗','小汽车'],'蛇':['🐍','贪吃蛇'],'舍':['🏠','小竹舍'],'社':['🎪','科技社团'],
+  '找':['🔍','找朋友'],'吵':['🤫','不吵闹'],'少':['🌱','多少个'],'早':['🌅','早上好'],'草':['🌿','绿青草'],'扫':['🧹','扫干净'],
+  '周':['📅','一星期周'],'抽':['🎁','抽盲盒'],'愁':['😊','天天不发愁'],'收':['🌾','大丰收'],'瘦':['🐒','瘦猴子'],'走':['🚶','向前走'],'搜':['🔭','搜索星星'],
+  '摘':['🍓','摘草莓'],'拆':['🎁','拆礼物'],'柴':['🪵','拾木柴'],'筛':['🥣','竹筛子'],'晒':['🌞','晒太阳'],
+  '灾':['🚒','消防防灾'],'在':['📍','正在读书'],'猜':['🤔','猜谜语'],'才':['🎨','小天才'],'采':['🐝','采花蜜'],'菜':['🥦','炒青菜'],'塞':['🍾','软木塞'],'赛':['🏆','跑步比赛'],
+  // L6
+  '班':['🏫','一年级班'],'板':['🛹','滑板车'],'本':['📒','作业本'],'冰':['🧊','大冰块'],'病':['🩺','不生病'],
+  '盆':['🪴','小花盆'],'平':['⚖️','平平安安'],'胖':['🐼','胖熊猫'],
+  '门':['🚪','开大门'],'忙':['🐝','蜜蜂忙'],'明':['🌕','明亮月光'],'梦':['💭','做美梦'],
+  '分':['🍰','分享蛋糕'],'粉':['🌸','粉红色'],'风':['🪁','放风筝'],
+  '单':['🛏️','小床单'],'胆':['🦁','胆子大'],'蛋':['🥚','煎鸡蛋'],'灯':['🏮','红灯笼'],'丁':['🧑‍🍳','小布丁'],'定':['⚓','一定能行'],'东':['🌅','太阳升东'],'动':['🐰','动一动'],
+  '听':['🎧','认真听讲'],'停':['🛑','红灯停'],'汤':['🍲','鲜美浓汤'],'糖':['🍬','棒棒糖'],'同':['👫','好同学'],
+  '南':['🌴','飞往南方'],'能':['🦸','超能力'],'您':['🙇','老师您好'],
+  '蓝':['🌌','蓝蓝天空'],'懒':['🐨','树袋熊不懒'],'冷':['🧣','天冷穿衣'],'零':['0️⃣','零花钱'],'龙':['🐉','大金龙'],
+  '干':['🍪','小饼干'],'敢':['🦁','最勇敢'],'跟':['👣','跟着走'],'更':['📈','更加棒'],'工':['🛠️','小木工'],
+  '看':['👀','看一看'],'空':['🚀','外太空'],
+  '很':['🌟','非常很好'],'红':['🍎','红苹果'],
+  '今':['📅','今天开心'],'紧':['✊','紧紧握住'],'进':['🚪','请进来'],'京':['🏯','天安门北京'],'井':['🪣','一口水井'],'静':['🤫','安安静静'],
+  '亲':['🥰','亲一亲'],'琴':['🎹','弹钢琴'],'青':['🐸','小青蛙'],'情':['❤️','好心情'],'请':['🍵','请喝茶'],
+  '心':['💖','小红心'],'信':['✉️','写一封信'],'星':['⭐','亮晶晶星'],'行':['🚶','人行道'],'醒':['⏰','睡醒啦'],'姓':['📛','你姓什么'],
+  '真':['✨','认真真棒'],'站':['🚏','公交车站'],'张':['🏹','张开翅膀'],'掌':['👏','拍手鼓掌'],'争':['🥇','力争第一'],'正':['📏','方方正正'],
+  '尘':['🧹','扫灰尘'],'产':['🌾','丰产果园'],'长':['🦒','长长的'],'厂':['🏭','大工厂'],'唱':['🎤','大声唱歌'],'成':['🏆','获得成功'],
+  '身':['🧘','锻炼身体'],'奔':['🐎','骏马奔跑'],'山':['⛰️','高高山峰'],'闪':['⚡','闪闪发光'],'商':['🏪','小商店'],'上':['🎈','飞上天空'],'生':['🎂','生日快乐'],
+  '人':['🧑‍🤝‍🧑','一家人'],'忍':['💪','坚强忍耐'],'认':['🔤','认真识字'],'让':['🍐','孔融让梨'],
+  '三':['3️⃣','三只小猪'],'伞':['☂️','花雨伞'],'森':['🌲','大森林'],
+  // L7
+  '知':['🦗','小知了'],'直':['📏','笔直大路'],'只':['🐤','一只小鸟'],'志':['🚀','有志向'],
+  '吃':['🍉','吃西瓜'],'迟':['⏰','上学不迟到'],'尺':['📐','小直尺'],'翅':['🦋','漂亮翅膀'],
+  '诗':['📜','背古诗'],'十':['🔟','十全十美'],'史':['🦕','恐龙历史'],'是':['✅','我们是朋友'],
+  '日':['☀️','红日初升'],
+  '资':['📚','学习资料'],'子':['🌰','小松子'],'字':['✍️','写好汉字'],
+  '词':['📖','组词语'],'此':['📍','此时此刻'],'次':['🥇','第一次'],
+  '丝':['🕸️','吐蚕丝'],'死':['🌱','枯木逢春'],'四':['🍀','四叶草'],
+  // L8
+  '一':['1️⃣','第一名'],'姨':['👩','好阿姨'],'椅':['🪑','小木椅'],'意':['💡','好主意'],
+  '屋':['🏡','小木屋'],'无':['☁️','无忧无虑'],'五':['🖐️','五指山'],'雾':['🌫️','山间晨雾'],
+  '淤':['🪷','出淤泥不染'],'鱼':['🐠','小金鱼'],'雨':['🌧️','下小雨'],'玉':['🌽','甜玉米'],
+  '椰':['🥥','大椰子'],'爷':['👴','老爷爷'],'也':['🙋','我也是'],'叶':['🍁','红枫叶'],
+  '约':['🤝','好朋友约定'],'月':['🌙','弯弯月亮'],
+  '冤':['⚖️','不冤枉'],'圆':['⭕','大圆圈'],'远':['🔭','看得很远'],'院':['🏡','小庭院'],
+  '因':['🌱','因为努力'],'银':['🥈','亮银币'],'引':['🧲','吸引过来'],'印':['🐾','小脚印'],
+  '晕':['🌀','转圈有点晕'],'云':['☁️','棉花糖云'],'允':['👌','允许通过'],'运':['🏃','爱运动'],
+  '英':['🌼','蒲公英'],'赢':['🏆','赢得比赛'],'影':['🎭','踩影子'],'硬':['🪨','硬石头'],
+  // L9
+  '瓜':['🍉','大甜瓜'],'锅':['🍲','大铁锅'],'国':['🇨🇳','美丽祖国'],'果':['🍎','红果子'],
+  '夸':['👍','夸奖你'],'跨':['🐎','大步跨过'],
+  '花':['🌻','向日葵花'],'滑':['🛝','滑滑梯'],'画':['🎨','画水彩画'],
+  '多':['🍓','好多果子'],'躲':['🙈','躲猫猫'],'拖':['🧹','拖地板'],'挪':['📦','挪一挪'],'罗':['🥁','敲锣打鼓罗'],
+  '坐':['🪑','请坐下'],'错':['❌','知错就改'],'锁':['🔒','小铜锁'],
+  '桌':['🪑','小书桌'],'戳':['👉','戳泡泡'],'说':['💬','大声说话'],
+  '关':['🚪','随手关门'],'宽':['🛣️','宽宽马路'],'欢':['🎉','欢天喜地'],
+  '光':['☀️','金色阳光'],'荒':['🌱','开荒种树'],
+  '端':['🍵','端茶水'],'团':['🍡','圆团子'],'暖':['🧣','暖洋洋'],
+  '家':['🏠','温暖的家'],'假':['🏖️','放暑假'],'架':['📚','小书架'],
+  '虾':['🦐','大红虾'],'霞':['🌅','红晚霞'],'下':['🌧️','下雪啦'],
+  '桥':['🌉','弯弯石桥'],'巧':['🍫','巧克力'],
+  '脚':['🦶','小脚丫'],'叫':['🐓','公鸡叫'],'小':['🐣','小鸡仔'],'笑':['😊','哈哈大笑'],
+  '天':['🌤️','蓝天白云'],'点':['🎂','小点心'],'面':['🍜','热汤面'],
+  '江':['⛵','滚滚长江'],'想':['💭','想一想'],'熊':['🐻','大棕熊'],
+  '捐':['💝','爱心捐款'],'圈':['🍩','甜甜圈'],'宣':['📣','大声宣布']
+};
+
+
+/* 获取汉字对应的趣味词语与表情提示 */
+function hintOf(ch){
+  return WORD_HINTS[ch] || ['🍲', ch+'字料理'];
+}
+
 /* 每个词的展示拼音 */
 function pyOf(w,mode){
   if(mode==='whole') return w[0];
@@ -744,8 +1285,7 @@ function pyOf(w,mode){
   }
   return w[0]+w[1];
 }
-/* 多音字容错表：拼音(去调) -> 该读音在题库里对应的汉字集合。
-   「长」既有 cháng 又有 zhǎng，孩子拼任意一个都算对，不会因为没上下文被误判。 */
+/* 多音字容错表：拼音(去调) -> 该读音在题库里对应的汉字集合。 */
 const PY2CHAR={};
 function buildPy2Char(){
   LEVELS.forEach(lv=>{
@@ -755,7 +1295,7 @@ function buildPy2Char(){
     });
   });
 }
-/* 汉字 -> 它在题库里的全部读音，用于提示「这个字还读…」 */
+/* 汉字 -> 它在题库里的全部读音 */
 function readingsOf(ch){
   const out=[];
   LEVELS.forEach(lv=>{
@@ -771,17 +1311,22 @@ function partsOf(w,mode){
 }
 
 /* ============================================================
-   本地记录
+   本地记录（100% 兼容旧版存档，扩展每日任务、锅具皮肤、盲听开关）
    ============================================================ */
 const KEY='pinyin_kitchen_v2';
 const KEY_BAK='pinyin_kitchen_v2_bak';
-/* 老版本用过的存档 key：升级后要把老记录接过来，不能丢 */
 const OLD_KEYS=['pinyin_kitchen_v1','pinyin_kitchen'];
-const DEF={unlocked:1,stars:{},food:{},wrong:{},wrongMastered:{},history:[],streak:{last:'',n:0},bestCombo:0,bf:[],cleared:{},tts:{slow:false}};
+const DEF={
+  unlocked:1,stars:{},food:{},wrong:{},wrongMastered:{},history:[],
+  streak:{last:'',n:0},bestCombo:0,bf:[],cleared:{},
+  tts:{slow:false},
+  potSkin:'classic',
+  blind:false,
+  daily:{d:'',rounds:0,maxCombo:0,words:0,claimed:{}}
+};
 let MIGR_NOTE=[];
 let canSave=true;
 
-/* 把一份存档「合并」进目标，而不是覆盖：星星取大、收字取并集、错题累加、蝴蝶拼接、打卡取更近的 */
 function mergeInto(t,s){
   if(!s||typeof s!=='object') return 0;
   let got=0;
@@ -793,6 +1338,9 @@ function mergeInto(t,s){
   if(s.cleared&&typeof s.cleared==='object') Object.keys(s.cleared).forEach(k=>{if(s.cleared[k]&&!t.cleared[k]){t.cleared[k]=1;got++;}});
   if(s.wrong&&typeof s.wrong==='object') Object.keys(s.wrong).forEach(k=>{
     t.wrong[k]=(+t.wrong[k]||0)+(+s.wrong[k]||0);got++;
+  });
+  if(s.wrongMastered&&typeof s.wrongMastered==='object') Object.keys(s.wrongMastered).forEach(k=>{
+    if(!t.wrongMastered[k]){t.wrongMastered[k]=s.wrongMastered[k];got++;}
   });
   if(Array.isArray(s.history)&&s.history.length){
     const seen=new Set(t.history.map(h=>[h.d,h.lv,h.r,h.t].join('|')));
@@ -807,6 +1355,18 @@ function mergeInto(t,s){
   if(Array.isArray(s.bf)&&s.bf.length){
     s.bf.forEach(x=>{ if(x&&x.t){ t.bf.push({t:x.t,lv:+x.lv||1,s:+x.s||1,d:x.d||today()}); got++; } });
   }
+  if(s.potSkin&&typeof s.potSkin==='string') t.potSkin=s.potSkin;
+  if(typeof s.blind==='boolean') t.blind=s.blind;
+  if(s.tts&&typeof s.tts==='object') t.tts={slow:!!s.tts.slow};
+  if(s.daily&&typeof s.daily==='object'&&s.daily.d===today()){
+    t.daily={
+      d:s.daily.d,
+      rounds:Math.max(t.daily.rounds||0,+s.daily.rounds||0),
+      maxCombo:Math.max(t.daily.maxCombo||0,+s.daily.maxCombo||0),
+      words:Math.max(t.daily.words||0,+s.daily.words||0),
+      claimed:Object.assign({},t.daily.claimed||{},s.daily.claimed||{})
+    };
+  }
   if(t.history.length>60) t.history=t.history.slice(-60);
   return got;
 }
@@ -817,11 +1377,11 @@ function readKey(k){
 function hasData(o){
   return !!(o&&(Object.keys(o.stars||{}).length||Object.keys(o.food||{}).length||(o.bf&&o.bf.length)||o.unlocked>1));
 }
-/* 读档顺序：主存档 → 自动备份 → 老版本存档（都合并，不覆盖） */
 function loadProg(){
   const p=JSON.parse(JSON.stringify(DEF));
   const main=readKey(KEY);
   if(main&&hasData(main)) mergeInto(p,main);
+  else if(main) mergeInto(p,main);
   else{
     const bak=readKey(KEY_BAK);
     if(bak&&hasData(bak)){ mergeInto(p,bak); MIGR_NOTE.push('主存档读不到，已从自动备份恢复'); }
@@ -829,7 +1389,6 @@ function loadProg(){
   OLD_KEYS.forEach(k=>{
     const o=readKey(k);
     if(!o||!hasData(o)) return;
-    /* 每个老 key 只合并一次，否则每次刷新都会重复累加（尤其蝴蝶会翻倍） */
     let done=false; try{ done=!!localStorage.getItem(KEY+'_merged_'+k); }catch(e){}
     if(done) return;
     if(mergeInto(p,o)>0) MIGR_NOTE.push('接回了旧版存档（'+k+'）的记录');
@@ -841,13 +1400,20 @@ let prog=loadProg();
 function save(){
   try{
     const prev=localStorage.getItem(KEY);
-    if(prev&&prev.length>20) localStorage.setItem(KEY_BAK,prev); /* 永远留一份上一版，可回滚 */
+    if(prev&&prev.length>20) localStorage.setItem(KEY_BAK,prev);
     localStorage.setItem(KEY,JSON.stringify(prog));
   }catch(e){canSave=false;}
 }
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function ensureDaily(){
+  const t=today();
+  if(!prog.daily||prog.daily.d!==t){
+    prog.daily={d:t,rounds:0,maxCombo:0,words:0,claimed:{}};
+  }
+}
 function touchStreak(){
   const t=today();
+  ensureDaily();
   if(prog.streak.last===t) return;
   const y=new Date(Date.now()-864e5);
   const ys=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
@@ -857,9 +1423,44 @@ function touchStreak(){
 const totalStars=()=>Object.keys(prog.stars).reduce((n,k)=>n+(prog.stars[k]||0),0);
 const foodCount=()=>Object.keys(prog.food).length;
 
+/* ---------- 5 款可解锁魔法锅具皮肤 ---------- */
+const POT_SKINS=[
+  {id:'classic', name:'番茄红锅', need:0,  body:'#E2574C', rim:'#C0392B', lid:'#D96B43', knob:'#F5B82E', ear:'#C85A32'},
+  {id:'pumpkin', name:'南瓜魔法锅', need:3,  body:'#F08A24', rim:'#C8640A', lid:'#F5A623', knob:'#4CAF50', ear:'#B85A08'},
+  {id:'mint',    name:'翡翠薄荷锅', need:8,  body:'#2FB380', rim:'#1E8A5E', lid:'#4CC998', knob:'#FFE082', ear:'#1D7A53'},
+  {id:'sakura',  name:'樱花甜心锅', need:15, body:'#EC6EAD', rim:'#C84B89', lid:'#F48FB1', knob:'#FFF59D', ear:'#B83D79'},
+  {id:'dragon',  name:'黄金小当家', need:22, body:'#F5B82E', rim:'#C8870A', lid:'#FFD54F', knob:'#E53935', ear:'#B57806'}
+];
+function currentPotSkin(){
+  const st=totalStars();
+  const found=POT_SKINS.find(s=>s.id===prog.potSkin && st>=s.need);
+  return found||POT_SKINS[0];
+}
+function potSVG(skin,w,h){
+  const s=skin||currentPotSkin();
+  return '<svg viewBox="0 0 150 112" width="'+(w||156)+'" height="'+(h||118)+'" aria-hidden="true">'+
+    '<g class="lid-group">'+
+      '<path d="M24 27 Q75 6 126 27 Z" fill="'+s.lid+'"/>'+
+      '<circle cx="75" cy="11" r="7.5" fill="'+s.knob+'"/>'+
+      '<path d="M18 26 h114" stroke="'+s.rim+'" stroke-width="6" stroke-linecap="round" fill="none"/>'+
+    '</g>'+
+    '<rect x="6" y="34" width="30" height="13" rx="6.5" fill="'+s.ear+'"/>'+
+    '<rect x="114" y="34" width="30" height="13" rx="6.5" fill="'+s.ear+'"/>'+
+    '<path d="M20 34 h110 l-9 55 a18 18 0 0 1 -17 14 H46 a18 18 0 0 1 -17 -14 Z" fill="'+s.body+'"/>'+
+    '<path d="M30 44 q4 36 14 48" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none" opacity=".28"/>'+
+    '<rect x="14" y="29" width="122" height="11" rx="5.5" fill="'+s.rim+'"/>'+
+    /* 锅宝可爱表情 */
+    '<circle cx="57" cy="64" r="4.8" fill="#3B2E22"/>'+
+    '<circle cx="55.5" cy="62.2" r="1.6" fill="#FFFFFF"/>'+
+    '<circle cx="93" cy="64" r="4.8" fill="#3B2E22"/>'+
+    '<circle cx="91.5" cy="62.2" r="1.6" fill="#FFFFFF"/>'+
+    '<ellipse cx="47" cy="70" rx="4.5" ry="2.5" fill="#FFCDD2" opacity=".65"/>'+
+    '<ellipse cx="103" cy="70" rx="4.5" ry="2.5" fill="#FFCDD2" opacity=".65"/>'+
+    '<path d="M68 73 q7 7 14 0" stroke="#3B2E22" stroke-width="3.2" fill="none" stroke-linecap="round"/>'+
+  '</svg>';
+}
+
 /* ---------- 蝴蝶图鉴：1 普通 / 2 漂亮 / 3 稀有 ---------- */
-/* ⚠️ 已有品种的 t 值（r o y g m b p k s w d h）绝对不能改 —— 存档里存的就是这些字母，改了记录全丢。
-   新增品种只能往后追加。 */
 const BUTTERFLY=[
   {t:'r',n:'辣椒红',  c:'#D2544B',c2:'#F09595',r:1},
   {t:'o',n:'南瓜橙',  c:'#E8873B',c2:'#FAC775',r:1},
@@ -873,7 +1474,6 @@ const BUTTERFLY=[
   {t:'w',n:'雪花白',  c:'#5F5E5A',c2:'#EFEDE7',r:2},
   {t:'d',n:'金翅蝶',  c:'#BA7517',c2:'#FAC775',r:3},
   {t:'h',n:'彩虹蝶',  c:'#D4537E',c2:'#378ADD',r:3},
-  /* ↓ 新增 8 种 */
   {t:'a',n:'玫瑰粉',  c:'#E86A8F',c2:'#F9C9D6',r:2},
   {t:'c',n:'珊瑚橘',  c:'#F2704A',c2:'#FBC9A6',r:1},
   {t:'e',n:'翡翠青',  c:'#2FA38A',c2:'#A9E6D6',r:2},
@@ -885,10 +1485,8 @@ const BUTTERFLY=[
 ];
 const RARE_NAME={1:'普通',2:'漂亮',3:'稀有'};
 
-/* ---------- 蝴蝶进化：同一种收集到一定数量就升级 ----------
-   等级完全由 prog.bf 数组实时算出来，不存额外字段 —— 老存档打开即自动生效，记录不会丢。 */
 const BF_LV_NAME={0:'未见过',1:'初见',2:'闪耀',3:'华丽'};
-const BF_LV_NEED=[0,1,3,6];          // 升到该等级所需只数
+const BF_LV_NEED=[0,1,3,6];
 function bfCount(t){ return prog.bf.filter(x=>x.t===t).length; }
 function bfLevel(t){
   const n=bfCount(t);
@@ -902,7 +1500,6 @@ function bfNextNeed(t){
 }
 
 let bUid=0;
-/* 四角星：比圆点更像「闪光」，华丽形态专用 */
 function star4(cx,cy,r){ const a=r,b=r*0.45; return 'M'+cx+' '+(cy-a)+' L'+(cx+b)+' '+(cy-b)+' L'+(cx+a)+' '+cy+' L'+(cx+b)+' '+(cy+b)+' L'+cx+' '+(cy+a)+' L'+(cx-b)+' '+(cy+b)+' L'+(cx-a)+' '+cy+' L'+(cx-b)+' '+(cy-b)+' Z'; }
 function bflySVG(b,size,opt){
   const o=opt||{};
@@ -914,7 +1511,6 @@ function bflySVG(b,size,opt){
     '</linearGradient>'+
     '<filter id="'+gid+'f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="'+(lv>=3?5.5:4)+'"/></filter>'+
   '</defs>';
-  // 升级光效：Lv2 柔和发光，Lv3 更亮更宽的双层光晕（用 blur 才看得见，渐变色在米白底上会消失）
   const halo = lv>=2
     ? '<ellipse cx="50" cy="48" rx="'+(lv>=3?50:45)+'" ry="'+(lv>=3?46:41)+'" fill="'+b.c2+'" opacity="'+(lv>=3?'.62':'.45')+'" filter="url(#'+gid+'f)"/>'+
       (lv>=3?'<ellipse cx="50" cy="48" rx="41" ry="37" fill="'+b.c+'" opacity=".38" filter="url(#'+gid+'f)"/>':'')
@@ -922,30 +1518,24 @@ function bflySVG(b,size,opt){
   const ring = b.r===3
     ? '<circle cx="50" cy="48" r="45" fill="none" stroke="'+(b.t==='h'?'#7F77DD':'#FAC775')+'" stroke-width="1.6" opacity=".65" stroke-dasharray="7 6"/>'
     : '';
-  // 等级描边：Lv2 细金，Lv3 粗金 —— 翅膀金线是等级最直观的信号
   const gold = lv>=3 ? ' stroke="#F5C542" stroke-width="2.4" stroke-linejoin="round"'
              : lv===2 ? ' stroke="#F0C95C" stroke-width="1.2" stroke-linejoin="round"' : '';
-  // Lv3 四角星闪光
   const spark = lv>=3
     ? '<g fill="#FFE08A" stroke="#F0B429" stroke-width="0.7" stroke-linejoin="round">'+
-      star4(16,12,4.4)+star4(84,12,4.4)+star4(50,7,3.4)+star4(24,86,3.4)+star4(76,86,3.4)+
+      '<path d="'+star4(16,12,4.4)+star4(84,12,4.4)+star4(50,7,3.4)+star4(24,86,3.4)+star4(76,86,3.4)+'"/>'+
       '</g>'
     : '';
   return '<svg class="bfly" viewBox="0 0 100 92" width="'+size+'" height="'+Math.round(size*0.92)+'" role="img" aria-label="'+b.n+'">'+
     defs+halo+ring+
     '<g class="wings">'+
       '<g id="'+id+'">'+
-        /* 前翅：带波浪外缘 */
         '<path d="M50 45 C 45 20, 31 5, 15 9 C 5 12, 5 26, 17 37 C 26 45, 40 48, 50 45 Z" fill="url(#'+gid+')"'+gold+'/>'+
-        /* 后翅：带小尾突 */
         '<path d="M50 51 C 41 58, 29 64, 29 76 C 29 86, 40 88, 47 78 C 51 72, 51 60, 50 51 Z" fill="url(#'+gid+')"'+gold+'/>'+
-        /* 翅斑：外圈深色 + 内圈浅色 + 白心 */
         '<circle cx="22" cy="26" r="6" fill="'+b.c+'" opacity=".85"/>'+
         '<circle cx="22" cy="26" r="3.4" fill="#fff" opacity=".8"/>'+
         '<circle cx="22" cy="26" r="1.4" fill="'+b.c+'"/>'+
         '<circle cx="37" cy="74" r="3.6" fill="'+b.c+'" opacity=".8"/>'+
         '<circle cx="37" cy="74" r="1.8" fill="#fff" opacity=".75"/>'+
-        /* 翅缘白点 */
         '<circle cx="13" cy="15" r="1.6" fill="#fff" opacity=".7"/>'+
         '<circle cx="10" cy="24" r="1.4" fill="#fff" opacity=".6"/>'+
         '<circle cx="33" cy="84" r="1.3" fill="#fff" opacity=".6"/>'+
@@ -953,12 +1543,10 @@ function bflySVG(b,size,opt){
       '<use href="#'+id+'" transform="translate(100,0) scale(-1,1)"/>'+
     '</g>'+
     spark+
-    /* 身体：分节 + 头部 */
     '<ellipse cx="50" cy="56" rx="3.8" ry="17" fill="#4A3F33"/>'+
     '<path d="M50 44 v22" stroke="#2F2820" stroke-width="1" opacity=".35"/>'+
     '<circle cx="50" cy="38" r="4.4" fill="#4A3F33"/>'+
     '<circle cx="48.4" cy="36.6" r="1.1" fill="#fff" opacity=".7"/>'+
-    /* 触角：末端小球 */
     '<path d="M48 35 C 43 27, 38 23, 32 21" stroke="#4A3F33" stroke-width="1.8" fill="none" stroke-linecap="round"/>'+
     '<path d="M52 35 C 57 27, 62 23, 68 21" stroke="#4A3F33" stroke-width="1.8" fill="none" stroke-linecap="round"/>'+
     '<circle cx="31.4" cy="20.6" r="1.9" fill="#4A3F33"/>'+
@@ -967,7 +1555,7 @@ function bflySVG(b,size,opt){
 }
 function bfById(t){ return BUTTERFLY.find(b=>b.t===t)||BUTTERFLY[0]; }
 
-/* ---------- 补发：加蝴蝶功能之前就已经通关的关卡，要补上 ---------- */
+/* ---------- 补发 ---------- */
 let BACKFILL=0;
 function give(n,st){
   prog.bf.push({t:rollButterfly(st).t,lv:n,s:st,d:today()});
@@ -981,20 +1569,18 @@ function migrate(){
   if(!prog.wrong || typeof prog.wrong!=='object') prog.wrong={};
   if(!prog.wrongMastered || typeof prog.wrongMastered!=='object') prog.wrongMastered={};
   if(typeof prog.unlocked!=='number' || prog.unlocked<1) prog.unlocked=1;
-  /* 解锁到第 N 关，说明 1..N-1 都已通关过 */
+  if(!prog.potSkin) prog.potSkin='classic';
+  ensureDaily();
   const upto=Math.min(prog.unlocked-1, LEVELS.length);
   for(let n=1;n<=upto;n++){
     if(!prog.cleared[n]){ prog.cleared[n]=1; give(n, prog.stars[n]||1); }
   }
-  /* 保险：星级有记录但 cleared 没记的 */
   Object.keys(prog.stars).forEach(k=>{
     const n=+k, st=prog.stars[n]||0;
     if(st>0 && !prog.cleared[n]){ prog.cleared[n]=1; give(n,st); }
   });
   if(BACKFILL) save();
 }
-/* 星级越高越可能开出稀有，但低稀有度不被屏蔽——否则高手永远集不齐图鉴。
-   大火额外加成：二星/三星成绩时，开出漂亮蝶与稀有蝶的概率都更高。 */
 function rollButterfly(stars,fire){
   const F=FIRE[fire||'mid']||FIRE.mid;
   const x=Math.random();
@@ -1006,39 +1592,30 @@ function rollButterfly(stars,fire){
 }
 
 const BADGES=[
-  {id:'first', n:'开张大吉',   d:'第一次通关任意一关', got:()=>Object.keys(prog.stars).length>0},
-  {id:'star3', n:'三星大厨',   d:'某一关拿到三颗星',   got:()=>Object.values(prog.stars).some(v=>v>=3)},
-  {id:'combo', n:'手速惊人',   d:'单局连对 5 次',      got:()=>prog.bestCombo>=5},
-  {id:'food50',n:'菜单丰盛',   d:'收集 50 个字',       got:()=>foodCount()>=50},
-  {id:'all',   n:'满汉全席',   d:'解锁全部 9 关',      got:()=>prog.unlocked>=LEVELS.length},
-  {id:'day3',  n:'天天来报到', d:'连续打卡 3 天',      got:()=>prog.streak.n>=3},
-  {id:'bf10',  n:'捕蝶小能手', d:'收集 10 只蝴蝶',     got:()=>prog.bf.length>=10},
-  {id:'bfevo', n:'进化大师',   d:'让 1 种蝴蝶完全进化（同种收集 6 只）', got:()=>BUTTERFLY.some(b=>bfLevel(b.t)>=3)},
-  {id:'bfall', n:'蝴蝶馆长',   d:'集齐全部 '+BUTTERFLY.length+' 种蝴蝶', got:()=>new Set(prog.bf.map(x=>x.t)).size>=BUTTERFLY.length}
+  {id:'first', n:'🎉 开张大吉',   d:'第一次通关任意一关', got:()=>Object.keys(prog.stars).length>0},
+  {id:'star3', n:'⭐ 三星大厨',   d:'某一关拿到三颗星',   got:()=>Object.values(prog.stars).some(v=>v>=3)},
+  {id:'combo', n:'⚡ 手速惊人',   d:'单局连对 5 次',      got:()=>prog.bestCombo>=5},
+  {id:'food50',n:'🍲 菜单丰盛',   d:'收集 50 个汉字',     got:()=>foodCount()>=50},
+  {id:'all',   n:'👑 满汉全席',   d:'解锁全部 9 关',      got:()=>prog.unlocked>=LEVELS.length},
+  {id:'day3',  n:'📅 天天来报到', d:'连续打卡 3 天',      got:()=>prog.streak.n>=3},
+  {id:'bf10',  n:'🦋 捕蝶小能手', d:'收集 10 只小蝴蝶',   got:()=>prog.bf.length>=10},
+  {id:'bfevo', n:'✨ 进化大师',   d:'让 1 种蝴蝶完全进化（同种收集 6 只）', got:()=>BUTTERFLY.some(b=>bfLevel(b.t)>=3)},
+  {id:'bfall', n:'🏛️ 蝴蝶馆长',   d:'集齐全部 '+BUTTERFLY.length+' 种蝴蝶', got:()=>new Set(prog.bf.map(x=>x.t)).size>=BUTTERFLY.length}
 ];
 
 /* ============================================================
    难度与动力
-   ============================================================
-   设计目标：让孩子「自己愿意选更难」，而不是被逼着爬难度。四条：
-     1) 火力自己选      —— 有掌控感，不是系统塞题
-     2) 越难越赚        —— 大火蝴蝶翻倍、稀有率更高，挑战有实利
-     3) 错了可回锅      —— 第一次答错不算错，降低挑战的心理成本
-     4) 错题变目标      —— 错过的字下次还会来，攻克了才算真学会
-   注意：火力只是「这一局怎么玩」，不写入解锁条件，
-        老存档打开后一切照旧，不丢记录。
-*/
+   ============================================================ */
 const FIRE={
   low: {key:'low', name:'小火', n:8,  rolls:1, b2:0.40, b3:0.40, retry:2,
-        desc:'8 道题', tip:'第一次玩这一关，选它'},
-  mid: {key:'mid', name:'中火', n:10, rolls:1, b2:0.40, b3:0.40, retry:2,
-        desc:'10 道题', tip:'大多数时候选这个'},
-  high:{key:'high',name:'大火', n:12, rolls:2, b2:0.60, b3:0.60, retry:3,
-        desc:'12 道题', tip:'蝴蝶翻倍，稀有蝶更容易出'}
+        desc:'8 道题 · 2 次回锅', tip:'第一次玩这一关，选它最稳'},
+  mid: {key:'mid', name:'中火', n:10, rolls:1, b2:0.45, b3:0.45, retry:2,
+        desc:'10 道题 · 2 次回锅', tip:'大多数时候选这个，刚刚好'},
+  high:{key:'high',name:'大火', n:12, rolls:2, b2:0.65, b3:0.65, retry:3,
+        desc:'12 道题 · 3 次回锅', tip:'🦋 蝴蝶翻倍！稀有蝶更容易出'}
 };
 const FIRE_ORDER=['low','mid','high'];
 
-/* 厨艺等级：累计星星决定。9 关满分 27 星 */
 const CHEF=[
   {n:0,  name:'洗菜小学徒'},
   {n:6,  name:'掌勺小厨'},
@@ -1055,12 +1632,13 @@ function chefInfo(){
 }
 
 /* ============================================================
-   声音
+   声音与音效（WebAudio 合成 + 浏览器语音）
    ============================================================ */
 let ac=null;
 function tone(f,start,dur,type,vol){
   try{
     ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended') ac.resume();
     const o=ac.createOscillator(),g=ac.createGain();
     o.type=type||'sine'; o.frequency.value=f;
     g.gain.setValueAtTime(0,ac.currentTime+start);
@@ -1071,16 +1649,12 @@ function tone(f,start,dur,type,vol){
   }catch(e){}
 }
 const sfxWin=()=>{tone(784,0,.12);tone(1046,.08,.16);tone(1318,.16,.22);};
-const sfxBig=()=>{tone(784,0,.12);tone(988,.08,.14);tone(1175,.15,.18);tone(1568,.24,.26);};
+const sfxBig=()=>{tone(784,0,.12);tone(988,.08,.14);tone(1175,.15,.18);tone(1568,.24,.28);};
 const sfxBad=()=>{tone(233,0,.22,'triangle',.12);tone(175,.1,.28,'triangle',.1);};
 const sfxSpark=()=>{tone(1046,0,.1);tone(1318,.08,.12);tone(1568,.16,.2);tone(2093,.24,.34);};
-const sfxTap=()=>tone(660,0,.06,'sine',.08);
-/* ---------------- 语音朗读 ----------------
-   清晰度三个关键点：
-   1) 必须显式指定 zh-CN 嗓音，否则浏览器可能挑到粤语/台湾腔或低质量合成器
-   2) 语速过慢(0.7)会让合成咬字发糊，调到 0.9 更自然；需要慢速时单独传 slow
-   3) Chrome 在 cancel() 后立刻 speak() 有概率静音，需 resume + 微小延迟
-*/
+const sfxTap=()=>{tone(587,0,.05,'sine',.09);tone(880,.03,.06,'sine',.07);};
+const sfxBubble=()=>{tone(420,0,.06,'sine',.08);tone(640,.05,.08,'sine',.09);};
+
 let VOICE=null, VOICE_TRIED=false;
 function pickVoice(){
   try{
@@ -1089,12 +1663,11 @@ function pickVoice(){
     if(!vs.length) return null;
     let pool=vs.filter(v=>/^zh/i.test(v.lang||'') || /chinese|中文|普通话|国语/i.test(v.name||''));
     if(!pool.length) return null;
-    // 严格优先大陆普通话，排除台湾腔/粤语（对一年级孩子口音要标准）
     const cn=pool.filter(v=>/zh[-_]cn|zh[-_]hans|china|大陆|普通话/i.test((v.lang||'')+' '+(v.name||'')));
     if(cn.length) pool=cn;
     const score=v=>{
       const n=(v.name||'').toLowerCase(); let sc=0;
-      if(v.localService) sc+=2;                                   // 本地合成更稳、不依赖网络
+      if(v.localService) sc+=2;
       if(/tingting|婷婷|xiaoxiao|晓晓|yaoyao|yunxi|云希|xiaoyi|晓伊|huihui|晓萱|google|microsoft/.test(n)) sc+=3;
       if(/tw|hk|taiwan|hong ?kong|meijia|sinji|ting-ting|粤|cantonese/.test(n)) sc-=5;
       return sc;
@@ -1106,17 +1679,12 @@ function ensureVoice(){
   try{
     if(!('speechSynthesis' in window)) return;
     if(!VOICE) VOICE=pickVoice();
-    // getVoices() 首次常返回空，需等 voiceschanged 再取一次
     if(!VOICE && !VOICE_TRIED){
       VOICE_TRIED=true;
       speechSynthesis.addEventListener('voiceschanged',()=>{ VOICE=pickVoice(); });
     }
   }catch(e){}
 }
-/* ---------------- 朗读入口 ----------------
-   直接用浏览器自带语音朗读。
-   此前尝试过「预生成 mp3」方案，实际听感不佳，已弃用；
-   audio/ 目录不再参与朗读（文件保留，需要时可从这里改回来）。 */
 function speak(t,opt){
   try{
     if(!t) return;
@@ -1128,7 +1696,7 @@ function speak(t,opt){
     u.lang='zh-CN';
     if(VOICE) u.voice=VOICE;
     u.rate=o.slow?Math.min(base,0.72):base;
-    u.pitch=1; u.volume=1;
+    u.pitch=1.05; u.volume=1;
     speechSynthesis.cancel();
     try{ speechSynthesis.resume(); }catch(e){}
     setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} },60);
@@ -1136,9 +1704,8 @@ function speak(t,opt){
 }
 
 /* ============================================================
-   DOM
+   DOM 辅助与主页渲染
    ============================================================ */
-/* 找不到元素时返回一个安全的哑元素：任何一个 id 写错都不会让整页初始化崩溃 */
 const __MISS=(function(){ const d=document.createElement('span'); d.style.display='none'; return d; })();
 const MISSING_IDS=[];
 const $=id=>{
@@ -1148,7 +1715,14 @@ const $=id=>{
   return __MISS;
 };
 const home=$('home'),game=$('game'),result=$('result');
-const PRAISE=['太棒了！','厨师长级别！','锅气十足！','香喷喷！','这一锅绝了！','厉害了！','你是大厨！','再来一个！'];
+const PRAISE=['太棒了！','厨师长级别！','锅气十足！','香喷喷！','这一锅绝了！','太厉害了！','你是神厨！','色香味俱全！'];
+const MASCOT_TIPS=[
+  '小熊团团：听一听，拼一拼，香喷喷的汉字出锅啦！',
+  '小熊团团：挑战「大火」模式，通关蝴蝶奖励翻倍哦！',
+  '小熊团团：攒够星星可以点「换锅具」换一口魔法新锅！',
+  '小熊团团：点「菜单」里的汉字卡片，团团会读给你听！',
+  '小熊团团：完成「今日小厨神目标」能领神秘蝴蝶盲盒！'
+];
 
 function showTab(which){
   ['Map','Coll','Bf','Rec'].forEach(k=>{
@@ -1160,15 +1734,91 @@ function showTab(which){
   if(which==='Rec') renderRec();
 }
 
-/* 厨艺等级：累计星星决定 —— 让「我变强了」这件事看得见 */
 function renderChef(){
   const nm=$('chefName'), sb=$('chefSub'), pf=$('chefBarFill');
   if(!nm) return;
   const c=chefInfo(), t=totalStars();
-  nm.textContent=c.name;
-  sb.textContent = c.next ? ('再拿 '+(c.next.n-t)+' 颗星 → '+c.next.name) : '已经是最高等级啦 ✨';
+  const sk=currentPotSkin();
+  nm.innerHTML=c.name+' <span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,.7);color:#8A4B12">🍲 '+sk.name+'</span>';
+  sb.textContent = c.next ? ('再拿 '+(c.next.n-t)+' 颗星升级 → '+c.next.name) : '已经是最高神厨等级啦 ✨';
   if(pf) pf.style.width=c.pct+'%';
+  /* 同步顶部小锅 logo 与游戏内大锅外观 */
+  const lb=$('logoBtn');
+  if(lb) lb.innerHTML=potSVG(sk,38,30);
+  const pw=$('potSvgWrap');
+  if(pw) pw.innerHTML=potSVG(sk,156,116);
 }
+
+function renderSkinBar(){
+  const box=$('skinBar');
+  if(!box||box===__MISS) return;
+  box.innerHTML='';
+  const st=totalStars();
+  const cur=currentPotSkin().id;
+  POT_SKINS.forEach(s=>{
+    const unlocked = st>=s.need;
+    const d=document.createElement('div');
+    d.className='skinitem'+(cur===s.id?' on':'')+(unlocked?'':' lock');
+    d.innerHTML=potSVG(s,48,36)+
+      '<div class="snm">'+s.name+'</div>'+
+      '<div class="sreq">'+(unlocked?(cur===s.id?'使用中':'点我换上'):('需 '+s.need+' ★'))+'</div>';
+    if(unlocked){
+      d.onclick=()=>{
+        prog.potSkin=s.id; save(); sfxWin();
+        renderChef(); renderSkinBar();
+      };
+    }
+    box.appendChild(d);
+  });
+}
+
+/* ---------- 今日小厨神目标 ---------- */
+const DAILY_QUESTS=[
+  {id:'q_round', title:'🍲 今日开火闯关 1 次', goal:1, val:()=>prog.daily.rounds||0},
+  {id:'q_combo', title:'⚡ 单局达成 4 连击',   goal:4, val:()=>prog.daily.maxCombo||0},
+  {id:'q_words', title:'📖 今日拼对 6 个汉字', goal:6, val:()=>prog.daily.words||0}
+];
+function renderDaily(){
+  ensureDaily();
+  const g=$('dailyGrid'); if(!g||g===__MISS) return;
+  g.innerHTML='';
+  let allDone=true;
+  DAILY_QUESTS.forEach(q=>{
+    const cur=Math.min(q.goal, q.val());
+    const finished=cur>=q.goal;
+    const claimed=!!(prog.daily.claimed&&prog.daily.claimed[q.id]);
+    if(!claimed) allDone=false;
+    const d=document.createElement('div');
+    d.className='dq'+(claimed?' done':(finished?' claim':''));
+    d.innerHTML='<div class="dq-t">'+q.title+'</div>'+
+      '<div class="dq-b"><span>'+cur+'/'+q.goal+'</span>'+
+      '<span class="dq-tag">'+(claimed?'已领蝶 ✓':(finished?'🎁 领蝴蝶':'进行中'))+'</span></div>';
+    if(finished && !claimed){
+      d.onclick=()=>claimDailyQuest(q);
+    }
+    g.appendChild(d);
+  });
+  const sub=$('dailySub');
+  if(sub) sub.textContent = allDone ? '🎉 今日目标全部达成，明天再来领新蝴蝶！' : '完成任意小目标，点击直接领奖励蝴蝶';
+}
+function claimDailyQuest(q){
+  ensureDaily();
+  if(prog.daily.claimed[q.id]) return;
+  prog.daily.claimed[q.id]=1;
+  const b=rollButterfly(3,'high');
+  const before=bfCount(b.t);
+  prog.bf.push({t:b.t,lv:1,s:3,d:today()});
+  save();
+  sfxSpark();
+  renderStats();
+  const lvOf=n=> n>=BF_LV_NEED[3] ? 3 : (n>=BF_LV_NEED[2] ? 2 : 1);
+  if(lvOf(before+1)>lvOf(before)){
+    showUpgrade([{b:b,from:lvOf(before),to:lvOf(before+1),n:before+1}]);
+  }else{
+    showUpgrade([{b:b,from:lvOf(before+1),to:lvOf(before+1),n:before+1,customTitle:'🎁 盲盒开出新蝴蝶！'}]);
+  }
+}
+
 function renderStats(){
   $('stStar').textContent=totalStars();
   $('stFood').textContent=foodCount();
@@ -1176,19 +1826,26 @@ function renderStats(){
   $('stBf').textContent=prog.bf.length;
   renderFloat();
   renderChef();
+  renderDaily();
   renderNotice();
 }
 
-/* 主页上飘着的小蝴蝶：让奖励看得见 */
 function renderFloat(){
   const box=$('bfFloat'); box.innerHTML='';
-  const rs=prog.bf.slice(-6).reverse();
+  const rs=prog.bf.slice(-7).reverse();
   if(!rs.length){ box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
   rs.forEach((x,i)=>{
     const b=bfById(x.t), d=document.createElement('div');
-    d.className='floater'; d.style.animationDelay=(i*0.35)+'s';
-    d.innerHTML=bflySVG(b,38); d.title=b.n+'（第'+x.lv+'关）';
+    d.className='floater'; d.style.animationDelay=(i*0.32)+'s';
+    d.innerHTML=bflySVG(b,40,{lv:bfLevel(x.t)});
+    d.title=b.n+'（点我飞一圈）';
+    d.onclick=()=>{
+      sfxSpark();
+      d.style.transform='scale(1.35) rotate(15deg)';
+      setTimeout(()=>d.style.transform='',360);
+      $('mascLine').textContent='🦋 '+b.n+'（'+BF_LV_NAME[bfLevel(x.t)]+'）向你扇了扇翅膀！';
+    };
     box.appendChild(d);
   });
 }
@@ -1205,7 +1862,28 @@ function renderNotice(){
   el.innerHTML=msgs.join('<br>');
 }
 
+function renderSpecialRow(){
+  const box=$('specialRow'); if(!box||box===__MISS) return;
+  box.innerHTML='';
+  const wrongKeys=Object.keys(prog.wrong).filter(k=>(prog.wrong[k]||0)>0);
+  /* 卡片 1：错题特训营 */
+  const c1=document.createElement('button');
+  c1.className='spcard wrong-camp';
+  c1.innerHTML='<span class="sp-ic">🛠️</span><div><div class="sp-t">消灭糊锅菜</div><div class="sp-d">'+
+    (wrongKeys.length ? ('当前有 '+wrongKeys.length+' 道错题待攻克') : '目前0错题！点我随机温习')+'</div></div>';
+  c1.onclick=()=>startSpecialMode('wrong');
+  box.appendChild(c1);
+
+  /* 卡片 2：名厨闪电全明星挑战 */
+  const c2=document.createElement('button');
+  c2.className='spcard allstar-camp';
+  c2.innerHTML='<span class="sp-ic">⚡</span><div><div class="sp-t">名厨随机挑战</div><div class="sp-d">已解锁关卡混合出题·送蝴蝶</div></div>';
+  c2.onclick=()=>startSpecialMode('allstar');
+  box.appendChild(c2);
+}
+
 function renderMap(){
+  renderSpecialRow();
   const box=$('levelMap'); box.innerHTML='';
   LEVELS.forEach((lv,i)=>{
     const n=i+1, locked=n>prog.unlocked, st=prog.stars[n]||0;
@@ -1213,9 +1891,9 @@ function renderMap(){
     const pct=Math.round(got/lv.words.length*100);
     const b=document.createElement('button');
     b.className='lv'+(locked?' locked':'')+(lv.mode==='whole'?' whole':(lv.mode==='tri'?' tri':''));
-    b.innerHTML='<div class="badge">'+(locked?'锁':n)+'</div>'+
+    b.innerHTML='<div class="badge">'+(locked?'🔒':n)+'</div>'+
       '<div class="info"><div class="nm">'+lv.name.replace(/^第 \d 关 · /,'')+'</div><div class="ds">'+lv.sub+'</div>'+
-        (lv.tip?'<div class="tip">'+lv.tip+'</div>':'')+'</div>'+
+        (lv.tip?'<div class="tip">💡 '+lv.tip+'</div>':'')+'</div>'+
       '<div class="rt"><div class="st">'+(locked?'':'★'.repeat(st)+'☆'.repeat(3-st))+'</div>'+
       '<div class="lk">'+(locked?'先过上一关':'已收 '+got+'/'+lv.words.length+' 字')+'</div>'+
       (locked?'':'<div class="pbar"><i style="width:'+pct+'%"></i></div>')+'</div>';
@@ -1224,23 +1902,61 @@ function renderMap(){
   });
 }
 
+/* ---------- 菜单（支持点读 + 筛选） ---------- */
+let COLL_FILTER='all';
 function renderColl(){
   const all=[];
-  LEVELS.forEach(lv=>lv.words.forEach(w=>all.push(charOf(w,lv.mode))));
+  const charMeta={};
+  LEVELS.forEach((lv,li)=>lv.words.forEach(w=>{
+    const ch=charOf(w,lv.mode);
+    all.push(ch);
+    if(!charMeta[ch]) charMeta[ch]={py:pyOf(w,lv.mode), lv:li+1};
+  }));
   const uniq=[...new Set(all)];
   const got=uniq.filter(c=>prog.food[c]);
-  $('collSub').textContent='拼对的字会端上桌，一共 '+uniq.length+' 个字';
+  $('collSub').textContent='拼对的汉字会端上菜谱（点击任意已收集汉字可点读发音），已收集 '+got.length+' / '+uniq.length+' 个字';
   $('collBar').style.width=Math.round(got.length/uniq.length*100)+'%';
+
+  const cf=$('collFilter');
+  if(cf && cf!==__MISS){
+    cf.innerHTML='';
+    [['all','全部 ('+uniq.length+')'],['got','已上菜 ('+got.length+')'],['todo','待解锁 ('+(uniq.length-got.length)+')']].forEach(pair=>{
+      const btn=document.createElement('button');
+      btn.className=COLL_FILTER===pair[0]?'on':'';
+      btn.textContent=pair[1];
+      btn.onclick=()=>{ COLL_FILTER=pair[0]; renderColl(); };
+      cf.appendChild(btn);
+    });
+  }
+
   const g=$('collGrid'); g.innerHTML='';
-  uniq.forEach(c=>{
+  uniq.filter(c=>COLL_FILTER==='all' ? true : (COLL_FILTER==='got' ? !!prog.food[c] : !prog.food[c])).forEach(c=>{
     const d=document.createElement('div');
-    d.className='cell'+(prog.food[c]?'':' empty');
-    d.textContent=prog.food[c]?c:'';
-    d.title=prog.food[c]?c:'还没拼出来';
+    const isGot=!!prog.food[c];
+    const h=hintOf(c);
+    d.className='cell'+(isGot?'':' empty');
+    d.innerHTML=isGot ? ('<span>'+c+'</span><small>'+h[0]+'</small>') : '?';
+    d.title=isGot?(c+'（'+charMeta[c].py+' · '+h[1]+'）'):'第 '+charMeta[c].lv+' 关可收集';
+    if(isGot){
+      d.onclick=()=>{
+        const sp=$('dishSpot');
+        if(sp && sp!==__MISS){
+          sp.classList.remove('hidden');
+          $('dsChar').textContent=c;
+          $('dsPy').textContent=readingsOf(c).join(' / ');
+          $('dsWd').textContent=h[0]+' '+h[1]+'（第 '+charMeta[c].lv+' 关）';
+          $('dsSpeakBtn').onclick=()=>speak(c+'，'+h[1]);
+        }
+        sfxTap();
+        speak(c+'，'+h[1]);
+      };
+    }
     g.appendChild(d);
   });
 }
 
+/* ---------- 蝴蝶生态花园 ---------- */
+let GARDEN_TIMER=null;
 function renderGarden(){
   const counts={};
   prog.bf.forEach(x=>counts[x.t]=(counts[x.t]||0)+1);
@@ -1249,21 +1965,62 @@ function renderGarden(){
   $('bfSub').textContent='一共 '+prog.bf.length+' 只 · 已认识 '+kinds+' / '+BUTTERFLY.length+' 种'
     + (lv3?(' · 完全进化 '+lv3+' 种'):'');
   $('bfBar').style.width=Math.round(kinds/BUTTERFLY.length*100)+'%';
+
+  /* 渲染花园实时飞舞蝴蝶 */
+  const stage=$('gardenActors');
+  if(stage && stage!==__MISS){
+    stage.innerHTML='';
+    const flyList=prog.bf.slice(-8);
+    if(!flyList.length){
+      $('gardenTip').textContent='🌱 花园还在等第一只小蝴蝶，快去闯关吧！';
+    }else{
+      $('gardenTip').textContent='✨ 点一点花丛中飞舞的小蝴蝶，它会向你跳舞哦！';
+      flyList.forEach((x,idx)=>{
+        const b=bfById(x.t), lv=bfLevel(x.t);
+        const act=document.createElement('div');
+        act.className='garden-actor';
+        act.style.left=(10 + (idx*11)%78)+'%';
+        act.style.top=(18 + (idx*17)%55)+'%';
+        act.innerHTML=bflySVG(b,44,{lv:lv});
+        act.onclick=()=>{
+          sfxSpark();
+          act.style.left=(8+Math.floor(Math.random()*78))+'%';
+          act.style.top=(14+Math.floor(Math.random()*58))+'%';
+          $('gardenTip').textContent='🦋 '+b.n+'（'+BF_LV_NAME[lv]+'）开心地转了个圈！';
+        };
+        stage.appendChild(act);
+      });
+      if(GARDEN_TIMER) clearInterval(GARDEN_TIMER);
+      GARDEN_TIMER=setInterval(()=>{
+        if($('viewBf').classList.contains('hidden')) return;
+        stage.querySelectorAll('.garden-actor').forEach(el=>{
+          if(Math.random()<0.45){
+            el.style.left=(8+Math.floor(Math.random()*78))+'%';
+            el.style.top=(14+Math.floor(Math.random()*58))+'%';
+          }
+        });
+      },2600);
+    }
+  }
+
   const g=$('bfGrid'); g.innerHTML='';
   BUTTERFLY.forEach(b=>{
     const n=counts[b.t]||0, lv=bfLevel(b.t), need=bfNextNeed(b.t);
     const d=document.createElement('div');
     d.className='bcard'+(n?' r'+b.r:' lock')+(lv>=3?' max':'');
     if(n){
-      // 进化进度条：距离下一级还差几只
       const prev=lv>=3?BF_LV_NEED[3]:BF_LV_NEED[lv];
       const pct = need ? Math.min(100,Math.round((n-prev)/(need-prev)*100)) : 100;
-      d.innerHTML = bflySVG(b,54,{lv:lv})
+      d.innerHTML = bflySVG(b,56,{lv:lv})
         +'<div class="bn2">'+b.n+'</div>'
         +'<div class="bc">×'+n+'</div>'
         +'<div><span class="tag r'+b.r+'">'+RARE_NAME[b.r]+'</span><span class="lvtag l'+lv+'">'+BF_LV_NAME[lv]+'</span></div>'
         + (need ? '<div class="upbar"><i style="width:'+pct+'%"></i></div><div class="uphint">再收 '+(need-n)+' 只进化</div>'
                 : '<div class="uphint done">已完全进化 ✨</div>');
+      d.onclick=()=>{
+        sfxSpark();
+        speak(b.n);
+      };
     }else{
       d.innerHTML='<div class="ph">?</div><div class="bn2">还没见过</div><div class="bc">'
         +(b.r===3?'三星最容易遇到':(b.r===2?'两星以上更容易':'通关就有机会'))+'</div>';
@@ -1275,9 +2032,10 @@ function renderGarden(){
   if(!rs.length) rc.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">还没有蝴蝶，通关一次就有了</div>';
   rs.forEach(x=>{
     const b=bfById(x.t), d=document.createElement('div');
-    d.style.cssText='display:flex;flex-direction:column;align-items:center';
-    d.innerHTML=bflySVG(b,40,{lv:bfLevel(x.t)})+'<div style="font-size:10px;color:var(--ink-soft);margin-top:1px">'+x.d.slice(5)+'</div>';
+    d.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:pointer';
+    d.innerHTML=bflySVG(b,42,{lv:bfLevel(x.t)})+'<div style="font-size:10px;color:var(--ink-soft);margin-top:1px">'+x.d.slice(5)+'</div>';
     d.title=b.n+' · 第'+x.lv+'关';
+    d.onclick=()=>sfxSpark();
     rc.appendChild(d);
   });
 }
@@ -1288,7 +2046,7 @@ function renderRec(){
   BADGES.forEach(b=>{
     const d=document.createElement('div');
     d.className='bg'+(b.got()?' got':'');
-    d.innerHTML='<div class="bn">'+(b.got()?'':'未解锁 · ')+b.n+'</div><div class="bd">'+b.d+'</div>';
+    d.innerHTML='<div class="bn">'+(b.got()?'':'🔒 未解锁 · ')+b.n+'</div><div class="bd">'+b.d+'</div>';
     bg.appendChild(d);
   });
 
@@ -1304,7 +2062,6 @@ function renderRec(){
     rl.appendChild(d);
   });
 
-  /* 已攻克：以前错过、后来拼对销账的字数。让进步看得见 */
   const mn=Object.keys(prog.wrongMastered||{}).length;
   const wsub=$('wrongSub');
   if(wsub) wsub.textContent = mn
@@ -1312,41 +2069,57 @@ function renderRec(){
     : '拼错最多的音节，可以重点练';
 
   const wl=$('wrongList'); wl.innerHTML='';
-  const ws=Object.keys(prog.wrong).map(k=>{const p=k.split('|');return {py:p[1],c:p[2],n:prog.wrong[k]};})
+  const ws=Object.keys(prog.wrong).filter(k=>(prog.wrong[k]||0)>0).map(k=>{const p=k.split('|');return {lv:+p[0]||1,py:p[1],c:p[2],n:prog.wrong[k]};})
     .sort((a,b)=>b.n-a.n).slice(0,8);
-  if(!ws.length) wl.innerHTML='<div class="row"><span class="t">还没有错题，很稳</span></div>';
+  const pwBtn=$('practiceWrongBtn');
+  if(pwBtn && pwBtn!==__MISS){
+    pwBtn.classList.toggle('hidden', ws.length===0);
+    pwBtn.onclick=()=>startSpecialMode('wrong');
+  }
+  if(!ws.length) wl.innerHTML='<div class="row"><span class="t">🎉 太棒了！目前没有错题欠账</span></div>';
   ws.forEach(w=>{
     const d=document.createElement('div'); d.className='row';
-    d.innerHTML='<span style="font-size:18px">'+w.c+'</span><span class="t">'+w.py+'</span><span class="sc">错 '+w.n+' 次</span>';
+    const h=hintOf(w.c);
+    d.innerHTML='<span style="font-size:20px;font-weight:800;cursor:pointer" title="点我发音">'+w.c+'</span>'+
+      '<span class="t">'+w.py+'（'+h[0]+' '+h[1]+'）</span><span class="sc" style="color:var(--red)">错 '+w.n+' 次</span>';
+    d.onclick=()=>speak(w.c+'，'+h[1]);
     wl.appendChild(d);
   });
 }
 
 /* ============================================================
-   游戏
+   游戏核心逻辑（含常规闯关、错题特训营、全明星随机挑战、盲听锅盖）
    ============================================================ */
 const ORDER={whole:['w'],split:['i','f'],tri:['i','m','f']};
 const LABEL={w:'整体认读音节',i:'声母',m:'介音',f:'韵母'};
 let S=null;
 
-/* 错题键：与 prog.wrong 保持一致，格式 关卡|拼音|字 */
 function wrongKey(n,w,mode){ return n+'|'+pyOf(w,mode)+'|'+charOf(w,mode); }
 
-/* ---------- 选火候 ----------
-   点关卡不直接开始，先问「今天想开多大的火」。
-   掌控感 + 越难越赚，是孩子愿意主动挑战的前提。 */
 let PICK_N=0;
+function renderBlindToggleUI(){
+  const on=!!prog.blind;
+  const bt=$('blindToggle'), sw=$('blindToggleSw'), ig=$('blindInGameBtn');
+  if(bt && bt!==__MISS){ bt.classList.toggle('on',on); }
+  if(sw && sw!==__MISS){ sw.textContent=on?'已开启':'关'; }
+  if(ig && ig!==__MISS){
+    ig.textContent='🛎️ 盲听:'+(on?'开':'关');
+    ig.classList.toggle('purple',on);
+  }
+}
+
 function openFirePicker(n){
   PICK_N=n;
   const lv=LEVELS[n-1], mode=lv.mode;
   $('fireTitle').textContent=lv.name;
+  renderBlindToggleUI();
   const box=$('fireOpts'); box.innerHTML='';
   FIRE_ORDER.forEach(k=>{
     const F=FIRE[k];
     const b=document.createElement('button');
     b.className='fopt'+(k==='high'?' hi':'');
-    const sz = k==='high'?26:(k==='mid'?21:17);
-    const col= k==='high'?'#D2544B':'#E8873B';
+    const sz = k==='high'?26:(k==='mid'?22:18);
+    const col= k==='high'?'#E25247':'#F07D2E';
     b.innerHTML='<span class="ic"><svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" aria-hidden="true">'+
         '<path d="M12 2.5c1.2 3 4.3 5 4.3 8.7a4.3 4.3 0 0 1-8.6 0c0-1.7.8-2.9 1.8-3.8.2 2 1.2 2.9 2.2 2.4 1.4-.8 1-4.2.3-7.3z" fill="'+col+'"/>'+
       '</svg></span>'+
@@ -1355,14 +2128,50 @@ function openFirePicker(n){
     b.onclick=()=>{ closeFirePicker(); startLevel(n,k); };
     box.appendChild(b);
   });
-  /* 提示本关还有多少「欠账」的错字 —— 给挑战一个具体目标 */
   const wrongN=lv.words.filter(w=>(prog.wrong[wrongKey(n,w,mode)]||0)>0).length;
   $('fireHint').textContent = wrongN
-    ? '这一关你还有 '+wrongN+' 个以前错过的字，这次把它们拿下！'
-    : '这一关的字都拿下过啦，可以试试更大的火。';
+    ? '🎯 这一关你还有 '+wrongN+' 个以前错过的字，这次把它们拿下！'
+    : '✨ 这一关的字都熟门熟路啦，可以试试「大火」或开启「神秘锅盖」！';
   $('fireOverlay').classList.add('on');
 }
 function closeFirePicker(){ $('fireOverlay').classList.remove('on'); }
+
+/* 特训营与名厨全明星挑战 */
+function startSpecialMode(type){
+  touchStreak();
+  let pool=[];
+  if(type==='wrong'){
+    LEVELS.forEach((lv,li)=>{
+      const n=li+1;
+      lv.words.forEach(w=>{
+        if((prog.wrong[wrongKey(n,w,lv.mode)]||0)>0){
+          pool.push({n, mode:lv.mode, w});
+        }
+      });
+    });
+  }
+  if(!pool.length){
+    const maxLv=Math.max(1, Math.min(prog.unlocked, LEVELS.length));
+    for(let i=0;i<maxLv;i++){
+      const lv=LEVELS[i];
+      lv.words.forEach(w=>pool.push({n:i+1, mode:lv.mode, w}));
+    }
+  }
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const picked=pool.slice(0,8);
+  const first=picked[0];
+  S={
+    n: first.n, mode: first.mode, fire:'mid', special:type,
+    queue: picked.map(x=>x.w), metaQueue: picked,
+    idx:0, right:0, combo:0, retryLeft:2, retried:false, mastered:0,
+    picks:{i:null,m:null,f:null,w:null}, locked:false, newFoods:[], revealed:false
+  };
+  $('levelName').textContent = type==='wrong' ? '🛠️ 消灭糊锅菜 · 错题特训' : '⚡ 名厨随机挑战';
+  $('levelSub').textContent = type==='wrong' ? '把以前错过的字全部攻克！' : '混合关卡特训 · 通关送蝴蝶';
+  home.classList.add('hidden'); result.classList.add('hidden'); game.classList.remove('hidden');
+  renderChef();
+  nextQuestion();
+}
 
 function startLevel(n,fire){
   touchStreak();
@@ -1370,21 +2179,22 @@ function startLevel(n,fire){
   const F=FIRE[fire||'mid']||FIRE.mid;
   const words=lv.words.slice();
   for(let i=words.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[words[i],words[j]]=[words[j],words[i]];}
-  /* 错题回流：本关以前错过的字排到最前面 —— 先练不会的，而不是重复刷会的 */
   const bad=[],good=[];
   words.forEach(w=>{ ((prog.wrong[wrongKey(n,w,mode)]||0)>0 ? bad : good).push(w); });
   let queue=bad.concat(good);
-  /* 词量不足时循环补齐（大火 12 题，个别关卡词量少） */
   let guard=0;
   while(queue.length<F.n && guard++<20) queue=queue.concat(bad.concat(good));
   queue=queue.slice(0,F.n);
-  S={ n, mode, fire:F.key, queue, idx:0, right:0, combo:0,
+  S={ n, mode, fire:F.key, special:null, queue, metaQueue:null, idx:0, right:0, combo:0,
       retryLeft:F.retry, retried:false, mastered:0,
-      picks:{i:null,m:null,f:null,w:null}, locked:false, newFoods:[] };
+      picks:{i:null,m:null,f:null,w:null}, locked:false, newFoods:[], revealed:false };
   buildCards(lv);
   $('levelName').textContent=lv.name;
   $('levelSub').textContent=lv.sub+'　·　'+F.name+' '+F.desc;
+  const sf=$('stoveFlames');
+  if(sf && sf!==__MISS) sf.className='stove-flames f-'+F.key;
   home.classList.add('hidden'); result.classList.add('hidden'); game.classList.remove('hidden');
+  renderChef();
   nextQuestion();
 }
 
@@ -1422,7 +2232,6 @@ function buildCards(lv){
       return toneIdx(a)-toneIdx(b);
     });
     const fc=$('finalCards'); fc.innerHTML='';
-    /* 按韵母类别分组，超过一类才显示小标题（第 6 关 27 张卡，不分组太难找） */
     const groups=[];
     fin.forEach(v=>{
       const k=finalKind(baseOf(v).replace(/v/g,'ü'));
@@ -1443,8 +2252,36 @@ function buildCards(lv){
 function mkCard(kind,v){
   const b=document.createElement('button');
   b.className='card '+kind; b.textContent=v; b.dataset.k=kind; b.dataset.v=v;
-  b.onclick=()=>pick(kind,v);
+  b.onclick=(ev)=>pick(kind,v,ev.currentTarget);
   return b;
+}
+
+/* 卡片飞入铁锅抛物线动画 */
+function flyCardToPot(btnEl,text,kind){
+  try{
+    if(!btnEl) return;
+    const r1=btnEl.getBoundingClientRect();
+    const potEl=$('pot');
+    if(!potEl||potEl===__MISS) return;
+    const r2=potEl.getBoundingClientRect();
+    const pill=document.createElement('div');
+    pill.className='fly-pill';
+    pill.textContent=text;
+    pill.style.background = kind==='i' ? 'var(--blue)' : (kind==='f' ? 'var(--orange)' : 'var(--purple)');
+    pill.style.left=(r1.left+r1.width/2-24)+'px';
+    pill.style.top=(r1.top+r1.height/2-18)+'px';
+    document.body.appendChild(pill);
+    const dx=(r2.left+r2.width/2)-(r1.left+r1.width/2);
+    const dy=(r2.top+36)-(r1.top+r1.height/2);
+    requestAnimationFrame(()=>{
+      pill.style.transform='translate('+dx+'px,'+dy+'px) scale(0.45)';
+      pill.style.opacity='0.2';
+    });
+    setTimeout(()=>{
+      pill.remove();
+      sfxBubble();
+    },310);
+  }catch(e){}
 }
 
 function renderSlots(){
@@ -1474,88 +2311,126 @@ function refresh(){
   });
 }
 
+function updateBlindCharDisplay(){
+  if(!S) return;
+  const hide = !!(prog.blind && !S.revealed);
+  $('targetChar').classList.toggle('hidden', hide);
+  $('clocheBtn').classList.toggle('hidden', !hide);
+  renderBlindToggleUI();
+}
+
 function nextQuestion(){
   if(S.idx>=S.queue.length){ finish(); return; }
+  /* 若是混合特训模式，每题动态切换对应关卡卡片 */
+  if(S.metaQueue && S.metaQueue[S.idx]){
+    const m=S.metaQueue[S.idx];
+    S.n=m.n; S.mode=m.mode;
+    buildCards(LEVELS[S.n-1]);
+  }
   ORDER[S.mode].forEach(k=>S.picks[k]=null);
   S.locked=false;
-  S.retried=false;   /* 每题的回锅机会重新计，但总次数 S.retryLeft 是整局共享的 */
+  S.retried=false;
+  S.revealed=false;
   document.querySelectorAll('.card').forEach(c=>c.classList.remove('sel','dim','correct'));
   renderSlots();
   const w=S.queue[S.idx], ch=charOf(w,S.mode);
+  const h=hintOf(ch);
   $('targetChar').textContent=ch;
+  $('wordEmoji').textContent=h[0];
+  $('wordText').textContent = prog.blind ? h[1].replace(new RegExp(ch,'g'),'？') : h[1];
+  updateBlindCharDisplay();
+
   $('targetLbl').textContent = S.mode==='whole'
-    ? '整体认读音节，不用拼，整块下锅'
+    ? '整体认读音节：不用拼，整块下锅'
     : (S.mode==='tri' ? '三拼音节：声母 + 介音 + 韵母' : '听一听，把这个字的拼音拼出来');
   $('qNo').textContent=S.idx+1;
   $('qTotal').textContent='/'+S.queue.length;
   $('hudStars').textContent='★'.repeat(S.right)+'☆'.repeat(S.queue.length-S.right);
-  $('hudCombo').textContent=S.combo>=2?('连对 '+S.combo+' 次'):'';
-  /* 本局火力 + 剩余回锅次数：让孩子随时知道「我还能补救几次」 */
+  $('hudCombo').textContent=S.combo>=2?('🔥 连对 '+S.combo+' 次'):'';
+  $('hudCombo').classList.toggle('hidden', S.combo<2);
+
   const F=FIRE[S.fire]||FIRE.mid;
   const hf=$('hudFire');
-  if(hf){ hf.textContent=F.name; hf.className='hudfire'+(S.fire==='high'?' hi':''); }
+  if(hf){ hf.textContent=S.special?(S.special==='wrong'?'错题营':'全明星'):F.name; hf.className='hudfire'+(S.fire==='high'?' hi':''); }
   const hr=$('hudRetry');
   if(hr){
-    let s='';
+    let s='回锅 ';
     for(let i=0;i<F.retry;i++) s+='<i class="retrydot'+(i<(F.retry-S.retryLeft)?' used':'')+'"></i>';
     hr.innerHTML=s;
     hr.title='回锅机会：还剩 '+S.retryLeft+' 次';
   }
   $('tip').className='tip'; $('tip').textContent='';
   $('steam').classList.remove('on');
-  $('pot').classList.remove('hot');
+  $('pot').classList.toggle('hot', S.combo>=3);
+  $('chefBubble').textContent = S.mode==='whole' ? '整体认读整块下锅哦！' : (S.combo>=3 ? '哇！连击火力全开！' : '先点蓝色声母下锅吧！');
+
   const tag=$('foodTag');
-  if(prog.food[ch]){ tag.textContent='这个字已经在你的菜单里了'; tag.className='foodtag got'; }
-  else { tag.textContent='拼出来就能收进菜单'; tag.className='foodtag'; }
+  if(prog.food[ch]){ tag.textContent='✓ 这个字已经在你的菜谱里了'; tag.className='foodtag got'; }
+  else { tag.textContent='✨ 拼出来就能收进中华小菜谱'; tag.className='foodtag'; }
+
+  /* 进入新题自动朗读一次汉字，体验更流畅 */
+  setTimeout(()=>{ if(S && S.queue[S.idx]===w) speak(ch); }, 120);
 }
 
-function pick(kind,v){
+function pick(kind,v,btnEl){
   if(S.locked) return;
   const ord=ORDER[S.mode], idx=ord.indexOf(kind);
   for(let j=0;j<idx;j++){
-    if(!S.picks[ord[j]]){ tipMsg('先选「'+LABEL[ord[j]]+'」哦','note'); return; }
+    if(!S.picks[ord[j]]){
+      tipMsg('先选「'+LABEL[ord[j]]+'」下锅哦','note');
+      $('chefBubble').textContent='别急，先放'+LABEL[ord[j]]+'！';
+      return;
+    }
   }
   sfxTap();
-  S.picks[kind]=(S.picks[kind]===v)?null:v;
+  const Removing = (S.picks[kind]===v);
+  S.picks[kind]=Removing?null:v;
+  if(!Removing && btnEl) flyCardToPot(btnEl,v,kind);
   refresh();
-  if(ord.every(k=>S.picks[k])){ S.locked=true; setTimeout(judge,300); }
+  if(ord.every(k=>S.picks[k])){ S.locked=true; setTimeout(judge,320); }
 }
 
 function tipMsg(t,cls){ const e=$('tip'); e.className='tip '+(cls||''); e.textContent=t; }
 
 function judge(){
   const w=S.queue[S.idx], p=partsOf(w,S.mode), py=pyOf(w,S.mode), ch=charOf(w,S.mode);
+  const h=hintOf(ch);
   const ord=ORDER[S.mode];
-  /* 精确匹配，或多音字容错：拼出的「带声调」音节也是题库里这个字的一个读音。
-     ⚠️ 必须用带声调的音节比较 —— 若先去掉声调，bā(八) 与 bá(拔) 都会变成 ba，
-        孩子拼错声调也会被判对，那就练不出声调了。 */
   const exact = ord.every(k=>S.picks[k]===p[k]);
   const pickedPy = ord.map(k=>S.picks[k]).join('');
   const ok = exact || readingsOf(ch).indexOf(pickedPy)>=0;
   S.polyAlt = (!exact && ok) ? pickedPy : null;
 
+  /* 揭开神秘锅盖显示完整字词 */
+  S.revealed=true;
+  updateBlindCharDisplay();
+  $('wordText').textContent=h[1];
+
   if(ok){
     S.right++; S.combo++;
-    if(S.combo>prog.bestCombo){prog.bestCombo=S.combo; save();}
+    ensureDaily();
+    prog.daily.words=(prog.daily.words||0)+1;
+    if(S.combo>(prog.daily.maxCombo||0)) prog.daily.maxCombo=S.combo;
+    if(S.combo>prog.bestCombo){prog.bestCombo=S.combo;}
     ord.forEach(k=>{
       const el=$('slot_'+k); el.classList.remove('filled'); el.classList.add('good');
     });
     $('pot').classList.add('shake'); $('steam').classList.add('on');
     if(S.combo>=3) $('pot').classList.add('hot');
-    const pop=$('popup'); pop.textContent=(S.polyAlt? ord.map(k=>S.picks[k]).join('') : py)+'  '+ch;
+    const pop=$('popup');
+    pop.textContent=h[0]+' '+(S.polyAlt? ord.map(k=>S.picks[k]).join('') : py)+' '+ch;
     pop.classList.remove('on'); void pop.offsetWidth; pop.classList.add('on');
     const pr=$('praise');
-    pr.textContent = S.combo>=3 ? ('连击 '+S.combo+' 连！'+PRAISE[Math.floor(Math.random()*PRAISE.length)])
+    pr.textContent = S.combo>=3 ? ('🔥 连击 '+S.combo+' 连！'+PRAISE[Math.floor(Math.random()*PRAISE.length)])
                                 : PRAISE[Math.floor(Math.random()*PRAISE.length)];
     pr.classList.remove('on'); void pr.offsetWidth; pr.classList.add('on');
+    $('chefBubble').textContent = S.combo>=3 ? '太神啦！神厨小当家！' : '好香呀！'+h[1]+'出锅喽！';
     (S.combo>=3?sfxBig:sfxWin)();
-    burst(S.combo>=3?10:6);
-    speak(ch);
+    burst(S.combo>=3?14:8);
+    speak(ch+'，'+h[1]);
 
     if(!prog.food[ch]){ prog.food[ch]=1; S.newFoods.push(ch); }
 
-    /* 错题攻克：以前在这个字上错过，这次拼对了 —— 从错题本里销账。
-       用了回锅机会才答对的，只减一次计数，先不销账，下次还要再练。 */
     const key=S.n+'|'+py+'|'+ch;
     if((prog.wrong[key]||0)>0){
       if(S.retried){
@@ -1572,14 +2447,11 @@ function judge(){
     else if(S.mode==='split' && ['j','q','x'].indexOf(w[0])>=0 && 'uü'.indexOf(w[1][0])>=0) note='（j q x 遇到 ü 要去两点，写成 u）';
     const others=readingsOf(ch).filter(r=>r!==py);
     if(others.length) note+='（「'+ch+'」还读 '+others.join('、')+'）';
-    tipMsg('咕嘟！变出「'+ch+'」'+note,'ok');
+    tipMsg('🍲 咕嘟！变出「'+ch+' · '+h[1]+'」'+note,'ok');
     save();
-    setTimeout(()=>$('pot').classList.remove('shake'),500);
-    setTimeout(()=>{S.idx++; nextQuestion();},1400);
+    setTimeout(()=>$('pot').classList.remove('shake'),520);
+    setTimeout(()=>{S.idx++; nextQuestion();},1500);
   }else{
-    /* 回锅：第一次答错先不判错，给孩子一次「再想想」的机会。
-       这是「愿意挑战大火」的关键 —— 失败不再可怕，孩子才敢往难的地方走。
-       连击照常断、次数整局共享，所以不是白送，只是不再一棍子打死。 */
     if(S.retryLeft>0 && !S.retried){
       S.retryLeft--; S.retried=true; S.combo=0;
       ord.forEach(k=>{ S.picks[k]=null; });
@@ -1587,7 +2459,8 @@ function judge(){
       document.querySelectorAll('.card').forEach(c=>c.classList.remove('sel','dim','correct'));
       refresh();
       sfxTap();
-      tipMsg('再想想～本局还能回锅 '+S.retryLeft+' 次','note');
+      $('chefBubble').textContent='差一点点，回锅再试一次吧！';
+      tipMsg('🍳 再想想～本局还能回锅 '+S.retryLeft+' 次','note');
       return;
     }
     S.combo=0;
@@ -1597,6 +2470,7 @@ function judge(){
       el.classList.add(S.picks[k]===p[k]?'good':'bad');
     });
     $('pot').classList.add('nope');
+    $('chefBubble').textContent='没关系，记住绿色的正确卡片哦！';
     sfxBad();
     document.querySelectorAll('.card').forEach(c=>{
       const good = c.dataset.k==='w' ? c.dataset.v===p.w
@@ -1608,21 +2482,22 @@ function judge(){
     });
     const key=S.n+'|'+py+'|'+ch;
     prog.wrong[key]=(prog.wrong[key]||0)+1; save();
-    tipMsg('不对哦，正确是 '+py+'（'+ch+'）','no');
-    speak(ch,{slow:true});   // 答错后用慢速读一遍，让孩子听清正确读音
+    tipMsg('不对哦，正确是 '+py+'（'+ch+' · '+h[1]+'）','no');
+    speak(ch+'，'+h[1],{slow:true});
     setTimeout(()=>$('pot').classList.remove('nope'),400);
-    setTimeout(()=>{S.idx++; nextQuestion();},2000);
+    setTimeout(()=>{S.idx++; nextQuestion();},2100);
   }
 }
 
 function burst(n){
   const fx=$('fx');
+  const cols=['#F07D2E','#3EA865','#F5B82E','#7A6EE6','#E05385'];
   for(let i=0;i<n;i++){
     const d=document.createElement('i');
-    const a=(-Math.PI/2)+(Math.random()-0.5)*2.2, r=60+Math.random()*60;
+    const a=(-Math.PI/2)+(Math.random()-0.5)*2.4, r=65+Math.random()*70;
     d.style.setProperty('--dx',Math.cos(a)*r+'px');
     d.style.setProperty('--dy',Math.sin(a)*r+'px');
-    d.style.background = i%2 ? 'var(--orange)' : 'var(--green)';
+    d.style.background = cols[i%cols.length];
     fx.appendChild(d);
     setTimeout(()=>d.remove(),900);
   }
@@ -1630,25 +2505,26 @@ function burst(n){
 
 function finish(){
   const total=S.queue.length, r=S.right;
-  /* 按正确率算星：题量随火力变化（8/10/12）。
-     若沿用固定的「对 7 道=三星」，题越多反而越容易，就没道理挑战大火了。 */
   const ratio = total ? r/total : 0;
   const st = ratio>=0.85 ? 3 : ratio>=0.62 ? 2 : ratio>=0.5 ? 1 : 0;
-  if(st>(prog.stars[S.n]||0)) prog.stars[S.n]=st;
-  if(r>=4 && S.n+1>prog.unlocked && S.n<LEVELS.length) prog.unlocked=S.n+1;
+  ensureDaily();
+  if(r>=4) prog.daily.rounds=(prog.daily.rounds||0)+1;
+
+  if(!S.special){
+    if(st>(prog.stars[S.n]||0)) prog.stars[S.n]=st;
+    if(r>=4 && S.n+1>prog.unlocked && S.n<LEVELS.length) prog.unlocked=S.n+1;
+  }
   prog.history.push({d:today(),lv:S.n,s:st,r:r,t:total,f:S.fire});
   if(prog.history.length>60) prog.history=prog.history.slice(-60);
 
-  /* 通关掉落小蝴蝶：基础掉落（大火翻倍），首次通关该关再额外 1 只 */
   const gifts=[];
   const ups=[];
   if(r>=4){
-    const firstClear = !prog.cleared[S.n];
-    prog.cleared[S.n]=1;
+    const firstClear = (!S.special && !prog.cleared[S.n]);
+    if(!S.special) prog.cleared[S.n]=1;
     const F=FIRE[S.fire]||FIRE.mid;
     for(let i=0;i<F.rolls;i++) gifts.push(rollButterfly(st,S.fire));
     if(firstClear) gifts.push(rollButterfly(st,S.fire));
-    // 发放前先记下各品种已有只数，用来判断是否跨过进化阈值
     const before={}; gifts.forEach(g=>{ if(before[g.t]===undefined) before[g.t]=bfCount(g.t); });
     gifts.forEach(b=>prog.bf.push({t:b.t,lv:S.n,s:st,d:today()}));
     const lvOf=n=> n>=BF_LV_NEED[3] ? 3 : (n>=BF_LV_NEED[2] ? 2 : 1);
@@ -1662,17 +2538,24 @@ function finish(){
   save();
 
   game.classList.add('hidden'); result.classList.remove('hidden');
-  $('rTitle').textContent = st>0?'通关啦':'再试一次吧';
+  $('rTitle').textContent = st>0?'🎉 出锅通关啦！':'💪 再试一次吧';
   $('rStars').textContent = '★'.repeat(st)+'☆'.repeat(3-st);
   $('rDesc').textContent = '答对 '+r+' / '+total+' 道'
-    + (S.mastered ? '，攻克了 '+S.mastered+' 个以前错过的字！' : '')
-    + (r>=4 ? (gifts.length>1?'，第一次通关，蝴蝶飞来了两只！':'，一只小蝴蝶飞来了！')
-            : '，答对 4 道就有小蝴蝶飞过来。');
+    + (S.mastered ? '，成功消灭了 '+S.mastered+' 个以前错过的字！' : '')
+    + (r>=4 ? (gifts.length>1?'，太棒了，飞来了 '+gifts.length+' 只小蝴蝶！':'，一只漂亮的小蝴蝶飞来了！')
+            : '，答对 4 道就有小蝴蝶飞过来哦。');
   const wrap=$('rNewWrap'), ng=$('rNewFoods');
   ng.innerHTML='';
   if(S.newFoods.length){
     wrap.classList.remove('hidden');
-    S.newFoods.forEach(c=>{const d=document.createElement('div');d.className='cell';d.textContent=c;ng.appendChild(d);});
+    S.newFoods.forEach(c=>{
+      const d=document.createElement('div');
+      d.className='cell';
+      const h=hintOf(c);
+      d.innerHTML='<span>'+c+'</span><small>'+h[0]+'</small>';
+      d.onclick=()=>speak(c+'，'+h[1]);
+      ng.appendChild(d);
+    });
   }else wrap.classList.add('hidden');
 
   const bw=$('rBfWrap'), bg=$('rBf');
@@ -1682,28 +2565,30 @@ function finish(){
     gifts.forEach(b=>{
       const lv=bfLevel(b.t);
       const d=document.createElement('div'); d.className='one';
-      d.innerHTML=bflySVG(b,66,{lv:lv})+'<div class="cap">'+b.n+'</div>'+
+      d.innerHTML=bflySVG(b,68,{lv:lv})+'<div class="cap">'+b.n+'</div>'+
         '<div><span class="tag r'+b.r+'">'+RARE_NAME[b.r]+'</span>'+
         (lv>1?'<span class="lvtag l'+lv+'">'+BF_LV_NAME[lv]+'</span>':'')+'</div>';
+      d.onclick=()=>{ sfxSpark(); speak(b.n); };
       bg.appendChild(d);
     });
     setTimeout(sfxSpark,320);
-    if(ups.length) setTimeout(()=>showUpgrade(ups),950);   // 进化动画压在结算之后
+    if(ups.length) setTimeout(()=>showUpgrade(ups),950);
   }else{
-    bg.innerHTML='<div style="font-size:13px;color:var(--ink-soft);align-self:center">这局还差一点，再试一次吧</div>';
+    bg.innerHTML='<div style="font-size:13px;color:var(--ink-soft);align-self:center">这局还差一点，再试一次就能吸引蝴蝶啦</div>';
   }
-  $('nextBtn').classList.toggle('hidden', !(S.n<LEVELS.length));
+  $('nextBtn').classList.toggle('hidden', !!(S.special || !(S.n<LEVELS.length)));
 }
 
-/* ---------- 蝴蝶进化：一只只播放，点按钮看下一只 ---------- */
+/* ---------- 蝴蝶进化全屏展示 ---------- */
 function showUpgrade(list){
   let i=0;
   const ov=$('upOverlay');
   function paint(){
     const up=list[i], b=up.b;
     $('upBf').innerHTML=bflySVG(b,190,{lv:up.to});
-    $('upTitle').textContent = up.to>=3 ? '完全进化！' : '进化啦！';
-    $('upSub').innerHTML='<b>'+b.n+'</b> 已收集 '+up.n+' 只　'+BF_LV_NAME[up.from]+' → <b>'+BF_LV_NAME[up.to]+'</b>';
+    $('upTitle').textContent = up.customTitle || (up.to>=3 ? '完全进化！' : '进化啦！');
+    $('upSub').innerHTML='<b>'+b.n+'</b> 已收集 '+up.n+' 只　'+
+      (up.from===up.to ? ('当前形态：<b>'+BF_LV_NAME[up.to]+'</b>') : (BF_LV_NAME[up.from]+' → <b>'+BF_LV_NAME[up.to]+'</b>'));
     $('upName').textContent = up.to>=3
       ? '这是它最华丽的形态 ✨'
       : '再收集 '+(BF_LV_NEED[up.to+1]-up.n)+' 只，还能继续进化';
@@ -1717,7 +2602,6 @@ function showUpgrade(list){
       e.style.animationDelay=(Math.random()*0.3).toFixed(2)+'s';
       sp.appendChild(e);
     }
-    // 重放入场动画
     const card=$('upCard');
     card.style.animation='none'; void card.offsetWidth; card.style.animation='';
     ov.classList.add('on');
@@ -1734,10 +2618,11 @@ function showUpgrade(list){
 }
 
 /* ============================================================
-   按钮
+   按钮事件绑定
    ============================================================ */
 function goHome(){
   game.classList.add('hidden'); result.classList.add('hidden'); home.classList.remove('hidden');
+  $('mascLine').textContent=MASCOT_TIPS[Math.floor(Math.random()*MASCOT_TIPS.length)];
   renderStats(); renderMap();
   if(!$('viewColl').classList.contains('hidden')) renderColl();
   if(!$('viewBf').classList.contains('hidden')) renderGarden();
@@ -1745,12 +2630,73 @@ function goHome(){
 }
 $('backBtn').onclick=goHome;
 $('homeBtn').onclick=goHome;
-$('againBtn').onclick=()=>openFirePicker(S.n);
-$('nextBtn').onclick=()=>openFirePicker(Math.min(S.n+1,LEVELS.length));
-$('playBtn').onclick=()=>{const w=S.queue[S.idx]; if(w) speak(charOf(w,S.mode));};
+$('againBtn').onclick=()=>{
+  if(S && S.special) startSpecialMode(S.special);
+  else openFirePicker(S?S.n:1);
+};
+$('nextBtn').onclick=()=>openFirePicker(Math.min((S?S.n:1)+1,LEVELS.length));
+
+$('playBtn').onclick=()=>{const w=S&&S.queue[S.idx]; if(w) speak(charOf(w,S.mode));};
+$('targetChar').onclick=()=>{const w=S&&S.queue[S.idx]; if(w) speak(charOf(w,S.mode));};
+$('playWordBtn').onclick=()=>{
+  const w=S&&S.queue[S.idx];
+  if(!w) return;
+  const ch=charOf(w,S.mode), h=hintOf(ch);
+  speak(ch+'，'+h[1]);
+};
+$('wordPill').onclick=()=>{
+  const w=S&&S.queue[S.idx];
+  if(!w) return;
+  const ch=charOf(w,S.mode), h=hintOf(ch);
+  speak(ch+'，'+h[1]);
+};
+$('clocheBtn').onclick=()=>{
+  if(!S) return;
+  S.revealed=true;
+  const w=S.queue[S.idx], ch=charOf(w,S.mode), h=hintOf(ch);
+  $('wordText').textContent=h[1];
+  updateBlindCharDisplay();
+  sfxTap();
+  speak(ch);
+};
+$('pot').onclick=()=>{
+  $('pot').classList.remove('shake');
+  void $('pot').offsetWidth;
+  $('pot').classList.add('shake');
+  sfxBubble();
+};
+
+function toggleBlindMode(){
+  prog.blind=!prog.blind;
+  save();
+  renderBlindToggleUI();
+  if(S){
+    S.revealed=false;
+    const w=S.queue[S.idx];
+    if(w){
+      const ch=charOf(w,S.mode), h=hintOf(ch);
+      $('wordText').textContent = prog.blind ? h[1].replace(new RegExp(ch,'g'),'？') : h[1];
+    }
+    updateBlindCharDisplay();
+  }
+}
+$('blindToggle').onclick=toggleBlindMode;
+$('blindInGameBtn').onclick=toggleBlindMode;
+
+function toggleSkinDrawer(){
+  const sb=$('skinBar');
+  if(!sb||sb===__MISS) return;
+  const show=sb.classList.contains('hidden');
+  sb.classList.toggle('hidden',!show);
+  if(show) renderSkinBar();
+  sfxTap();
+}
+$('skinToggleBtn').onclick=toggleSkinDrawer;
+$('logoBtn').onclick=toggleSkinDrawer;
+
 function renderSlowBtn(){
   const on=!!(prog.tts&&prog.tts.slow);
-  $('slowBtn').textContent='慢速：'+(on?'开':'关');
+  $('slowBtn').textContent='🐢 慢速：'+(on?'开':'关');
   $('slowBtn').classList.toggle('on',on);
 }
 $('slowBtn').onclick=()=>{
@@ -1758,7 +2704,7 @@ $('slowBtn').onclick=()=>{
   prog.tts.slow=!prog.tts.slow;
   save(); renderSlowBtn();
   const w=S&&S.queue[S.idx];
-  if(w) speak(charOf(w,S.mode));   // 立刻用新速度读一遍，方便对比
+  if(w) speak(charOf(w,S.mode));
 };
 $('fireCancel').onclick=closeFirePicker;
 $('fireOverlay').onclick=e=>{ if(e.target===$('fireOverlay')) closeFirePicker(); };
@@ -1795,7 +2741,6 @@ $('importFile').onchange=ev=>{
 $('resetBtn').onclick=()=>{
   if(!confirm('确定清空所有星星、菜单、蝴蝶和记录吗？清空后不能恢复。')) return;
   prog=JSON.parse(JSON.stringify(DEF)); BACKFILL=0; MIGR_NOTE=[];
-  /* 备份键和老版本 key 也要删掉，否则重新打开时又会被合并回来 */
   try{ [KEY,KEY_BAK].concat(OLD_KEYS).forEach(k=>{localStorage.removeItem(k);localStorage.removeItem(KEY+'_merged_'+k);}); }catch(e){}
   save();
   renderStats(); renderMap(); renderRec(); renderColl(); renderGarden();
@@ -1804,9 +2749,10 @@ $('resetBtn').onclick=()=>{
 migrate();
 buildPy2Char();
 renderSlowBtn();
+renderBlindToggleUI();
 renderStats(); renderMap();
 
-/* 启动自检：万一关卡没能渲染出来，给出醒目提示，而不是留一片空白让人以为是记录丢了 */
+/* 启动自检 */
 (function(){
   try{
     const box=$('levelMap');
