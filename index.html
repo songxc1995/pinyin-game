@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>拼音小厨房</title>
+<style>
+:root{
+  --cream:#FFF7EC;
+  --card:#FFFFFF;
+  --ink:#3A3226;
+  --ink-soft:#8A7F6E;
+  --blue:#3B82C4;
+  --blue-soft:#E4F0FA;
+  --orange:#E8873B;
+  --orange-soft:#FDEBDC;
+  --green:#4B9E6A;
+  --green-soft:#E8F5EC;
+  --red:#D2544B;
+  --purple:#7F77DD;
+  --line:rgba(58,50,38,.12);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(900px 420px at 50% -140px, #FFE7C6 0%, rgba(255,231,198,.55) 45%, rgba(255,231,198,0) 72%),
+    linear-gradient(180deg,#FFFAF3 0%, #FFF4E6 60%, #FFEFDC 100%);
+  background-attachment:fixed;
+  color:var(--ink);
+  min-height:100vh;display:flex;justify-content:center;
+}
+#app{width:100%;max-width:680px;padding:18px 16px 40px}
+.hidden{display:none !important}
+
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.potlogo{
+  width:44px;height:44px;flex:none;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#FFE7C7 0%,#FFD5A3 100%);
+  box-shadow:0 2px 0 rgba(180,110,40,.18), 0 6px 14px -8px rgba(200,120,40,.55);
+}
+.title{font-size:21px;font-weight:700;letter-spacing:.5px}
+.title small{display:block;font-size:12px;font-weight:400;color:var(--ink-soft);letter-spacing:0;margin-top:2px}
+.spacer{flex:1}
+.btn{
+  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:12px;padding:8px 14px;font-size:14px;cursor:pointer;font-family:inherit;
+  box-shadow:0 1px 0 rgba(58,50,38,.07);
+  transition:transform .12s, box-shadow .12s, border-color .12s;
+}
+.btn:hover{border-color:rgba(58,50,38,.3);box-shadow:0 3px 8px -3px rgba(58,50,38,.25)}
+.btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(58,50,38,.07)}
+.btn.primary{
+  background:linear-gradient(180deg,#F19A4E 0%,var(--orange) 100%);
+  border-color:var(--orange);color:#fff;box-shadow:0 2px 0 rgba(180,100,32,.35);
+}
+.btn.sm{padding:6px 10px;font-size:13px}
+
+/* ---------- 统计条 ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.stat{
+  background:linear-gradient(180deg,#fff 0%,#FFFCF6 100%);
+  border:1px solid var(--line);border-radius:16px;padding:12px 6px 10px;text-align:center;
+  box-shadow:0 2px 0 rgba(58,50,38,.045), 0 6px 14px -10px rgba(58,50,38,.25);
+}
+.stat .ic{display:block;width:18px;height:18px;margin:0 auto 5px;opacity:.9}
+.stat .v{font-size:24px;font-weight:700;line-height:1.1;letter-spacing:-.5px}
+.stat .k{font-size:11px;color:var(--ink-soft);margin-top:3px}
+.stat.a .v{color:var(--orange)}
+.stat.b .v{color:var(--green)}
+.stat.c .v{color:var(--purple)}
+.stat.d .v{color:#D4537E}
+.stat.a .ic{color:var(--orange)}
+.stat.b .ic{color:var(--green)}
+.stat.c .ic{color:var(--purple)}
+.stat.d .ic{color:#D4537E}
+
+/* ---------- 蝴蝶 ---------- */
+.bfly{display:block}
+.bfly .wings{animation:flap .62s ease-in-out infinite;transform-box:view-box;transform-origin:50px 52px}
+@keyframes flap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.48)}}
+@media (prefers-reduced-motion:reduce){.bfly .wings{animation:none}}
+.bgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.bcard{background:#FBF8F3;border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.bcard.r2{border-color:rgba(212,83,126,.45)}
+.bcard.r3{border-color:rgba(232,135,59,.65);background:var(--orange-soft)}
+.bcard.lock{opacity:.45}
+.bcard .bn2{font-size:12px;font-weight:600;margin-top:4px}
+.bcard .bc{font-size:11px;color:var(--ink-soft);margin-top:1px}
+.bcard .ph{height:46px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink-soft)}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;margin-top:4px}
+.tag.r2{background:#FBEAF0;color:#993556}
+.tag.r3{background:#FAEEDA;color:#854F0B}
+.bflyaward{display:flex;gap:16px;justify-content:center;align-items:flex-end;margin:6px 0 12px;min-height:80px;flex-wrap:wrap}
+.bflyaward .one{text-align:center;animation:flyin .85s cubic-bezier(.2,1.3,.4,1) both}
+.bflyaward .one:nth-child(2){animation-delay:.25s}
+.bflyaward .cap{font-size:11px;font-weight:600;margin-top:2px}
+@keyframes flyin{0%{opacity:0;transform:translateY(26px) scale(.35) rotate(-18deg)}55%{opacity:1;transform:translateY(-4px) scale(1.12) rotate(6deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+.recent{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.bffloat{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;min-height:40px}
+.floater{animation:drift 2.8s ease-in-out infinite}
+@keyframes drift{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-8px) rotate(5deg)}}
+@media (prefers-reduced-motion:reduce){.floater{animation:none}}
+.notice{border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6;margin-bottom:12px;background:var(--green-soft);border:1px solid rgba(75,158,106,.4);color:#2F6B45}
+.notice.warn{background:#FCEBEB;border-color:rgba(210,84,75,.4);color:#791F1F}
+.notice b{font-weight:600}
+
+/* ---------- tab ---------- */
+.tabs{display:flex;gap:4px;margin-bottom:14px;background:rgba(58,50,38,.055);padding:4px;border-radius:14px}
+.tab{
+  flex:1;border:0;background:transparent;border-radius:11px;padding:9px 0;font-size:14px;
+  cursor:pointer;font-family:inherit;color:var(--ink-soft);
+  transition:background .15s,color .15s,box-shadow .15s;
+}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(58,50,38,.14)}
+
+/* ---------- 关卡地图 ---------- */
+.map{display:flex;flex-direction:column;gap:10px}
+.lv{
+  display:flex;align-items:center;gap:12px;background:var(--card);
+  border:1px solid var(--line);border-radius:18px;padding:12px 14px 12px 17px;
+  cursor:pointer;text-align:left;font-family:inherit;color:inherit;width:100%;
+  position:relative;overflow:hidden;
+  box-shadow:0 1px 2px rgba(58,50,38,.05);
+  transition:transform .15s, box-shadow .15s, border-color .15s;
+}
+.lv::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue)}
+.lv.whole::before{background:var(--purple)}
+.lv.tri::before{background:var(--orange)}
+.lv:hover{border-color:rgba(58,50,38,.24);transform:translateY(-2px);box-shadow:0 6px 16px -6px rgba(58,50,38,.22)}
+.lv.locked:hover{transform:none;box-shadow:0 1px 2px rgba(58,50,38,.05)}
+.lv .badge{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:600;color:#fff;background:var(--blue);
+  box-shadow:0 0 0 3px rgba(59,130,196,.16);
+}
+.lv.whole .badge{background:var(--purple);box-shadow:0 0 0 3px rgba(127,119,221,.16)}
+.lv.tri .badge{background:var(--orange);box-shadow:0 0 0 3px rgba(232,135,59,.18)}
+.pbar{height:4px;border-radius:2px;background:#F0EBE2;margin:5px 0 0 auto;width:76px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:2px;background:var(--green)}
+.lv .info{flex:1;min-width:0}
+.lv .nm{font-size:15px;font-weight:600}
+.lv .ds{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.lv .tip{font-size:11px;line-height:1.5;color:#8A5A24;background:rgba(232,135,59,.14);border-radius:8px;padding:5px 8px;margin-top:6px}
+.listenrow{display:flex;gap:8px;justify-content:center;margin-top:6px}
+.listenrow .btn.on{background:var(--orange);border-color:var(--orange);color:#fff}
+
+/* ---------- 蝴蝶进化全屏动画 ---------- */
+.upov{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 42%, rgba(255,244,222,.97), rgba(255,226,186,.95) 45%, rgba(238,186,128,.92));}
+.upov.on{display:flex}
+.upcard{position:relative;text-align:center;padding:26px 24px;animation:upCard .5s cubic-bezier(.2,1.3,.4,1)}
+@keyframes upCard{from{transform:scale(.72);opacity:0}to{transform:scale(1);opacity:1}}
+.uprings{position:absolute;left:50%;top:118px;width:0;height:0;pointer-events:none}
+.uprings i{position:absolute;left:-68px;top:-68px;width:136px;height:136px;border-radius:50%;
+  border:2px solid rgba(245,197,66,.85);opacity:0;animation:upRing 1.7s ease-out infinite}
+.uprings i:nth-child(2){animation-delay:.4s}
+.uprings i:nth-child(3){animation-delay:.8s}
+@keyframes upRing{0%{transform:scale(.3);opacity:.95}100%{transform:scale(2.2);opacity:0}}
+.upbf{margin:0 auto;width:190px;animation:upPop .75s cubic-bezier(.2,1.5,.4,1);filter:drop-shadow(0 6px 14px rgba(190,120,40,.28))}
+@keyframes upPop{0%{transform:scale(.35) rotate(-16deg);opacity:0}
+                 60%{transform:scale(1.15) rotate(5deg);opacity:1}
+                 100%{transform:scale(1) rotate(0)}}
+.upbf .bfly{animation:upFlap 1.15s ease-in-out infinite}
+@keyframes upFlap{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.87)}}
+.upsparks{position:absolute;left:50%;top:130px;width:0;height:0;pointer-events:none}
+.upsparks b{position:absolute;width:7px;height:7px;border-radius:50%;background:#F5C542;
+  animation:upFly 1s ease-out forwards}
+@keyframes upFly{0%{transform:translate(0,0) scale(1);opacity:1}
+                 100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+.uptitle{font-size:25px;font-weight:700;color:#8A4B12;margin-top:12px;letter-spacing:3px;
+  text-shadow:0 2px 0 rgba(255,255,255,.75)}
+.upsub{font-size:14px;color:#8A5A24;margin-top:7px}
+.upname{font-size:13px;color:#7A4E22;margin-top:5px}
+.upbtn{margin-top:18px;padding:9px 26px}
+.lvtag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;line-height:1.5}
+.lvtag.l2{background:#FFF0C2;color:#8A5A10}
+.lvtag.l3{background:linear-gradient(90deg,#F9E39B,#F5C542);color:#6B4A08;font-weight:600}
+.upbar{height:4px;background:rgba(58,50,38,.12);border-radius:3px;margin:5px 5px 0;overflow:hidden}
+.upbar i{display:block;height:100%;background:linear-gradient(90deg,#F9E39B,#F5C542);border-radius:3px}
+.uphint{font-size:10px;color:var(--ink-soft);margin-top:3px}
+.uphint.done{color:#B0781A;font-weight:600}
+.bcard.max{box-shadow:0 0 0 2px rgba(245,197,66,.5),0 4px 12px rgba(190,120,40,.18)}
+.lv .rt{text-align:right;flex:none}
+.lv .st{font-size:15px;letter-spacing:1px;color:var(--orange)}
+.lv .lk{font-size:11px;color:var(--ink-soft);margin-top:2px}
+.lv.locked{opacity:.5;cursor:not-allowed}
+
+/* ---------- 选火候：这一局做多难，孩子自己定 ---------- */
+.fireov{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;
+  background:rgba(58,50,38,.45);padding:20px}
+.fireov.on{display:flex}
+.firecard{background:var(--card);border-radius:20px;padding:20px 18px;max-width:360px;width:100%;text-align:center;
+  box-shadow:0 14px 40px rgba(58,50,38,.28);animation:fireIn .28s ease-out}
+@keyframes fireIn{from{transform:translateY(14px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+.firecard .ftitle{font-size:17px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.firecard .fsub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.firehint{font-size:11.5px;line-height:1.55;color:#8A5A24;background:rgba(232,135,59,.14);
+  border-radius:9px;padding:7px 10px;margin:0 0 11px}
+.fopts{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.fopt{display:flex;align-items:center;gap:11px;padding:10px 13px;border:1px solid var(--line);border-radius:13px;
+  background:#fff;cursor:pointer;text-align:left;transition:transform .12s,box-shadow .12s}
+.fopt:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(58,50,38,.5)}
+.fopt .ic{flex:none;width:26px;display:flex;align-items:center;justify-content:center}
+.fopt .tx{flex:1;min-width:0}
+.fopt .nn{font-size:14.5px;font-weight:600;color:var(--ink)}
+.fopt .dd{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+.fopt.hi{border-color:var(--orange);background:var(--orange-soft)}
+
+/* 游戏内：本局火力 + 回锅次数 */
+.hudfire{display:inline-block;font-size:12px;padding:2px 9px;border-radius:9px;
+  background:var(--orange-soft);color:#8A5A24;margin-left:6px}
+.hudfire.hi{background:linear-gradient(90deg,#F9E39B,#FAC775);color:#6B4A08}
+.retrydot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:2px;
+  vertical-align:middle}
+.retrydot.used{background:rgba(58,50,38,.18)}
+
+/* ---------- 厨艺等级：让「变强」这件事看得见 ---------- */
+.chefbar{display:flex;align-items:center;gap:11px;background:linear-gradient(90deg,#FFF4E0,#FFE9CC);
+  border:1px solid rgba(232,135,59,.3);border-radius:16px;padding:11px 14px;margin:0 0 12px}
+.chefcrown{flex:none;width:34px;height:34px;border-radius:50%;background:#FAC775;
+  display:flex;align-items:center;justify-content:center;color:#6B4A08}
+.chefcrown svg{width:20px;height:20px}
+.cheftx{flex:1;min-width:0}
+.chefnm{font-size:15px;font-weight:600;color:#6B4A08}
+.chefsub{font-size:11.5px;color:#8A5A24;margin-top:1px}
+.chefprog{flex:none;width:78px;height:7px;border-radius:4px;background:rgba(107,74,8,.16);overflow:hidden}
+.chefprog i{display:block;height:100%;background:linear-gradient(90deg,#F9E39B,#F5C542);border-radius:4px}
+
+.hintbox{
+  background:linear-gradient(180deg,#FFF3E6 0%,var(--orange-soft) 100%);
+  border:1px solid rgba(232,135,59,.28);
+  border-radius:16px;padding:14px 16px;font-size:13px;line-height:1.7;color:#7A4E22;margin:14px 0 0;
+}
+
+/* ---------- 收藏 / 记录 ---------- */
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;
+  box-shadow:0 1px 3px rgba(58,50,38,.05);
+}
+.panel h3{font-size:15px;margin:0 0 4px;font-weight:600}
+.panel .sub{font-size:12px;color:var(--ink-soft);margin-bottom:12px}
+.grid{display:flex;flex-wrap:wrap;gap:8px}
+.cell{
+  min-width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;background:var(--green-soft);border:1px solid rgba(75,158,106,.35);color:#2F6B45;
+  transition:transform .12s, box-shadow .12s;
+}
+.cell:not(.empty):hover{transform:translateY(-2px);box-shadow:0 5px 12px -5px rgba(75,158,106,.7)}
+.cell.empty{background:#F5F2EC;border:1px dashed rgba(58,50,38,.2);color:transparent}
+.bar{height:8px;border-radius:4px;background:#F0EBE2;overflow:hidden;margin:8px 0 14px}
+.bar i{display:block;height:100%;background:var(--green);border-radius:4px}
+
+.row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.row:last-child{border-bottom:0}
+.row .t{color:var(--ink-soft)}
+.row .sc{margin-left:auto;font-weight:600}
+.badges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#FBF8F3}
+.bg.got{background:var(--orange-soft);border-color:rgba(232,135,59,.4)}
+.bg .bn{font-size:13px;font-weight:600}
+.bg .bd{font-size:11px;color:var(--ink-soft);margin-top:2px}
+
+/* ---------- 游戏区 ---------- */
+.hud{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-soft);margin-bottom:10px}
+.hud .stars{letter-spacing:2px;font-size:16px;color:var(--orange)}
+.hud .combo{color:var(--green);font-weight:600}
+
+.target{
+  background:linear-gradient(180deg,#fff 0%,#FFFCF7 100%);
+  border:1px solid var(--line);border-radius:20px;padding:16px 16px 18px;text-align:center;margin-bottom:12px;
+  box-shadow:0 2px 0 rgba(58,50,38,.045), 0 10px 22px -14px rgba(58,50,38,.35);
+}
+.target .lbl{font-size:12px;color:var(--ink-soft);margin-bottom:8px}
+.bigchar{font-size:64px;line-height:1.1;font-weight:700}
+.foodtag{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:15px}
+.foodtag.got{color:var(--green);font-weight:600}
+.slots{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.slot{
+  min-width:70px;height:50px;border-radius:12px;border:2px dashed rgba(58,50,38,.22);
+  display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--ink-soft);
+}
+.slot.wide{min-width:110px}
+.slot.filled{border-style:solid;border-color:var(--blue);background:var(--blue-soft);color:var(--blue);font-weight:600}
+.slot.k-m.filled{border-color:var(--purple);background:#EEEDFE;color:#534AB7}
+.slot.k-f.filled{border-color:var(--orange);background:var(--orange-soft);color:#B6621F}
+.slot.k-w.filled{border-color:var(--purple);background:#EEEDFE;color:#534AB7}
+.slot.bad{border-color:var(--red);background:#FBEAE8;color:var(--red);animation:shake .4s}
+.slot.good{border-color:var(--green);background:#E8F5EC;color:var(--green)}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+.stage{display:flex;flex-direction:column;align-items:center;margin:4px 0 14px;position:relative;height:152px;justify-content:flex-end}
+.pot{width:150px;height:112px;position:relative}
+.pot.shake{animation:potshake .5s}
+@keyframes potshake{0%,100%{transform:rotate(0) translateY(0)}20%{transform:rotate(-4deg) translateY(-5px)}50%{transform:rotate(4deg) translateY(-2px)}80%{transform:rotate(-2deg) translateY(0)}}
+.pot.nope{animation:potshake .35s}
+.pot.hot{transform:scale(1.06)}
+.steam{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);display:flex;gap:14px;opacity:0;transition:opacity .2s}
+.steam.on{opacity:1}
+.steam span{display:block;width:6px;height:26px;border-radius:3px;background:rgba(74,85,104,.35);animation:rise 1.2s infinite}
+.steam span:nth-child(2){animation-delay:.2s}
+.steam span:nth-child(3){animation-delay:.4s}
+.steam span:nth-child(4){animation-delay:.6s}
+@keyframes rise{0%{transform:translateY(10px) scaleY(.6);opacity:0}40%{opacity:.9}100%{transform:translateY(-16px) scaleY(1.2);opacity:0}}
+.popup{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);font-size:40px;font-weight:600;opacity:0;pointer-events:none;white-space:nowrap}
+.popup.on{animation:pop 1.3s ease-out}
+@keyframes pop{0%{opacity:0;transform:translateX(-50%) translateY(10px) scale(.6)}25%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.15)}70%{opacity:1;transform:translateX(-50%) translateY(-8px) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-22px) scale(.95)}}
+.praise{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);font-size:15px;font-weight:600;color:var(--orange);opacity:0;white-space:nowrap;pointer-events:none}
+.praise.on{animation:praise 1.2s ease-out}
+@keyframes praise{0%{opacity:0;transform:translateX(-50%) translateY(6px)}30%{opacity:1;transform:translateX(-50%) translateY(-4px)}100%{opacity:0;transform:translateX(-50%) translateY(-20px)}}
+.fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.fx i{position:absolute;left:50%;top:70px;width:9px;height:9px;border-radius:50%;background:var(--orange);animation:fly .85s ease-out forwards}
+@keyframes fly{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+
+.group{margin-bottom:12px}
+.glabel{font-size:12px;color:var(--ink-soft);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.glabel i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.famlab{font-size:11px;color:var(--ink-soft);width:100%;margin:6px 0 2px}
+.famlab:first-child{margin-top:0}
+.flab{width:100%;font-size:11px;font-weight:600;color:#8A6A3A;margin:10px 0 2px;padding-left:7px;border-left:3px solid #E8C89A}
+.flab:first-child{margin-top:0}
+.cards{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.card{
+  min-width:54px;padding:11px 14px;border-radius:14px;border:1px solid var(--line);
+  background:var(--card);font-size:23px;font-family:inherit;color:var(--ink);cursor:pointer;line-height:1.2;
+  box-shadow:0 1px 0 rgba(58,50,38,.07);
+  transition:transform .12s, box-shadow .12s, border-color .12s;
+}
+.card:hover{border-color:rgba(58,50,38,.32);transform:translateY(-2px);box-shadow:0 5px 12px -4px rgba(58,50,38,.22)}
+.card:active{transform:translateY(0) scale(.95)}
+.card.i{border-color:#C6DCF0;background:var(--blue-soft);color:#2C6BA3}
+.card.m{border-color:#CECBF6;background:#EEEDFE;color:#534AB7}
+.card.f{border-color:#F2D5B8;background:var(--orange-soft);color:#B6621F}
+.card.w{border-color:#CECBF6;background:#EEEDFE;color:#534AB7}
+.card.sel{outline:3px solid var(--blue);outline-offset:1px}
+.card.m.sel,.card.w.sel{outline-color:var(--purple)}
+.card.f.sel{outline-color:var(--orange)}
+.card.dim{opacity:.3}
+.card.correct{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+
+.tip{text-align:center;font-size:13px;min-height:22px;color:var(--ink-soft);margin:2px 0 10px}
+.tip.ok{color:var(--green);font-weight:600}
+.tip.no{color:var(--red)}
+.tip.note{color:#B6621F}
+
+/* ---------- 结算 ---------- */
+.result{
+  background:linear-gradient(180deg,#fff 0%,#FFF8EE 100%);
+  border:1px solid var(--line);border-radius:22px;padding:26px 20px;text-align:center;
+  box-shadow:0 4px 18px -8px rgba(58,50,38,.28);
+}
+.result h2{font-size:20px;margin:0 0 4px;font-weight:600}
+.result .big{font-size:42px;letter-spacing:6px;color:var(--orange);margin:12px 0}
+.result p{font-size:14px;color:var(--ink-soft);margin:6px 0 14px}
+.newfood{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:16px}
+.newfood .cell{width:40px;height:40px;min-width:40px;font-size:19px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 主页 ============ -->
+  <div id="home">
+    <div class="topbar">
+      <div class="potlogo">
+        <svg viewBox="0 0 150 112" width="27" height="20" aria-hidden="true">
+          <path d="M18 13 h114" stroke="#8A7F6E" stroke-width="9" stroke-linecap="round" fill="none"/>
+          <rect x="8" y="21" width="34" height="14" rx="7" fill="#8A7F6E"/>
+          <rect x="108" y="21" width="34" height="14" rx="7" fill="#8A7F6E"/>
+          <path d="M22 35 h106 l-9 52 a16 16 0 0 1 -15 12 H46 a16 16 0 0 1 -15 -12 Z" fill="#4A5568"/>
+          <rect x="14" y="31" width="122" height="12" rx="6" fill="#3B4453"/>
+        </svg>
+      </div>
+      <div class="title">拼音小厨房<small>听一听，拼一拼，锅里变出字</small></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat a">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.2.9-4.5 4.4 1.1 6.1L12 17.3l-5.5 2.9 1.1-6.1L3.1 9.7l6.2-.9z"/></svg>
+        <div class="v" id="stStar">0</div><div class="k">总星星</div>
+      </div>
+      <div class="stat b">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 11h17a8.5 8.5 0 0 1-8.5 8.5A8.5 8.5 0 0 1 3.5 11z"/><path d="M8.5 8c0-1.4.9-1.9.9-2.8M12 8c0-1.4.9-1.9.9-2.8M15.5 8c0-1.4.9-1.9.9-2.8"/></svg>
+        <div class="v" id="stFood">0</div><div class="k">菜单收字</div>
+      </div>
+      <div class="stat c">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.2" y="5" width="17.6" height="15.8" rx="3.4"/><path d="M8 3.2v3.6M16 3.2v3.6M3.2 10.2h17.6"/></svg>
+        <div class="v" id="stDay">0</div><div class="k">连续打卡</div>
+      </div>
+      <div class="stat d">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7.4C10 3.8 5.4 2.8 3.9 5.4 2.5 8 6.2 11.6 12 12.6z"/><path d="M12 7.4c2-3.6 6.6-4.6 8.1-2 1.4 2.6-2.3 6.2-8.1 7.2z"/><path d="M12 12.6c-3.4 1.6-4.9 5.2-3.3 7.2 1.2 1.6 2.6.3 3.3-1.3z"/><path d="M12 12.6c3.4 1.6 4.9 5.2 3.3 7.2-1.2 1.6-2.6.3-3.3-1.3z"/></svg>
+        <div class="v" id="stBf">0</div><div class="k">小蝴蝶</div>
+      </div>
+    </div>
+
+    <div class="bffloat hidden" id="bfFloat"></div>
+    <div class="notice hidden" id="notice"></div>
+
+    <div class="chefbar">
+      <div class="chefcrown">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.6 8.2l3.7 3.1 1.9-2.9 2.8 3.3 2.8-3.3 1.9 2.9 3.7-3.1v9.3a2.4 2.4 0 0 1-2.4 2.4H6a2.4 2.4 0 0 1-2.4-2.4z"/><circle cx="12" cy="4.4" r="1.7"/></svg>
+      </div>
+      <div class="cheftx">
+        <div class="chefnm" id="chefName">洗菜小学徒</div>
+        <div class="chefsub" id="chefSub"></div>
+      </div>
+      <div class="chefprog"><i id="chefBarFill"></i></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" id="tabMap">闯关</button>
+      <button class="tab" id="tabColl">菜单</button>
+      <button class="tab" id="tabBf">蝴蝶</button>
+      <button class="tab" id="tabRec">记录</button>
+    </div>
+
+    <div id="viewMap">
+      <div class="map" id="levelMap"></div>
+      <div class="hintbox">
+        玩法：听上面的字，按顺序点卡片下锅，咕嘟一声就变出汉字。<br>
+        <b>两拼</b>点声母 + 韵母；<b>三拼</b>点声母 + 介音 + 韵母；<b>整体认读</b>整块下锅，不用拼。每关 8 题，答对 4 道解锁下一关。
+      </div>
+    </div>
+
+    <div id="viewColl" class="hidden">
+      <div class="panel">
+        <h3>我的菜单</h3>
+        <div class="sub" id="collSub"></div>
+        <div class="bar"><i id="collBar" style="width:0%"></i></div>
+        <div class="grid" id="collGrid"></div>
+      </div>
+    </div>
+
+    <div id="viewBf" class="hidden">
+      <div class="panel" style="margin-bottom:12px">
+        <h3>蝴蝶花园</h3>
+        <div class="sub" id="bfSub"></div>
+        <div class="bar"><i id="bfBar" style="width:0%"></i></div>
+        <div class="bgrid" id="bfGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>最近捉到的</h3>
+        <div class="sub">每通关一次送一只，第一次通关额外再送一只</div>
+        <div class="recent" id="bfRecent"></div>
+      </div>
+    </div>
+
+    <div id="viewRec" class="hidden">
+      <div class="panel" style="margin-bottom:12px">
+        <h3>成就徽章</h3>
+        <div class="sub">解锁条件达成后自动点亮</div>
+        <div class="badges" id="badgeGrid"></div>
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>最近战绩</h3>
+        <div class="sub">最近 8 次闯关</div>
+        <div id="recList"></div>
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>错题本</h3>
+        <div class="sub" id="wrongSub">拼错最多的音节，可以重点练</div>
+        <div id="wrongList"></div>
+      </div>
+      <div class="panel" style="margin-bottom:12px">
+        <h3>记录备份</h3>
+        <div class="sub">记录存在这台设备的浏览器里。换设备、清缓存前，先导出一份留着</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" id="exportBtn" style="flex:1">导出记录</button>
+          <button class="btn" id="importBtn" style="flex:1">导入记录</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+      </div>
+      <button class="btn" id="resetBtn" style="width:100%">清空全部本地记录</button>
+      <div style="font-size:11px;color:var(--ink-soft);text-align:center;margin-top:10px" id="dbg"></div>
+    </div>
+  </div>
+
+  <!-- ============ 游戏 ============ -->
+  <div id="game" class="hidden">
+    <div class="topbar">
+      <button class="btn" id="backBtn">返回</button>
+      <div style="min-width:0">
+        <div style="font-size:15px;font-weight:600" id="levelName"></div>
+        <div style="font-size:11px;color:var(--ink-soft)" id="levelSub"></div>
+      </div>
+    </div>
+    <div class="hud">
+      <span>第 <b id="qNo">1</b><span id="qTotal">/8</span> 题</span>
+      <span class="hudfire" id="hudFire"></span>
+      <span class="stars" id="hudStars"></span>
+      <span class="combo" id="hudCombo"></span>
+      <span id="hudRetry"></span>
+    </div>
+
+    <div class="target">
+      <div class="lbl" id="targetLbl">听一听，把这个字的拼音拼出来</div>
+      <div class="bigchar" id="targetChar">妈</div>
+      <div class="foodtag" id="foodTag"></div>
+      <div class="listenrow">
+        <button class="btn sm" id="playBtn">听一听</button>
+        <button class="btn sm" id="slowBtn">慢速：关</button>
+      </div>
+      <div class="slots" id="slots"></div>
+    </div>
+
+    <div class="stage">
+      <div class="fx" id="fx"></div>
+      <div class="praise" id="praise"></div>
+      <div class="popup" id="popup"></div>
+      <div class="pot" id="pot">
+        <div class="steam" id="steam"><span></span><span></span><span></span><span></span></div>
+        <svg viewBox="0 0 150 112" width="150" height="112">
+          <path d="M18 12 h114" stroke="#8A7F6E" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M24 12 v6 M126 12 v6" stroke="#8A7F6E" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <rect x="10" y="20" width="34" height="14" rx="7" fill="#8A7F6E"/>
+          <rect x="106" y="20" width="34" height="14" rx="7" fill="#8A7F6E"/>
+          <path d="M22 34 h106 l-9 52 a16 16 0 0 1 -15 12 H46 a16 16 0 0 1 -15 -12 Z" fill="#4A5568"/>
+          <rect x="14" y="30" width="122" height="12" rx="6" fill="#3B4453"/>
+          <circle cx="60" cy="66" r="4" fill="#657287"/>
+          <circle cx="90" cy="74" r="3" fill="#657287"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="tip" id="tip"></div>
+
+    <div class="group hidden" id="grpI">
+      <div class="glabel"><i style="background:#3B82C4"></i>声母</div>
+      <div class="cards" id="initCards"></div>
+    </div>
+    <div class="group hidden" id="grpM">
+      <div class="glabel"><i style="background:#7F77DD"></i>介音</div>
+      <div class="cards" id="medCards"></div>
+    </div>
+    <div class="group hidden" id="grpF">
+      <div class="glabel"><i style="background:#E8873B"></i>韵母（带声调）</div>
+      <div class="cards" id="finalCards"></div>
+    </div>
+    <div class="group hidden" id="grpW">
+      <div class="glabel"><i style="background:#7F77DD"></i>整体认读音节（整块下锅，不用拼）</div>
+      <div class="cards" id="wholeCards"></div>
+    </div>
+  </div>
+
+  <!-- ============ 结算 ============ -->
+  <div id="result" class="hidden">
+    <div class="result">
+      <h2 id="rTitle">通关啦</h2>
+      <div class="big" id="rStars"></div>
+      <p id="rDesc"></p>
+      <div id="rNewWrap" class="hidden">
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">本局新收进菜单的字</div>
+        <div class="newfood" id="rNewFoods"></div>
+      </div>
+      <div id="rBfWrap" class="hidden">
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px">通关奖励</div>
+        <div class="bflyaward" id="rBf"></div>
+      </div>
+      <button class="btn primary" id="againBtn">再来一次</button>
+      <button class="btn" id="nextBtn" style="margin-left:8px">下一关</button>
+      <button class="btn" id="homeBtn" style="margin-left:8px">选关</button>
+    </div>
+  </div>
+
+  <!-- 蝴蝶进化：收集到一定数量触发 -->
+  <div class="upov" id="upOverlay">
+    <div class="upcard" id="upCard">
+      <div class="uprings"><i></i><i></i><i></i></div>
+      <div class="upbf" id="upBf"></div>
+      <div class="upsparks" id="upSparks"></div>
+      <div class="uptitle" id="upTitle">进化啦</div>
+      <div class="upsub" id="upSub"></div>
+      <div class="upname" id="upName"></div>
+      <button class="btn primary upbtn" id="upBtn">太棒了！</button>
+    </div>
+  </div>
+
+  <!-- 选火候：进入关卡前，让孩子自己决定这一局有多难 -->
+  <div class="fireov" id="fireOverlay">
+    <div class="firecard">
+      <div class="ftitle" id="fireTitle">第 1 关</div>
+      <div class="fsub">今天想开多大的火？</div>
+      <p class="firehint" id="fireHint"></p>
+      <div class="fopts" id="fireOpts"></div>
+      <button class="btn sm" id="fireCancel">先不玩</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   数据格式
+   mode split : [声母, 带调韵母, 汉字]
+   mode tri   : [声母, 介音, 带调韵母, 汉字]
+   mode whole : [整体认读音节, 汉字]
+   ============================================================ */
+const LEVELS = [
+  { name:"第 1 关 · 单韵母", sub:"a o e i u ü", mode:"split",
+    words:[['b','ā','八'],['b','á','拔'],['b','ǎ','把'],['b','à','爸'],
+           ['p','á','爬'],['p','à','怕'],['p','ō','坡'],['p','ó','婆'],['p','ò','破'],
+           ['m','ā','妈'],['m','á','麻'],['m','ǎ','马'],['m','à','骂'],['m','ō','摸'],['m','ó','磨'],['m','ǐ','米'],['m','ì','蜜'],
+           ['f','ā','发'],['f','á','罚'],['f','ǎ','法'],['f','ó','佛'],['f','ū','夫'],['f','ú','服'],['f','ǔ','府'],['f','ù','父'],
+           ['d','ā','搭'],['d','á','答'],['d','ǎ','打'],['d','à','大'],['d','ī','低'],['d','ǐ','底'],['d','ì','地'],['d','ú','读'],['d','ǔ','堵'],['d','ù','度'],
+           ['t','ā','他'],['t','ǎ','塔'],['t','ī','梯'],['t','í','提'],['t','ǐ','体'],['t','ì','替'],['t','ū','突'],['t','ú','图'],['t','ǔ','土'],['t','ù','兔']] },
+
+  { name:"第 2 关 · n l g k h", sub:"鼻音、边音和舌根音", mode:"split",
+    words:[['n','á','拿'],['n','ǎ','哪'],['n','à','那'],['n','í','泥'],['n','ǐ','你'],['n','ǔ','努'],['n','ù','怒'],['n','ǚ','女'],
+           ['l','ā','拉'],['l','à','辣'],['l','í','梨'],['l','ǐ','里'],['l','ì','力'],['l','ú','炉'],['l','ǔ','鲁'],['l','ù','路'],['l','ǘ','驴'],['l','ǚ','旅'],['l','ǜ','绿'],
+           ['g','ē','哥'],['g','é','格'],['g','è','个'],['g','ū','姑'],['g','ǔ','古'],['g','ù','故'],
+           ['k','ǎ','卡'],['k','ē','科'],['k','ě','可'],['k','è','课'],['k','ū','哭'],['k','ǔ','苦'],['k','ù','库'],
+           ['h','ā','哈'],['h','ē','喝'],['h','é','河'],['h','ū','呼'],['h','ú','湖'],['h','ǔ','虎'],['h','ù','户']] },
+
+  { name:"第 3 关 · 复韵母", sub:"ai ei ui ao ou iu", mode:"split",
+    words:[['b','ái','白'],['b','ǎi','百'],['b','ēi','杯'],['b','ěi','北'],['b','èi','背'],['b','āo','包'],['b','ǎo','饱'],['b','ào','抱'],
+           ['p','āi','拍'],['p','ái','排'],['p','éi','陪'],['p','ǎo','跑'],['p','ào','泡'],
+           ['m','ǎi','买'],['m','ài','卖'],['m','éi','没'],['m','ěi','美'],['m','èi','妹'],['m','āo','猫'],['m','áo','毛'],['m','ào','帽'],
+           ['f','ēi','飞'],['f','éi','肥'],['f','ǒu','否'],
+           ['d','ài','带'],['d','āo','刀'],['d','ào','到'],['d','ōu','都'],['d','òu','豆'],['d','uī','堆'],
+           ['t','ái','抬'],['t','áo','桃'],['t','ào','套'],['t','óu','头'],
+           ['n','ǎi','奶'],['n','ǎo','脑'],['n','ào','闹'],['n','iú','牛'],
+           ['l','ái','来'],['l','èi','累'],['l','ǎo','老'],['l','óu','楼'],['l','iú','流'],['l','iù','六'],
+           ['g','āi','该'],['g','ǎi','改'],['g','ài','盖'],['g','ěi','给'],['g','āo','高'],['g','ào','告'],['g','ǒu','狗'],['g','òu','够'],
+           ['k','āi','开'],['k','ào','靠'],['k','ǒu','口'],['k','òu','扣'],
+           ['h','ái','还'],['h','ǎi','海'],['h','ēi','黑'],['h','ǎo','好'],['h','ào','号'],['h','óu','猴'],['h','òu','后'],['h','uī','灰'],['h','uí','回']] },
+
+  { name:"第 4 关 · j q x", sub:"遇到 ü 要去两点", mode:"split",
+    words:[['j','ī','鸡'],['j','í','极'],['j','ǐ','几'],['j','ì','记'],['j','ū','居'],['j','ú','菊'],['j','ǔ','举'],['j','ù','句'],
+           ['q','ī','七'],['q','í','骑'],['q','ǐ','起'],['q','ì','气'],['q','ū','区'],['q','ú','渠'],['q','ǔ','取'],['q','ù','去'],
+           ['x','ī','西'],['x','í','习'],['x','ǐ','洗'],['x','ì','细'],['x','ū','需'],['x','ú','徐'],['x','ǔ','许'],['x','ù','续'],
+           ['j','iē','接'],['j','ié','节'],['j','iě','姐'],['j','iè','借'],
+           ['q','ié','茄'],['q','iē','切'],
+           ['x','iē','些'],['x','ié','鞋'],['x','iě','写'],['x','iè','谢'],
+           ['j','iǔ','九'],['j','iù','旧'],['q','iū','秋'],['q','iú','球'],['x','iū','休'],['x','iù','秀'],
+           ['x','ué','学'],['x','uě','雪'],['q','uè','确'],['q','uē','缺'],['j','ūn','军'],['q','ún','群']] },
+
+  { name:"第 5 关 · 平舌翘舌", sub:"zh ch sh r / z c s（不含整体认读）", mode:"split",
+    tip:"知、吃、十、日、字、次、四 这些字不拼读，要整块认，在第 7 关学",
+    words:[['zh','ū','猪'],['zh','ú','竹'],['zh','ǔ','主'],['zh','ù','住'],
+           ['ch','ū','出'],['ch','ú','除'],['ch','ǔ','楚'],['ch','ù','处'],
+           ['sh','ū','书'],['sh','ú','熟'],['sh','ǔ','数'],['sh','ù','树'],
+           ['r','è','热'],['r','ú','如'],['r','ǔ','乳'],['r','ù','入'],
+           ['z','ū','租'],['z','ú','足'],['z','ǔ','组'],
+           ['c','ū','粗'],['c','ù','醋'],
+           ['s','ū','苏'],['s','ù','素'],
+           ['zh','è','这'],['zh','ě','者'],['ch','ē','车'],['sh','é','蛇'],['sh','ě','舍'],['sh','è','社'],
+           ['zh','ǎo','找'],['ch','ǎo','吵'],['sh','ǎo','少'],['z','ǎo','早'],['c','ǎo','草'],['s','ǎo','扫'],
+           ['zh','ōu','周'],['ch','ōu','抽'],['ch','óu','愁'],['sh','ōu','收'],['sh','òu','瘦'],['z','ǒu','走'],['s','ōu','搜'],
+           ['zh','āi','摘'],['ch','āi','拆'],['ch','ái','柴'],['sh','āi','筛'],['sh','ài','晒'],
+           ['z','āi','灾'],['z','ài','在'],['c','āi','猜'],['c','ái','才'],['c','ǎi','采'],['c','ài','菜'],['s','āi','塞'],['s','ài','赛']] },
+
+  { name:"第 6 关 · 前后鼻音", sub:"an en in / ang eng ing ong", mode:"split",
+    words:[['b','ān','班'],['b','ǎn','板'],['b','ěn','本'],['b','īng','冰'],['b','ìng','病'],
+           ['p','én','盆'],['p','íng','平'],['p','àng','胖'],
+           ['m','én','门'],['m','áng','忙'],['m','íng','明'],['m','èng','梦'],
+           ['f','ēn','分'],['f','ěn','粉'],['f','ēng','风'],
+           ['d','ān','单'],['d','ǎn','胆'],['d','àn','蛋'],['d','ēng','灯'],['d','īng','丁'],['d','ìng','定'],['d','ōng','东'],['d','òng','动'],
+           ['t','īng','听'],['t','íng','停'],['t','āng','汤'],['t','áng','糖'],['t','óng','同'],
+           ['n','án','南'],['n','éng','能'],['n','ín','您'],
+           ['l','án','蓝'],['l','ǎn','懒'],['l','ěng','冷'],['l','íng','零'],['l','óng','龙'],
+           ['g','ān','干'],['g','ǎn','敢'],['g','ēn','跟'],['g','èng','更'],['g','ōng','工'],
+           ['k','àn','看'],['k','ōng','空'],
+           ['h','ěn','很'],['h','óng','红'],
+           ['j','īn','今'],['j','ǐn','紧'],['j','ìn','进'],['j','īng','京'],['j','ǐng','井'],['j','ìng','静'],
+           ['q','īn','亲'],['q','ín','琴'],['q','īng','青'],['q','íng','情'],['q','ǐng','请'],
+           ['x','īn','心'],['x','ìn','信'],['x','īng','星'],['x','íng','行'],['x','ǐng','醒'],['x','ìng','姓'],
+           ['zh','ēn','真'],['zh','àn','站'],['zh','āng','张'],['zh','ǎng','掌'],['zh','ēng','争'],['zh','èng','正'],
+           ['ch','én','尘'],['ch','ǎn','产'],['ch','áng','长'],['ch','ǎng','厂'],['ch','àng','唱'],['ch','éng','成'],
+           ['sh','ēn','身'],['b','ēn','奔'],['sh','ān','山'],['sh','ǎn','闪'],['sh','āng','商'],['sh','àng','上'],['sh','ēng','生'],
+           ['r','én','人'],['r','ěn','忍'],['r','èn','认'],['r','àng','让'],
+           ['s','ān','三'],['s','ǎn','伞'],['s','ēn','森']] },
+
+  { name:"第 7 关 · 整体认读（一）", sub:"zhi chi shi ri zi ci si · 整块下锅", mode:"whole",
+    words:[['zhī','知'],['zhí','直'],['zhǐ','只'],['zhì','志'],
+           ['chī','吃'],['chí','迟'],['chǐ','尺'],['chì','翅'],
+           ['shī','诗'],['shí','十'],['shǐ','史'],['shì','是'],
+           ['rì','日'],
+           ['zī','资'],['zǐ','子'],['zì','字'],
+           ['cí','词'],['cǐ','此'],['cì','次'],
+           ['sī','丝'],['sǐ','死'],['sì','四']] },
+
+  { name:"第 8 关 · 整体认读（二）", sub:"yi wu yu ye yue yuan yin yun ying", mode:"whole",
+    words:[['yī','一'],['yí','姨'],['yǐ','椅'],['yì','意'],
+           ['wū','屋'],['wú','无'],['wǔ','五'],['wù','雾'],
+           ['yū','淤'],['yú','鱼'],['yǔ','雨'],['yù','玉'],
+           ['yē','椰'],['yé','爷'],['yě','也'],['yè','叶'],
+           ['yuē','约'],['yuè','月'],
+           ['yuān','冤'],['yuán','圆'],['yuǎn','远'],['yuàn','院'],
+           ['yīn','因'],['yín','银'],['yǐn','引'],['yìn','印'],
+           ['yūn','晕'],['yún','云'],['yǔn','允'],['yùn','运'],
+           ['yīng','英'],['yíng','赢'],['yǐng','影'],['yìng','硬']] },
+
+  { name:"第 9 关 · 三拼音节", sub:"声母 + 介音 + 韵母，i / u / ü 三种介音", mode:"tri",
+    words:[['g','u','ā','瓜'],['g','u','ō','锅'],['g','u','ó','国'],['g','u','ǒ','果'],
+           ['k','u','ā','夸'],['k','u','à','跨'],
+           ['h','u','ā','花'],['h','u','á','滑'],['h','u','à','画'],
+           ['d','u','ō','多'],['d','u','ǒ','躲'],['t','u','ō','拖'],['n','u','ó','挪'],['l','u','ó','罗'],
+           ['z','u','ò','坐'],['c','u','ò','错'],['s','u','ǒ','锁'],
+           ['zh','u','ō','桌'],['ch','u','ō','戳'],['sh','u','ō','说'],
+           ['g','u','ān','关'],['k','u','ān','宽'],['h','u','ān','欢'],
+           ['g','u','āng','光'],['h','u','āng','荒'],
+           ['d','u','ān','端'],['t','u','án','团'],['n','u','ǎn','暖'],
+           ['j','i','ā','家'],['j','i','ǎ','假'],['j','i','à','架'],
+           ['x','i','ā','虾'],['x','i','á','霞'],['x','i','à','下'],
+           ['q','i','áo','桥'],['q','i','ǎo','巧'],
+           ['j','i','ǎo','脚'],['j','i','ào','叫'],['x','i','ǎo','小'],['x','i','ào','笑'],
+           ['t','i','ān','天'],['d','i','ǎn','点'],['m','i','àn','面'],
+           ['j','i','āng','江'],['x','i','ǎng','想'],['x','i','óng','熊'],
+           ['j','ü','ān','捐'],['q','ü','ān','圈'],['x','ü','ān','宣']] }
+];
+
+const INIT_ORDER=['b','p','m','f','d','t','n','l','g','k','h','j','q','x','zh','ch','sh','r','z','c','s'];
+const FINAL_ORDER=['a','o','e','i','u','ü','ai','ei','ui','ao','ou','iu','ie','üe','er','an','en','in','un','ün','ang','eng','ing','ong'];
+const WHOLE_ORDER=['zhi','chi','shi','ri','zi','ci','si','yi','wu','yu','ye','yue','yuan','yin','yun','ying'];
+/* 韵母分类：卡片多的时候按类分组，好找 */
+const FINAL_KIND=[{k:'单韵母',list:['a','o','e','i','u','ü']},
+                  {k:'复韵母',list:['ai','ei','ui','ao','ou','iu','ie','üe','ue','er']},
+                  {k:'前鼻韵母',list:['an','en','in','un','ün']},
+                  {k:'后鼻韵母',list:['ang','eng','ing','ong']}];
+function finalKind(base){
+  for(const g of FINAL_KIND) if(g.list.indexOf(base)>=0) return g.k;
+  return '其他';
+}
+const TMAP={'ā':0,'á':1,'ǎ':2,'à':3,'ō':0,'ó':1,'ǒ':2,'ò':3,'ē':0,'é':1,'ě':2,'è':3,
+            'ī':0,'í':1,'ǐ':2,'ì':3,'ū':0,'ú':1,'ǔ':2,'ù':3,'ǖ':0,'ǘ':1,'ǚ':2,'ǜ':3};
+function baseOf(s){
+  const M={'ā':'a','á':'a','ǎ':'a','à':'a','ō':'o','ó':'o','ǒ':'o','ò':'o','ē':'e','é':'e','ě':'e','è':'e',
+           'ī':'i','í':'i','ǐ':'i','ì':'i','ū':'u','ú':'u','ǔ':'u','ù':'u','ǖ':'v','ǘ':'v','ǚ':'v','ǜ':'v'};
+  return s.split('').map(c=>M[c]||c).join('');
+}
+function toneIdx(s){for(const c of s){if(c in TMAP) return TMAP[c];} return 0;}
+const TOTAL_WORDS = LEVELS.reduce((n,l)=>n+l.words.length,0);
+
+/* 每个词的展示拼音 */
+function pyOf(w,mode){
+  if(mode==='whole') return w[0];
+  if(mode==='tri'){
+    let m=w[1];
+    if(['j','q','x'].indexOf(w[0])>=0 && m==='ü') m='u';
+    return w[0]+m+w[2];
+  }
+  return w[0]+w[1];
+}
+/* 多音字容错表：拼音(去调) -> 该读音在题库里对应的汉字集合。
+   「长」既有 cháng 又有 zhǎng，孩子拼任意一个都算对，不会因为没上下文被误判。 */
+const PY2CHAR={};
+function buildPy2Char(){
+  LEVELS.forEach(lv=>{
+    lv.words.forEach(w=>{
+      const b=baseOf(pyOf(w,lv.mode)).replace(/v/g,'ü');
+      (PY2CHAR[b]=PY2CHAR[b]||new Set()).add(charOf(w,lv.mode));
+    });
+  });
+}
+/* 汉字 -> 它在题库里的全部读音，用于提示「这个字还读…」 */
+function readingsOf(ch){
+  const out=[];
+  LEVELS.forEach(lv=>{
+    lv.words.forEach(w=>{ if(charOf(w,lv.mode)===ch) out.push(pyOf(w,lv.mode)); });
+  });
+  return [...new Set(out)];
+}
+function charOf(w,mode){ return mode==='whole'? w[1] : (mode==='tri'? w[3] : w[2]); }
+function partsOf(w,mode){
+  if(mode==='whole') return {w:w[0]};
+  if(mode==='tri') return {i:w[0],m:w[1],f:w[2]};
+  return {i:w[0],f:w[1]};
+}
+
+/* ============================================================
+   本地记录
+   ============================================================ */
+const KEY='pinyin_kitchen_v2';
+const KEY_BAK='pinyin_kitchen_v2_bak';
+/* 老版本用过的存档 key：升级后要把老记录接过来，不能丢 */
+const OLD_KEYS=['pinyin_kitchen_v1','pinyin_kitchen'];
+const DEF={unlocked:1,stars:{},food:{},wrong:{},wrongMastered:{},history:[],streak:{last:'',n:0},bestCombo:0,bf:[],cleared:{},tts:{slow:false}};
+let MIGR_NOTE=[];
+let canSave=true;
+
+/* 把一份存档「合并」进目标，而不是覆盖：星星取大、收字取并集、错题累加、蝴蝶拼接、打卡取更近的 */
+function mergeInto(t,s){
+  if(!s||typeof s!=='object') return 0;
+  let got=0;
+  if(typeof s.unlocked==='number'&&s.unlocked>t.unlocked){t.unlocked=s.unlocked;got++;}
+  if(s.stars&&typeof s.stars==='object') Object.keys(s.stars).forEach(k=>{
+    const v=+s.stars[k]||0; if(v>(+t.stars[k]||0)){t.stars[k]=v;got++;}
+  });
+  if(s.food&&typeof s.food==='object') Object.keys(s.food).forEach(k=>{if(!t.food[k]){t.food[k]=1;got++;}});
+  if(s.cleared&&typeof s.cleared==='object') Object.keys(s.cleared).forEach(k=>{if(s.cleared[k]&&!t.cleared[k]){t.cleared[k]=1;got++;}});
+  if(s.wrong&&typeof s.wrong==='object') Object.keys(s.wrong).forEach(k=>{
+    t.wrong[k]=(+t.wrong[k]||0)+(+s.wrong[k]||0);got++;
+  });
+  if(Array.isArray(s.history)&&s.history.length){
+    const seen=new Set(t.history.map(h=>[h.d,h.lv,h.r,h.t].join('|')));
+    s.history.forEach(h=>{ const k=[h.d,h.lv,h.r,h.t].join('|'); if(!seen.has(k)){seen.add(k);t.history.push(h);got++;} });
+  }
+  if(s.streak&&typeof s.streak==='object'){
+    const a=t.streak.last||'', b=s.streak.last||'';
+    if(b>a){t.streak={last:b,n:+s.streak.n||0};got++;}
+    else if(b&&b===a&&(+s.streak.n||0)>(t.streak.n||0)){t.streak.n=+s.streak.n||0;got++;}
+  }
+  if(typeof s.bestCombo==='number'&&s.bestCombo>(t.bestCombo||0)){t.bestCombo=s.bestCombo;got++;}
+  if(Array.isArray(s.bf)&&s.bf.length){
+    s.bf.forEach(x=>{ if(x&&x.t){ t.bf.push({t:x.t,lv:+x.lv||1,s:+x.s||1,d:x.d||today()}); got++; } });
+  }
+  if(t.history.length>60) t.history=t.history.slice(-60);
+  return got;
+}
+function readKey(k){
+  try{const raw=localStorage.getItem(k); if(!raw) return null;
+      const o=JSON.parse(raw); return (o&&typeof o==='object')?o:null;}catch(e){return null;}
+}
+function hasData(o){
+  return !!(o&&(Object.keys(o.stars||{}).length||Object.keys(o.food||{}).length||(o.bf&&o.bf.length)||o.unlocked>1));
+}
+/* 读档顺序：主存档 → 自动备份 → 老版本存档（都合并，不覆盖） */
+function loadProg(){
+  const p=JSON.parse(JSON.stringify(DEF));
+  const main=readKey(KEY);
+  if(main&&hasData(main)) mergeInto(p,main);
+  else{
+    const bak=readKey(KEY_BAK);
+    if(bak&&hasData(bak)){ mergeInto(p,bak); MIGR_NOTE.push('主存档读不到，已从自动备份恢复'); }
+  }
+  OLD_KEYS.forEach(k=>{
+    const o=readKey(k);
+    if(!o||!hasData(o)) return;
+    /* 每个老 key 只合并一次，否则每次刷新都会重复累加（尤其蝴蝶会翻倍） */
+    let done=false; try{ done=!!localStorage.getItem(KEY+'_merged_'+k); }catch(e){}
+    if(done) return;
+    if(mergeInto(p,o)>0) MIGR_NOTE.push('接回了旧版存档（'+k+'）的记录');
+    try{ localStorage.setItem(KEY+'_merged_'+k,'1'); }catch(e){}
+  });
+  return p;
+}
+let prog=loadProg();
+function save(){
+  try{
+    const prev=localStorage.getItem(KEY);
+    if(prev&&prev.length>20) localStorage.setItem(KEY_BAK,prev); /* 永远留一份上一版，可回滚 */
+    localStorage.setItem(KEY,JSON.stringify(prog));
+  }catch(e){canSave=false;}
+}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function touchStreak(){
+  const t=today();
+  if(prog.streak.last===t) return;
+  const y=new Date(Date.now()-864e5);
+  const ys=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+  prog.streak.n = (prog.streak.last===ys)? prog.streak.n+1 : 1;
+  prog.streak.last=t; save();
+}
+const totalStars=()=>Object.keys(prog.stars).reduce((n,k)=>n+(prog.stars[k]||0),0);
+const foodCount=()=>Object.keys(prog.food).length;
+
+/* ---------- 蝴蝶图鉴：1 普通 / 2 漂亮 / 3 稀有 ---------- */
+/* ⚠️ 已有品种的 t 值（r o y g m b p k s w d h）绝对不能改 —— 存档里存的就是这些字母，改了记录全丢。
+   新增品种只能往后追加。 */
+const BUTTERFLY=[
+  {t:'r',n:'辣椒红',  c:'#D2544B',c2:'#F09595',r:1},
+  {t:'o',n:'南瓜橙',  c:'#E8873B',c2:'#FAC775',r:1},
+  {t:'y',n:'柠檬黄',  c:'#EF9F27',c2:'#FAE3A8',r:1},
+  {t:'g',n:'青苹果',  c:'#639922',c2:'#C0DD97',r:1},
+  {t:'m',n:'薄荷绿',  c:'#1D9E75',c2:'#9FE1CB',r:1},
+  {t:'b',n:'天空蓝',  c:'#378ADD',c2:'#B5D4F4',r:1},
+  {t:'p',n:'紫葡萄',  c:'#7F77DD',c2:'#CECBF6',r:1},
+  {t:'k',n:'樱花粉',  c:'#D4537E',c2:'#F4C0D1',r:2},
+  {t:'s',n:'海水双色',c:'#0F6E56',c2:'#85B7EB',r:2},
+  {t:'w',n:'雪花白',  c:'#5F5E5A',c2:'#EFEDE7',r:2},
+  {t:'d',n:'金翅蝶',  c:'#BA7517',c2:'#FAC775',r:3},
+  {t:'h',n:'彩虹蝶',  c:'#D4537E',c2:'#378ADD',r:3},
+  /* ↓ 新增 8 种 */
+  {t:'a',n:'玫瑰粉',  c:'#E86A8F',c2:'#F9C9D6',r:2},
+  {t:'c',n:'珊瑚橘',  c:'#F2704A',c2:'#FBC9A6',r:1},
+  {t:'e',n:'翡翠青',  c:'#2FA38A',c2:'#A9E6D6',r:2},
+  {t:'f',n:'火焰红',  c:'#C0392B',c2:'#F5B041',r:3},
+  {t:'i',n:'靛青蓝',  c:'#3C4F9E',c2:'#A9B6EE',r:2},
+  {t:'j',n:'芥末黄',  c:'#C9A227',c2:'#F2E49C',r:1},
+  {t:'l',n:'薰衣草',  c:'#9B7FD4',c2:'#DCCEF7',r:1},
+  {t:'n',n:'夜空蓝',  c:'#1B3A6B',c2:'#7FA8E8',r:3}
+];
+const RARE_NAME={1:'普通',2:'漂亮',3:'稀有'};
+
+/* ---------- 蝴蝶进化：同一种收集到一定数量就升级 ----------
+   等级完全由 prog.bf 数组实时算出来，不存额外字段 —— 老存档打开即自动生效，记录不会丢。 */
+const BF_LV_NAME={0:'未见过',1:'初见',2:'闪耀',3:'华丽'};
+const BF_LV_NEED=[0,1,3,6];          // 升到该等级所需只数
+function bfCount(t){ return prog.bf.filter(x=>x.t===t).length; }
+function bfLevel(t){
+  const n=bfCount(t);
+  if(n>=BF_LV_NEED[3]) return 3;
+  if(n>=BF_LV_NEED[2]) return 2;
+  return n>=1?1:0;
+}
+function bfNextNeed(t){
+  const lv=bfLevel(t);
+  return lv>=3?null:BF_LV_NEED[lv+1];
+}
+
+let bUid=0;
+/* 四角星：比圆点更像「闪光」，华丽形态专用 */
+function star4(cx,cy,r){ const a=r,b=r*0.45; return 'M'+cx+' '+(cy-a)+' L'+(cx+b)+' '+(cy-b)+' L'+(cx+a)+' '+cy+' L'+(cx+b)+' '+(cy+b)+' L'+cx+' '+(cy+a)+' L'+(cx-b)+' '+(cy+b)+' L'+(cx-a)+' '+cy+' L'+(cx-b)+' '+(cy-b)+' Z'; }
+function bflySVG(b,size,opt){
+  const o=opt||{};
+  const lv=o.lv||1;
+  const id='bw'+(++bUid), gid='bg'+id;
+  const defs='<defs>'+
+    '<linearGradient id="'+gid+'" x1="0" y1="0" x2="0.85" y2="1">'+
+      '<stop offset="0%" stop-color="'+b.c+'"/><stop offset="100%" stop-color="'+b.c2+'"/>'+
+    '</linearGradient>'+
+    '<filter id="'+gid+'f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="'+(lv>=3?5.5:4)+'"/></filter>'+
+  '</defs>';
+  // 升级光效：Lv2 柔和发光，Lv3 更亮更宽的双层光晕（用 blur 才看得见，渐变色在米白底上会消失）
+  const halo = lv>=2
+    ? '<ellipse cx="50" cy="48" rx="'+(lv>=3?50:45)+'" ry="'+(lv>=3?46:41)+'" fill="'+b.c2+'" opacity="'+(lv>=3?'.62':'.45')+'" filter="url(#'+gid+'f)"/>'+
+      (lv>=3?'<ellipse cx="50" cy="48" rx="41" ry="37" fill="'+b.c+'" opacity=".38" filter="url(#'+gid+'f)"/>':'')
+    : '';
+  const ring = b.r===3
+    ? '<circle cx="50" cy="48" r="45" fill="none" stroke="'+(b.t==='h'?'#7F77DD':'#FAC775')+'" stroke-width="1.6" opacity=".65" stroke-dasharray="7 6"/>'
+    : '';
+  // 等级描边：Lv2 细金，Lv3 粗金 —— 翅膀金线是等级最直观的信号
+  const gold = lv>=3 ? ' stroke="#F5C542" stroke-width="2.4" stroke-linejoin="round"'
+             : lv===2 ? ' stroke="#F0C95C" stroke-width="1.2" stroke-linejoin="round"' : '';
+  // Lv3 四角星闪光
+  const spark = lv>=3
+    ? '<g fill="#FFE08A" stroke="#F0B429" stroke-width="0.7" stroke-linejoin="round">'+
+      star4(16,12,4.4)+star4(84,12,4.4)+star4(50,7,3.4)+star4(24,86,3.4)+star4(76,86,3.4)+
+      '</g>'
+    : '';
+  return '<svg class="bfly" viewBox="0 0 100 92" width="'+size+'" height="'+Math.round(size*0.92)+'" role="img" aria-label="'+b.n+'">'+
+    defs+halo+ring+
+    '<g class="wings">'+
+      '<g id="'+id+'">'+
+        /* 前翅：带波浪外缘 */
+        '<path d="M50 45 C 45 20, 31 5, 15 9 C 5 12, 5 26, 17 37 C 26 45, 40 48, 50 45 Z" fill="url(#'+gid+')"'+gold+'/>'+
+        /* 后翅：带小尾突 */
+        '<path d="M50 51 C 41 58, 29 64, 29 76 C 29 86, 40 88, 47 78 C 51 72, 51 60, 50 51 Z" fill="url(#'+gid+')"'+gold+'/>'+
+        /* 翅斑：外圈深色 + 内圈浅色 + 白心 */
+        '<circle cx="22" cy="26" r="6" fill="'+b.c+'" opacity=".85"/>'+
+        '<circle cx="22" cy="26" r="3.4" fill="#fff" opacity=".8"/>'+
+        '<circle cx="22" cy="26" r="1.4" fill="'+b.c+'"/>'+
+        '<circle cx="37" cy="74" r="3.6" fill="'+b.c+'" opacity=".8"/>'+
+        '<circle cx="37" cy="74" r="1.8" fill="#fff" opacity=".75"/>'+
+        /* 翅缘白点 */
+        '<circle cx="13" cy="15" r="1.6" fill="#fff" opacity=".7"/>'+
+        '<circle cx="10" cy="24" r="1.4" fill="#fff" opacity=".6"/>'+
+        '<circle cx="33" cy="84" r="1.3" fill="#fff" opacity=".6"/>'+
+      '</g>'+
+      '<use href="#'+id+'" transform="translate(100,0) scale(-1,1)"/>'+
+    '</g>'+
+    spark+
+    /* 身体：分节 + 头部 */
+    '<ellipse cx="50" cy="56" rx="3.8" ry="17" fill="#4A3F33"/>'+
+    '<path d="M50 44 v22" stroke="#2F2820" stroke-width="1" opacity=".35"/>'+
+    '<circle cx="50" cy="38" r="4.4" fill="#4A3F33"/>'+
+    '<circle cx="48.4" cy="36.6" r="1.1" fill="#fff" opacity=".7"/>'+
+    /* 触角：末端小球 */
+    '<path d="M48 35 C 43 27, 38 23, 32 21" stroke="#4A3F33" stroke-width="1.8" fill="none" stroke-linecap="round"/>'+
+    '<path d="M52 35 C 57 27, 62 23, 68 21" stroke="#4A3F33" stroke-width="1.8" fill="none" stroke-linecap="round"/>'+
+    '<circle cx="31.4" cy="20.6" r="1.9" fill="#4A3F33"/>'+
+    '<circle cx="68.6" cy="20.6" r="1.9" fill="#4A3F33"/>'+
+  '</svg>';
+}
+function bfById(t){ return BUTTERFLY.find(b=>b.t===t)||BUTTERFLY[0]; }
+
+/* ---------- 补发：加蝴蝶功能之前就已经通关的关卡，要补上 ---------- */
+let BACKFILL=0;
+function give(n,st){
+  prog.bf.push({t:rollButterfly(st).t,lv:n,s:st,d:today()});
+  prog.bf.push({t:rollButterfly(st).t,lv:n,s:st,d:today()});
+  BACKFILL+=2;
+}
+function migrate(){
+  if(!Array.isArray(prog.bf)) prog.bf=[];
+  if(!prog.cleared || typeof prog.cleared!=='object') prog.cleared={};
+  if(!prog.stars || typeof prog.stars!=='object') prog.stars={};
+  if(!prog.wrong || typeof prog.wrong!=='object') prog.wrong={};
+  if(!prog.wrongMastered || typeof prog.wrongMastered!=='object') prog.wrongMastered={};
+  if(typeof prog.unlocked!=='number' || prog.unlocked<1) prog.unlocked=1;
+  /* 解锁到第 N 关，说明 1..N-1 都已通关过 */
+  const upto=Math.min(prog.unlocked-1, LEVELS.length);
+  for(let n=1;n<=upto;n++){
+    if(!prog.cleared[n]){ prog.cleared[n]=1; give(n, prog.stars[n]||1); }
+  }
+  /* 保险：星级有记录但 cleared 没记的 */
+  Object.keys(prog.stars).forEach(k=>{
+    const n=+k, st=prog.stars[n]||0;
+    if(st>0 && !prog.cleared[n]){ prog.cleared[n]=1; give(n,st); }
+  });
+  if(BACKFILL) save();
+}
+/* 星级越高越可能开出稀有，但低稀有度不被屏蔽——否则高手永远集不齐图鉴。
+   大火额外加成：二星/三星成绩时，开出漂亮蝶与稀有蝶的概率都更高。 */
+function rollButterfly(stars,fire){
+  const F=FIRE[fire||'mid']||FIRE.mid;
+  const x=Math.random();
+  let r=1;
+  if(stars>=3)       r = x<F.b3 ? 3 : (x<F.b3+0.30 ? 2 : 1);
+  else if(stars===2) r = x<F.b2 ? 2 : 1;
+  const pool=BUTTERFLY.filter(b=>b.r===r);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+const BADGES=[
+  {id:'first', n:'开张大吉',   d:'第一次通关任意一关', got:()=>Object.keys(prog.stars).length>0},
+  {id:'star3', n:'三星大厨',   d:'某一关拿到三颗星',   got:()=>Object.values(prog.stars).some(v=>v>=3)},
+  {id:'combo', n:'手速惊人',   d:'单局连对 5 次',      got:()=>prog.bestCombo>=5},
+  {id:'food50',n:'菜单丰盛',   d:'收集 50 个字',       got:()=>foodCount()>=50},
+  {id:'all',   n:'满汉全席',   d:'解锁全部 9 关',      got:()=>prog.unlocked>=LEVELS.length},
+  {id:'day3',  n:'天天来报到', d:'连续打卡 3 天',      got:()=>prog.streak.n>=3},
+  {id:'bf10',  n:'捕蝶小能手', d:'收集 10 只蝴蝶',     got:()=>prog.bf.length>=10},
+  {id:'bfevo', n:'进化大师',   d:'让 1 种蝴蝶完全进化（同种收集 6 只）', got:()=>BUTTERFLY.some(b=>bfLevel(b.t)>=3)},
+  {id:'bfall', n:'蝴蝶馆长',   d:'集齐全部 '+BUTTERFLY.length+' 种蝴蝶', got:()=>new Set(prog.bf.map(x=>x.t)).size>=BUTTERFLY.length}
+];
+
+/* ============================================================
+   难度与动力
+   ============================================================
+   设计目标：让孩子「自己愿意选更难」，而不是被逼着爬难度。四条：
+     1) 火力自己选      —— 有掌控感，不是系统塞题
+     2) 越难越赚        —— 大火蝴蝶翻倍、稀有率更高，挑战有实利
+     3) 错了可回锅      —— 第一次答错不算错，降低挑战的心理成本
+     4) 错题变目标      —— 错过的字下次还会来，攻克了才算真学会
+   注意：火力只是「这一局怎么玩」，不写入解锁条件，
+        老存档打开后一切照旧，不丢记录。
+*/
+const FIRE={
+  low: {key:'low', name:'小火', n:8,  rolls:1, b2:0.40, b3:0.40, retry:2,
+        desc:'8 道题', tip:'第一次玩这一关，选它'},
+  mid: {key:'mid', name:'中火', n:10, rolls:1, b2:0.40, b3:0.40, retry:2,
+        desc:'10 道题', tip:'大多数时候选这个'},
+  high:{key:'high',name:'大火', n:12, rolls:2, b2:0.60, b3:0.60, retry:3,
+        desc:'12 道题', tip:'蝴蝶翻倍，稀有蝶更容易出'}
+};
+const FIRE_ORDER=['low','mid','high'];
+
+/* 厨艺等级：累计星星决定。9 关满分 27 星 */
+const CHEF=[
+  {n:0,  name:'洗菜小学徒'},
+  {n:6,  name:'掌勺小厨'},
+  {n:14, name:'熟练大厨'},
+  {n:24, name:'神厨小当家'}
+];
+function chefInfo(){
+  const t=totalStars();
+  let lv=0;
+  for(let i=0;i<CHEF.length;i++) if(t>=CHEF[i].n) lv=i;
+  const nx=CHEF[lv+1];
+  return { lv, name:CHEF[lv].name, cur:CHEF[lv].n, next:nx||null,
+           pct: nx ? Math.min(100,Math.round((t-CHEF[lv].n)/(nx.n-CHEF[lv].n)*100)) : 100 };
+}
+
+/* ============================================================
+   声音
+   ============================================================ */
+let ac=null;
+function tone(f,start,dur,type,vol){
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.type=type||'sine'; o.frequency.value=f;
+    g.gain.setValueAtTime(0,ac.currentTime+start);
+    g.gain.linearRampToValueAtTime(vol||0.14,ac.currentTime+start+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+start+dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(ac.currentTime+start); o.stop(ac.currentTime+start+dur+0.05);
+  }catch(e){}
+}
+const sfxWin=()=>{tone(784,0,.12);tone(1046,.08,.16);tone(1318,.16,.22);};
+const sfxBig=()=>{tone(784,0,.12);tone(988,.08,.14);tone(1175,.15,.18);tone(1568,.24,.26);};
+const sfxBad=()=>{tone(233,0,.22,'triangle',.12);tone(175,.1,.28,'triangle',.1);};
+const sfxSpark=()=>{tone(1046,0,.1);tone(1318,.08,.12);tone(1568,.16,.2);tone(2093,.24,.34);};
+const sfxTap=()=>tone(660,0,.06,'sine',.08);
+/* ---------------- 语音朗读 ----------------
+   清晰度三个关键点：
+   1) 必须显式指定 zh-CN 嗓音，否则浏览器可能挑到粤语/台湾腔或低质量合成器
+   2) 语速过慢(0.7)会让合成咬字发糊，调到 0.9 更自然；需要慢速时单独传 slow
+   3) Chrome 在 cancel() 后立刻 speak() 有概率静音，需 resume + 微小延迟
+*/
+let VOICE=null, VOICE_TRIED=false;
+function pickVoice(){
+  try{
+    if(!('speechSynthesis' in window)) return null;
+    const vs=speechSynthesis.getVoices()||[];
+    if(!vs.length) return null;
+    let pool=vs.filter(v=>/^zh/i.test(v.lang||'') || /chinese|中文|普通话|国语/i.test(v.name||''));
+    if(!pool.length) return null;
+    // 严格优先大陆普通话，排除台湾腔/粤语（对一年级孩子口音要标准）
+    const cn=pool.filter(v=>/zh[-_]cn|zh[-_]hans|china|大陆|普通话/i.test((v.lang||'')+' '+(v.name||'')));
+    if(cn.length) pool=cn;
+    const score=v=>{
+      const n=(v.name||'').toLowerCase(); let sc=0;
+      if(v.localService) sc+=2;                                   // 本地合成更稳、不依赖网络
+      if(/tingting|婷婷|xiaoxiao|晓晓|yaoyao|yunxi|云希|xiaoyi|晓伊|huihui|晓萱|google|microsoft/.test(n)) sc+=3;
+      if(/tw|hk|taiwan|hong ?kong|meijia|sinji|ting-ting|粤|cantonese/.test(n)) sc-=5;
+      return sc;
+    };
+    return pool.slice().sort((a,b)=>score(b)-score(a))[0];
+  }catch(e){ return null; }
+}
+function ensureVoice(){
+  try{
+    if(!('speechSynthesis' in window)) return;
+    if(!VOICE) VOICE=pickVoice();
+    // getVoices() 首次常返回空，需等 voiceschanged 再取一次
+    if(!VOICE && !VOICE_TRIED){
+      VOICE_TRIED=true;
+      speechSynthesis.addEventListener('voiceschanged',()=>{ VOICE=pickVoice(); });
+    }
+  }catch(e){}
+}
+/* ---------------- 朗读入口 ----------------
+   直接用浏览器自带语音朗读。
+   此前尝试过「预生成 mp3」方案，实际听感不佳，已弃用；
+   audio/ 目录不再参与朗读（文件保留，需要时可从这里改回来）。 */
+function speak(t,opt){
+  try{
+    if(!t) return;
+    const o=opt||{};
+    if(!('speechSynthesis' in window)) return;
+    ensureVoice();
+    const base=(prog.tts&&prog.tts.slow)?0.72:0.9;
+    const u=new SpeechSynthesisUtterance(t);
+    u.lang='zh-CN';
+    if(VOICE) u.voice=VOICE;
+    u.rate=o.slow?Math.min(base,0.72):base;
+    u.pitch=1; u.volume=1;
+    speechSynthesis.cancel();
+    try{ speechSynthesis.resume(); }catch(e){}
+    setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} },60);
+  }catch(e){}
+}
+
+/* ============================================================
+   DOM
+   ============================================================ */
+/* 找不到元素时返回一个安全的哑元素：任何一个 id 写错都不会让整页初始化崩溃 */
+const __MISS=(function(){ const d=document.createElement('span'); d.style.display='none'; return d; })();
+const MISSING_IDS=[];
+const $=id=>{
+  const el=document.getElementById(id);
+  if(el) return el;
+  if(MISSING_IDS.indexOf(id)<0){ MISSING_IDS.push(id); console.warn('[拼音厨房] 缺少页面元素 #'+id); }
+  return __MISS;
+};
+const home=$('home'),game=$('game'),result=$('result');
+const PRAISE=['太棒了！','厨师长级别！','锅气十足！','香喷喷！','这一锅绝了！','厉害了！','你是大厨！','再来一个！'];
+
+function showTab(which){
+  ['Map','Coll','Bf','Rec'].forEach(k=>{
+    $('tab'+k).classList.toggle('on',k===which);
+    $('view'+k).classList.toggle('hidden',k!==which);
+  });
+  if(which==='Coll') renderColl();
+  if(which==='Bf') renderGarden();
+  if(which==='Rec') renderRec();
+}
+
+/* 厨艺等级：累计星星决定 —— 让「我变强了」这件事看得见 */
+function renderChef(){
+  const nm=$('chefName'), sb=$('chefSub'), pf=$('chefBarFill');
+  if(!nm) return;
+  const c=chefInfo(), t=totalStars();
+  nm.textContent=c.name;
+  sb.textContent = c.next ? ('再拿 '+(c.next.n-t)+' 颗星 → '+c.next.name) : '已经是最高等级啦 ✨';
+  if(pf) pf.style.width=c.pct+'%';
+}
+function renderStats(){
+  $('stStar').textContent=totalStars();
+  $('stFood').textContent=foodCount();
+  $('stDay').textContent=prog.streak.n||0;
+  $('stBf').textContent=prog.bf.length;
+  renderFloat();
+  renderChef();
+  renderNotice();
+}
+
+/* 主页上飘着的小蝴蝶：让奖励看得见 */
+function renderFloat(){
+  const box=$('bfFloat'); box.innerHTML='';
+  const rs=prog.bf.slice(-6).reverse();
+  if(!rs.length){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  rs.forEach((x,i)=>{
+    const b=bfById(x.t), d=document.createElement('div');
+    d.className='floater'; d.style.animationDelay=(i*0.35)+'s';
+    d.innerHTML=bflySVG(b,38); d.title=b.n+'（第'+x.lv+'关）';
+    box.appendChild(d);
+  });
+}
+
+function renderNotice(){
+  const el=$('notice');
+  const msgs=[];
+  MIGR_NOTE.forEach(m=>msgs.push(m));
+  if(BACKFILL) msgs.push('补发了 <b>'+BACKFILL+'</b> 只蝴蝶——之前通关的关卡当时还没这个奖励，现在补给你了。');
+  if(!canSave) msgs.push('浏览器不允许保存进度（可能开了无痕模式），关掉页面后星星和蝴蝶会丢失。可以用下面的「导出记录」存一份。');
+  if(!msgs.length){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.className='notice'+(canSave?'':' warn');
+  el.innerHTML=msgs.join('<br>');
+}
+
+function renderMap(){
+  const box=$('levelMap'); box.innerHTML='';
+  LEVELS.forEach((lv,i)=>{
+    const n=i+1, locked=n>prog.unlocked, st=prog.stars[n]||0;
+    const got=lv.words.filter(w=>prog.food[charOf(w,lv.mode)]).length;
+    const pct=Math.round(got/lv.words.length*100);
+    const b=document.createElement('button');
+    b.className='lv'+(locked?' locked':'')+(lv.mode==='whole'?' whole':(lv.mode==='tri'?' tri':''));
+    b.innerHTML='<div class="badge">'+(locked?'锁':n)+'</div>'+
+      '<div class="info"><div class="nm">'+lv.name.replace(/^第 \d 关 · /,'')+'</div><div class="ds">'+lv.sub+'</div>'+
+        (lv.tip?'<div class="tip">'+lv.tip+'</div>':'')+'</div>'+
+      '<div class="rt"><div class="st">'+(locked?'':'★'.repeat(st)+'☆'.repeat(3-st))+'</div>'+
+      '<div class="lk">'+(locked?'先过上一关':'已收 '+got+'/'+lv.words.length+' 字')+'</div>'+
+      (locked?'':'<div class="pbar"><i style="width:'+pct+'%"></i></div>')+'</div>';
+    if(!locked) b.onclick=()=>openFirePicker(n);
+    box.appendChild(b);
+  });
+}
+
+function renderColl(){
+  const all=[];
+  LEVELS.forEach(lv=>lv.words.forEach(w=>all.push(charOf(w,lv.mode))));
+  const uniq=[...new Set(all)];
+  const got=uniq.filter(c=>prog.food[c]);
+  $('collSub').textContent='拼对的字会端上桌，一共 '+uniq.length+' 个字';
+  $('collBar').style.width=Math.round(got.length/uniq.length*100)+'%';
+  const g=$('collGrid'); g.innerHTML='';
+  uniq.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cell'+(prog.food[c]?'':' empty');
+    d.textContent=prog.food[c]?c:'';
+    d.title=prog.food[c]?c:'还没拼出来';
+    g.appendChild(d);
+  });
+}
+
+function renderGarden(){
+  const counts={};
+  prog.bf.forEach(x=>counts[x.t]=(counts[x.t]||0)+1);
+  const kinds=Object.keys(counts).length;
+  const lv3=BUTTERFLY.filter(b=>bfLevel(b.t)>=3).length;
+  $('bfSub').textContent='一共 '+prog.bf.length+' 只 · 已认识 '+kinds+' / '+BUTTERFLY.length+' 种'
+    + (lv3?(' · 完全进化 '+lv3+' 种'):'');
+  $('bfBar').style.width=Math.round(kinds/BUTTERFLY.length*100)+'%';
+  const g=$('bfGrid'); g.innerHTML='';
+  BUTTERFLY.forEach(b=>{
+    const n=counts[b.t]||0, lv=bfLevel(b.t), need=bfNextNeed(b.t);
+    const d=document.createElement('div');
+    d.className='bcard'+(n?' r'+b.r:' lock')+(lv>=3?' max':'');
+    if(n){
+      // 进化进度条：距离下一级还差几只
+      const prev=lv>=3?BF_LV_NEED[3]:BF_LV_NEED[lv];
+      const pct = need ? Math.min(100,Math.round((n-prev)/(need-prev)*100)) : 100;
+      d.innerHTML = bflySVG(b,54,{lv:lv})
+        +'<div class="bn2">'+b.n+'</div>'
+        +'<div class="bc">×'+n+'</div>'
+        +'<div><span class="tag r'+b.r+'">'+RARE_NAME[b.r]+'</span><span class="lvtag l'+lv+'">'+BF_LV_NAME[lv]+'</span></div>'
+        + (need ? '<div class="upbar"><i style="width:'+pct+'%"></i></div><div class="uphint">再收 '+(need-n)+' 只进化</div>'
+                : '<div class="uphint done">已完全进化 ✨</div>');
+    }else{
+      d.innerHTML='<div class="ph">?</div><div class="bn2">还没见过</div><div class="bc">'
+        +(b.r===3?'三星最容易遇到':(b.r===2?'两星以上更容易':'通关就有机会'))+'</div>';
+    }
+    g.appendChild(d);
+  });
+  const rc=$('bfRecent'); rc.innerHTML='';
+  const rs=prog.bf.slice(-12).reverse();
+  if(!rs.length) rc.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">还没有蝴蝶，通关一次就有了</div>';
+  rs.forEach(x=>{
+    const b=bfById(x.t), d=document.createElement('div');
+    d.style.cssText='display:flex;flex-direction:column;align-items:center';
+    d.innerHTML=bflySVG(b,40,{lv:bfLevel(x.t)})+'<div style="font-size:10px;color:var(--ink-soft);margin-top:1px">'+x.d.slice(5)+'</div>';
+    d.title=b.n+' · 第'+x.lv+'关';
+    rc.appendChild(d);
+  });
+}
+
+function renderRec(){
+  $('dbg').textContent='已通关 '+Object.keys(prog.cleared).length+' 关 · 蝴蝶 '+prog.bf.length+' 只 · 存档'+(canSave?'正常':'不可用')+' · 自动备份已开';
+  const bg=$('badgeGrid'); bg.innerHTML='';
+  BADGES.forEach(b=>{
+    const d=document.createElement('div');
+    d.className='bg'+(b.got()?' got':'');
+    d.innerHTML='<div class="bn">'+(b.got()?'':'未解锁 · ')+b.n+'</div><div class="bd">'+b.d+'</div>';
+    bg.appendChild(d);
+  });
+
+  const rl=$('recList'); rl.innerHTML='';
+  const h=prog.history.slice(-8).reverse();
+  if(!h.length) rl.innerHTML='<div class="row"><span class="t">还没有记录，去闯一关吧</span></div>';
+  h.forEach(r=>{
+    const d=document.createElement('div'); d.className='row';
+    const s=Math.max(0,Math.min(3,+r.s||0));
+    const nm=(LEVELS[r.lv-1]?LEVELS[r.lv-1].name:'第 '+r.lv+' 关').replace(/^第 (\d) 关 · /,'第 $1 关 ');
+    d.innerHTML='<span class="t">'+r.d+'</span><span>'+nm+'</span>'+
+      '<span class="sc">'+'★'.repeat(s)+'☆'.repeat(3-s)+' '+r.r+'/'+r.t+'</span>';
+    rl.appendChild(d);
+  });
+
+  /* 已攻克：以前错过、后来拼对销账的字数。让进步看得见 */
+  const mn=Object.keys(prog.wrongMastered||{}).length;
+  const wsub=$('wrongSub');
+  if(wsub) wsub.textContent = mn
+    ? ('拼错最多的音节，可以重点练　·　已攻克 '+mn+' 个')
+    : '拼错最多的音节，可以重点练';
+
+  const wl=$('wrongList'); wl.innerHTML='';
+  const ws=Object.keys(prog.wrong).map(k=>{const p=k.split('|');return {py:p[1],c:p[2],n:prog.wrong[k]};})
+    .sort((a,b)=>b.n-a.n).slice(0,8);
+  if(!ws.length) wl.innerHTML='<div class="row"><span class="t">还没有错题，很稳</span></div>';
+  ws.forEach(w=>{
+    const d=document.createElement('div'); d.className='row';
+    d.innerHTML='<span style="font-size:18px">'+w.c+'</span><span class="t">'+w.py+'</span><span class="sc">错 '+w.n+' 次</span>';
+    wl.appendChild(d);
+  });
+}
+
+/* ============================================================
+   游戏
+   ============================================================ */
+const ORDER={whole:['w'],split:['i','f'],tri:['i','m','f']};
+const LABEL={w:'整体认读音节',i:'声母',m:'介音',f:'韵母'};
+let S=null;
+
+/* 错题键：与 prog.wrong 保持一致，格式 关卡|拼音|字 */
+function wrongKey(n,w,mode){ return n+'|'+pyOf(w,mode)+'|'+charOf(w,mode); }
+
+/* ---------- 选火候 ----------
+   点关卡不直接开始，先问「今天想开多大的火」。
+   掌控感 + 越难越赚，是孩子愿意主动挑战的前提。 */
+let PICK_N=0;
+function openFirePicker(n){
+  PICK_N=n;
+  const lv=LEVELS[n-1], mode=lv.mode;
+  $('fireTitle').textContent=lv.name;
+  const box=$('fireOpts'); box.innerHTML='';
+  FIRE_ORDER.forEach(k=>{
+    const F=FIRE[k];
+    const b=document.createElement('button');
+    b.className='fopt'+(k==='high'?' hi':'');
+    const sz = k==='high'?26:(k==='mid'?21:17);
+    const col= k==='high'?'#D2544B':'#E8873B';
+    b.innerHTML='<span class="ic"><svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" aria-hidden="true">'+
+        '<path d="M12 2.5c1.2 3 4.3 5 4.3 8.7a4.3 4.3 0 0 1-8.6 0c0-1.7.8-2.9 1.8-3.8.2 2 1.2 2.9 2.2 2.4 1.4-.8 1-4.2.3-7.3z" fill="'+col+'"/>'+
+      '</svg></span>'+
+      '<span class="tx"><span class="nn">'+F.name+'　'+F.desc+'</span>'+
+      '<span class="dd">'+F.tip+'</span></span>';
+    b.onclick=()=>{ closeFirePicker(); startLevel(n,k); };
+    box.appendChild(b);
+  });
+  /* 提示本关还有多少「欠账」的错字 —— 给挑战一个具体目标 */
+  const wrongN=lv.words.filter(w=>(prog.wrong[wrongKey(n,w,mode)]||0)>0).length;
+  $('fireHint').textContent = wrongN
+    ? '这一关你还有 '+wrongN+' 个以前错过的字，这次把它们拿下！'
+    : '这一关的字都拿下过啦，可以试试更大的火。';
+  $('fireOverlay').classList.add('on');
+}
+function closeFirePicker(){ $('fireOverlay').classList.remove('on'); }
+
+function startLevel(n,fire){
+  touchStreak();
+  const lv=LEVELS[n-1], mode=lv.mode;
+  const F=FIRE[fire||'mid']||FIRE.mid;
+  const words=lv.words.slice();
+  for(let i=words.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[words[i],words[j]]=[words[j],words[i]];}
+  /* 错题回流：本关以前错过的字排到最前面 —— 先练不会的，而不是重复刷会的 */
+  const bad=[],good=[];
+  words.forEach(w=>{ ((prog.wrong[wrongKey(n,w,mode)]||0)>0 ? bad : good).push(w); });
+  let queue=bad.concat(good);
+  /* 词量不足时循环补齐（大火 12 题，个别关卡词量少） */
+  let guard=0;
+  while(queue.length<F.n && guard++<20) queue=queue.concat(bad.concat(good));
+  queue=queue.slice(0,F.n);
+  S={ n, mode, fire:F.key, queue, idx:0, right:0, combo:0,
+      retryLeft:F.retry, retried:false, mastered:0,
+      picks:{i:null,m:null,f:null,w:null}, locked:false, newFoods:[] };
+  buildCards(lv);
+  $('levelName').textContent=lv.name;
+  $('levelSub').textContent=lv.sub+'　·　'+F.name+' '+F.desc;
+  home.classList.add('hidden'); result.classList.add('hidden'); game.classList.remove('hidden');
+  nextQuestion();
+}
+
+function buildCards(lv){
+  const mode=lv.mode;
+  ['grpI','grpM','grpF','grpW'].forEach(g=>$(g).classList.add('hidden'));
+  if(mode==='whole'){
+    $('grpW').classList.remove('hidden');
+    const wc=$('wholeCards'); wc.innerHTML='';
+    const fam=[...new Set(lv.words.map(w=>baseOf(w[0]).replace(/v/g,'ü')))]
+      .sort((a,b)=>WHOLE_ORDER.indexOf(a)-WHOLE_ORDER.indexOf(b));
+    fam.forEach(f=>{
+      const lab=document.createElement('div'); lab.className='famlab'; lab.textContent=f+' 家';
+      wc.appendChild(lab);
+      lv.words.filter(w=>baseOf(w[0]).replace(/v/g,'ü')===f)
+        .map(w=>w[0])
+        .filter((v,i,a)=>a.indexOf(v)===i)
+        .sort((a,b)=>toneIdx(a)-toneIdx(b))
+        .forEach(v=>wc.appendChild(mkCard('w',v)));
+    });
+  }else{
+    $('grpI').classList.remove('hidden'); $('grpF').classList.remove('hidden');
+    if(mode==='tri') $('grpM').classList.remove('hidden');
+    const ini=[...new Set(lv.words.map(w=>w[0]))].sort((a,b)=>INIT_ORDER.indexOf(a)-INIT_ORDER.indexOf(b));
+    const ic=$('initCards'); ic.innerHTML=''; ini.forEach(v=>ic.appendChild(mkCard('i',v)));
+    if(mode==='tri'){
+      const med=[...new Set(lv.words.map(w=>w[1]))].sort((a,b)=>a.localeCompare(b));
+      const mc=$('medCards'); mc.innerHTML=''; med.forEach(v=>mc.appendChild(mkCard('m',v)));
+    }
+    const finIdx = mode==='tri'?2:1;
+    const fin=[...new Set(lv.words.map(w=>w[finIdx]))].sort((a,b)=>{
+      const ra=FINAL_ORDER.indexOf(baseOf(a).replace(/v/g,'ü'));
+      const rb=FINAL_ORDER.indexOf(baseOf(b).replace(/v/g,'ü'));
+      if(ra!==rb) return (ra<0?99:ra)-(rb<0?99:rb);
+      return toneIdx(a)-toneIdx(b);
+    });
+    const fc=$('finalCards'); fc.innerHTML='';
+    /* 按韵母类别分组，超过一类才显示小标题（第 6 关 27 张卡，不分组太难找） */
+    const groups=[];
+    fin.forEach(v=>{
+      const k=finalKind(baseOf(v).replace(/v/g,'ü'));
+      let g=null; for(const x of groups) if(x.k===k){g=x;break;}
+      if(!g){ g={k,items:[]}; groups.push(g); }
+      g.items.push(v);
+    });
+    const multi=groups.length>1;
+    groups.forEach(g=>{
+      if(multi){
+        const lab=document.createElement('div'); lab.className='flab'; lab.textContent=g.k;
+        fc.appendChild(lab);
+      }
+      g.items.forEach(v=>fc.appendChild(mkCard('f',v)));
+    });
+  }
+}
+function mkCard(kind,v){
+  const b=document.createElement('button');
+  b.className='card '+kind; b.textContent=v; b.dataset.k=kind; b.dataset.v=v;
+  b.onclick=()=>pick(kind,v);
+  return b;
+}
+
+function renderSlots(){
+  const box=$('slots'); box.innerHTML='';
+  const defs = S.mode==='whole' ? [['w','整体认读',true]]
+             : S.mode==='tri'  ? [['i','声母'],['m','介音'],['f','韵母']]
+             : [['i','声母'],['f','韵母']];
+  defs.forEach(d=>{
+    const el=document.createElement('div');
+    el.className='slot k-'+d[0]+(d[2]?' wide':'');
+    el.id='slot_'+d[0];
+    el.textContent=d[1];
+    box.appendChild(el);
+  });
+}
+
+function refresh(){
+  ORDER[S.mode].forEach(k=>{
+    const el=$('slot_'+k); if(!el) return;
+    const v=S.picks[k];
+    el.textContent=v||LABEL[k];
+    el.classList.toggle('filled',!!v);
+  });
+  document.querySelectorAll('.card').forEach(c=>{
+    if(c.classList.contains('correct')||c.classList.contains('dim')) return;
+    c.classList.toggle('sel', S.picks[c.dataset.k]===c.dataset.v);
+  });
+}
+
+function nextQuestion(){
+  if(S.idx>=S.queue.length){ finish(); return; }
+  ORDER[S.mode].forEach(k=>S.picks[k]=null);
+  S.locked=false;
+  S.retried=false;   /* 每题的回锅机会重新计，但总次数 S.retryLeft 是整局共享的 */
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('sel','dim','correct'));
+  renderSlots();
+  const w=S.queue[S.idx], ch=charOf(w,S.mode);
+  $('targetChar').textContent=ch;
+  $('targetLbl').textContent = S.mode==='whole'
+    ? '整体认读音节，不用拼，整块下锅'
+    : (S.mode==='tri' ? '三拼音节：声母 + 介音 + 韵母' : '听一听，把这个字的拼音拼出来');
+  $('qNo').textContent=S.idx+1;
+  $('qTotal').textContent='/'+S.queue.length;
+  $('hudStars').textContent='★'.repeat(S.right)+'☆'.repeat(S.queue.length-S.right);
+  $('hudCombo').textContent=S.combo>=2?('连对 '+S.combo+' 次'):'';
+  /* 本局火力 + 剩余回锅次数：让孩子随时知道「我还能补救几次」 */
+  const F=FIRE[S.fire]||FIRE.mid;
+  const hf=$('hudFire');
+  if(hf){ hf.textContent=F.name; hf.className='hudfire'+(S.fire==='high'?' hi':''); }
+  const hr=$('hudRetry');
+  if(hr){
+    let s='';
+    for(let i=0;i<F.retry;i++) s+='<i class="retrydot'+(i<(F.retry-S.retryLeft)?' used':'')+'"></i>';
+    hr.innerHTML=s;
+    hr.title='回锅机会：还剩 '+S.retryLeft+' 次';
+  }
+  $('tip').className='tip'; $('tip').textContent='';
+  $('steam').classList.remove('on');
+  $('pot').classList.remove('hot');
+  const tag=$('foodTag');
+  if(prog.food[ch]){ tag.textContent='这个字已经在你的菜单里了'; tag.className='foodtag got'; }
+  else { tag.textContent='拼出来就能收进菜单'; tag.className='foodtag'; }
+}
+
+function pick(kind,v){
+  if(S.locked) return;
+  const ord=ORDER[S.mode], idx=ord.indexOf(kind);
+  for(let j=0;j<idx;j++){
+    if(!S.picks[ord[j]]){ tipMsg('先选「'+LABEL[ord[j]]+'」哦','note'); return; }
+  }
+  sfxTap();
+  S.picks[kind]=(S.picks[kind]===v)?null:v;
+  refresh();
+  if(ord.every(k=>S.picks[k])){ S.locked=true; setTimeout(judge,300); }
+}
+
+function tipMsg(t,cls){ const e=$('tip'); e.className='tip '+(cls||''); e.textContent=t; }
+
+function judge(){
+  const w=S.queue[S.idx], p=partsOf(w,S.mode), py=pyOf(w,S.mode), ch=charOf(w,S.mode);
+  const ord=ORDER[S.mode];
+  /* 精确匹配，或多音字容错：拼出的「带声调」音节也是题库里这个字的一个读音。
+     ⚠️ 必须用带声调的音节比较 —— 若先去掉声调，bā(八) 与 bá(拔) 都会变成 ba，
+        孩子拼错声调也会被判对，那就练不出声调了。 */
+  const exact = ord.every(k=>S.picks[k]===p[k]);
+  const pickedPy = ord.map(k=>S.picks[k]).join('');
+  const ok = exact || readingsOf(ch).indexOf(pickedPy)>=0;
+  S.polyAlt = (!exact && ok) ? pickedPy : null;
+
+  if(ok){
+    S.right++; S.combo++;
+    if(S.combo>prog.bestCombo){prog.bestCombo=S.combo; save();}
+    ord.forEach(k=>{
+      const el=$('slot_'+k); el.classList.remove('filled'); el.classList.add('good');
+    });
+    $('pot').classList.add('shake'); $('steam').classList.add('on');
+    if(S.combo>=3) $('pot').classList.add('hot');
+    const pop=$('popup'); pop.textContent=(S.polyAlt? ord.map(k=>S.picks[k]).join('') : py)+'  '+ch;
+    pop.classList.remove('on'); void pop.offsetWidth; pop.classList.add('on');
+    const pr=$('praise');
+    pr.textContent = S.combo>=3 ? ('连击 '+S.combo+' 连！'+PRAISE[Math.floor(Math.random()*PRAISE.length)])
+                                : PRAISE[Math.floor(Math.random()*PRAISE.length)];
+    pr.classList.remove('on'); void pr.offsetWidth; pr.classList.add('on');
+    (S.combo>=3?sfxBig:sfxWin)();
+    burst(S.combo>=3?10:6);
+    speak(ch);
+
+    if(!prog.food[ch]){ prog.food[ch]=1; S.newFoods.push(ch); }
+
+    /* 错题攻克：以前在这个字上错过，这次拼对了 —— 从错题本里销账。
+       用了回锅机会才答对的，只减一次计数，先不销账，下次还要再练。 */
+    const key=S.n+'|'+py+'|'+ch;
+    if((prog.wrong[key]||0)>0){
+      if(S.retried){
+        prog.wrong[key]=(prog.wrong[key]||0)-1;
+        if(prog.wrong[key]<=0){ prog.wrongMastered[key]=1; delete prog.wrong[key]; }
+      }else{
+        prog.wrongMastered[key]=(prog.wrong[key]||0);
+        delete prog.wrong[key];
+        S.mastered++;
+      }
+    }
+    let note='';
+    if(S.mode==='tri' && ['j','q','x'].indexOf(w[0])>=0 && w[1]==='ü') note='（j q x 遇到 ü 要去两点，写成 u）';
+    else if(S.mode==='split' && ['j','q','x'].indexOf(w[0])>=0 && 'uü'.indexOf(w[1][0])>=0) note='（j q x 遇到 ü 要去两点，写成 u）';
+    const others=readingsOf(ch).filter(r=>r!==py);
+    if(others.length) note+='（「'+ch+'」还读 '+others.join('、')+'）';
+    tipMsg('咕嘟！变出「'+ch+'」'+note,'ok');
+    save();
+    setTimeout(()=>$('pot').classList.remove('shake'),500);
+    setTimeout(()=>{S.idx++; nextQuestion();},1400);
+  }else{
+    /* 回锅：第一次答错先不判错，给孩子一次「再想想」的机会。
+       这是「愿意挑战大火」的关键 —— 失败不再可怕，孩子才敢往难的地方走。
+       连击照常断、次数整局共享，所以不是白送，只是不再一棍子打死。 */
+    if(S.retryLeft>0 && !S.retried){
+      S.retryLeft--; S.retried=true; S.combo=0;
+      ord.forEach(k=>{ S.picks[k]=null; });
+      S.locked=false;
+      document.querySelectorAll('.card').forEach(c=>c.classList.remove('sel','dim','correct'));
+      refresh();
+      sfxTap();
+      tipMsg('再想想～本局还能回锅 '+S.retryLeft+' 次','note');
+      return;
+    }
+    S.combo=0;
+    ord.forEach(k=>{
+      const el=$('slot_'+k);
+      el.classList.remove('filled');
+      el.classList.add(S.picks[k]===p[k]?'good':'bad');
+    });
+    $('pot').classList.add('nope');
+    sfxBad();
+    document.querySelectorAll('.card').forEach(c=>{
+      const good = c.dataset.k==='w' ? c.dataset.v===p.w
+                 : (c.dataset.k==='i'&&c.dataset.v===p.i)
+                 || (c.dataset.k==='m'&&c.dataset.v===p.m)
+                 || (c.dataset.k==='f'&&c.dataset.v===p.f);
+      c.classList.remove('sel');
+      c.classList.add(good?'correct':'dim');
+    });
+    const key=S.n+'|'+py+'|'+ch;
+    prog.wrong[key]=(prog.wrong[key]||0)+1; save();
+    tipMsg('不对哦，正确是 '+py+'（'+ch+'）','no');
+    speak(ch,{slow:true});   // 答错后用慢速读一遍，让孩子听清正确读音
+    setTimeout(()=>$('pot').classList.remove('nope'),400);
+    setTimeout(()=>{S.idx++; nextQuestion();},2000);
+  }
+}
+
+function burst(n){
+  const fx=$('fx');
+  for(let i=0;i<n;i++){
+    const d=document.createElement('i');
+    const a=(-Math.PI/2)+(Math.random()-0.5)*2.2, r=60+Math.random()*60;
+    d.style.setProperty('--dx',Math.cos(a)*r+'px');
+    d.style.setProperty('--dy',Math.sin(a)*r+'px');
+    d.style.background = i%2 ? 'var(--orange)' : 'var(--green)';
+    fx.appendChild(d);
+    setTimeout(()=>d.remove(),900);
+  }
+}
+
+function finish(){
+  const total=S.queue.length, r=S.right;
+  /* 按正确率算星：题量随火力变化（8/10/12）。
+     若沿用固定的「对 7 道=三星」，题越多反而越容易，就没道理挑战大火了。 */
+  const ratio = total ? r/total : 0;
+  const st = ratio>=0.85 ? 3 : ratio>=0.62 ? 2 : ratio>=0.5 ? 1 : 0;
+  if(st>(prog.stars[S.n]||0)) prog.stars[S.n]=st;
+  if(r>=4 && S.n+1>prog.unlocked && S.n<LEVELS.length) prog.unlocked=S.n+1;
+  prog.history.push({d:today(),lv:S.n,s:st,r:r,t:total,f:S.fire});
+  if(prog.history.length>60) prog.history=prog.history.slice(-60);
+
+  /* 通关掉落小蝴蝶：基础掉落（大火翻倍），首次通关该关再额外 1 只 */
+  const gifts=[];
+  const ups=[];
+  if(r>=4){
+    const firstClear = !prog.cleared[S.n];
+    prog.cleared[S.n]=1;
+    const F=FIRE[S.fire]||FIRE.mid;
+    for(let i=0;i<F.rolls;i++) gifts.push(rollButterfly(st,S.fire));
+    if(firstClear) gifts.push(rollButterfly(st,S.fire));
+    // 发放前先记下各品种已有只数，用来判断是否跨过进化阈值
+    const before={}; gifts.forEach(g=>{ if(before[g.t]===undefined) before[g.t]=bfCount(g.t); });
+    gifts.forEach(b=>prog.bf.push({t:b.t,lv:S.n,s:st,d:today()}));
+    const lvOf=n=> n>=BF_LV_NEED[3] ? 3 : (n>=BF_LV_NEED[2] ? 2 : 1);
+    const done=new Set();
+    gifts.forEach(g=>{
+      if(done.has(g.t)) return; done.add(g.t);
+      const b0=before[g.t]||0, b1=bfCount(g.t);
+      if(lvOf(b1)>lvOf(b0)) ups.push({b:g,from:lvOf(b0),to:lvOf(b1),n:b1});
+    });
+  }
+  save();
+
+  game.classList.add('hidden'); result.classList.remove('hidden');
+  $('rTitle').textContent = st>0?'通关啦':'再试一次吧';
+  $('rStars').textContent = '★'.repeat(st)+'☆'.repeat(3-st);
+  $('rDesc').textContent = '答对 '+r+' / '+total+' 道'
+    + (S.mastered ? '，攻克了 '+S.mastered+' 个以前错过的字！' : '')
+    + (r>=4 ? (gifts.length>1?'，第一次通关，蝴蝶飞来了两只！':'，一只小蝴蝶飞来了！')
+            : '，答对 4 道就有小蝴蝶飞过来。');
+  const wrap=$('rNewWrap'), ng=$('rNewFoods');
+  ng.innerHTML='';
+  if(S.newFoods.length){
+    wrap.classList.remove('hidden');
+    S.newFoods.forEach(c=>{const d=document.createElement('div');d.className='cell';d.textContent=c;ng.appendChild(d);});
+  }else wrap.classList.add('hidden');
+
+  const bw=$('rBfWrap'), bg=$('rBf');
+  bg.innerHTML='';
+  bw.classList.remove('hidden');
+  if(gifts.length){
+    gifts.forEach(b=>{
+      const lv=bfLevel(b.t);
+      const d=document.createElement('div'); d.className='one';
+      d.innerHTML=bflySVG(b,66,{lv:lv})+'<div class="cap">'+b.n+'</div>'+
+        '<div><span class="tag r'+b.r+'">'+RARE_NAME[b.r]+'</span>'+
+        (lv>1?'<span class="lvtag l'+lv+'">'+BF_LV_NAME[lv]+'</span>':'')+'</div>';
+      bg.appendChild(d);
+    });
+    setTimeout(sfxSpark,320);
+    if(ups.length) setTimeout(()=>showUpgrade(ups),950);   // 进化动画压在结算之后
+  }else{
+    bg.innerHTML='<div style="font-size:13px;color:var(--ink-soft);align-self:center">这局还差一点，再试一次吧</div>';
+  }
+  $('nextBtn').classList.toggle('hidden', !(S.n<LEVELS.length));
+}
+
+/* ---------- 蝴蝶进化：一只只播放，点按钮看下一只 ---------- */
+function showUpgrade(list){
+  let i=0;
+  const ov=$('upOverlay');
+  function paint(){
+    const up=list[i], b=up.b;
+    $('upBf').innerHTML=bflySVG(b,190,{lv:up.to});
+    $('upTitle').textContent = up.to>=3 ? '完全进化！' : '进化啦！';
+    $('upSub').innerHTML='<b>'+b.n+'</b> 已收集 '+up.n+' 只　'+BF_LV_NAME[up.from]+' → <b>'+BF_LV_NAME[up.to]+'</b>';
+    $('upName').textContent = up.to>=3
+      ? '这是它最华丽的形态 ✨'
+      : '再收集 '+(BF_LV_NEED[up.to+1]-up.n)+' 只，还能继续进化';
+    const sp=$('upSparks'); sp.innerHTML='';
+    for(let k=0;k<18;k++){
+      const e=document.createElement('b');
+      const ang=Math.PI*2*k/18, dist=72+Math.random()*50;
+      e.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(1)+'px');
+      e.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(1)+'px');
+      e.style.background = k%3===0 ? '#FFF3C4' : (k%3===1 ? '#F5C542' : b.c2);
+      e.style.animationDelay=(Math.random()*0.3).toFixed(2)+'s';
+      sp.appendChild(e);
+    }
+    // 重放入场动画
+    const card=$('upCard');
+    card.style.animation='none'; void card.offsetWidth; card.style.animation='';
+    ov.classList.add('on');
+    sfxBig(); setTimeout(sfxSpark,240);
+  }
+  $('upBtn').textContent = list.length>1 ? ('下一只（'+1+'/'+list.length+'）') : '太棒了！';
+  paint();
+  $('upBtn').onclick=()=>{
+    i++;
+    if(i>=list.length){ ov.classList.remove('on'); return; }
+    $('upBtn').textContent='下一只（'+(i+1)+'/'+list.length+'）';
+    paint();
+  };
+}
+
+/* ============================================================
+   按钮
+   ============================================================ */
+function goHome(){
+  game.classList.add('hidden'); result.classList.add('hidden'); home.classList.remove('hidden');
+  renderStats(); renderMap();
+  if(!$('viewColl').classList.contains('hidden')) renderColl();
+  if(!$('viewBf').classList.contains('hidden')) renderGarden();
+  if(!$('viewRec').classList.contains('hidden')) renderRec();
+}
+$('backBtn').onclick=goHome;
+$('homeBtn').onclick=goHome;
+$('againBtn').onclick=()=>openFirePicker(S.n);
+$('nextBtn').onclick=()=>openFirePicker(Math.min(S.n+1,LEVELS.length));
+$('playBtn').onclick=()=>{const w=S.queue[S.idx]; if(w) speak(charOf(w,S.mode));};
+function renderSlowBtn(){
+  const on=!!(prog.tts&&prog.tts.slow);
+  $('slowBtn').textContent='慢速：'+(on?'开':'关');
+  $('slowBtn').classList.toggle('on',on);
+}
+$('slowBtn').onclick=()=>{
+  prog.tts=prog.tts||{slow:false};
+  prog.tts.slow=!prog.tts.slow;
+  save(); renderSlowBtn();
+  const w=S&&S.queue[S.idx];
+  if(w) speak(charOf(w,S.mode));   // 立刻用新速度读一遍，方便对比
+};
+$('fireCancel').onclick=closeFirePicker;
+$('fireOverlay').onclick=e=>{ if(e.target===$('fireOverlay')) closeFirePicker(); };
+$('tabMap').onclick=()=>showTab('Map');
+$('tabColl').onclick=()=>showTab('Coll');
+$('tabBf').onclick=()=>showTab('Bf');
+$('tabRec').onclick=()=>showTab('Rec');
+$('exportBtn').onclick=()=>{
+  try{
+    const blob=new Blob([JSON.stringify(prog,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download='拼音小厨房-记录-'+today()+'.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1200);
+  }catch(e){ alert('导出失败：'+e.message); }
+};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=ev=>{
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const o=JSON.parse(fr.result);
+      if(!o||typeof o!=='object') throw new Error('不是有效的记录文件');
+      const n=mergeInto(prog,o);
+      save();
+      renderStats(); renderMap(); renderRec(); renderColl(); renderGarden();
+      alert(n? ('已合并 '+n+' 条记录') : '这份记录里没有新内容');
+    }catch(err){ alert('导入失败：'+err.message); }
+  };
+  fr.readAsText(f);
+  ev.target.value='';
+};
+$('resetBtn').onclick=()=>{
+  if(!confirm('确定清空所有星星、菜单、蝴蝶和记录吗？清空后不能恢复。')) return;
+  prog=JSON.parse(JSON.stringify(DEF)); BACKFILL=0; MIGR_NOTE=[];
+  /* 备份键和老版本 key 也要删掉，否则重新打开时又会被合并回来 */
+  try{ [KEY,KEY_BAK].concat(OLD_KEYS).forEach(k=>{localStorage.removeItem(k);localStorage.removeItem(KEY+'_merged_'+k);}); }catch(e){}
+  save();
+  renderStats(); renderMap(); renderRec(); renderColl(); renderGarden();
+};
+
+migrate();
+buildPy2Char();
+renderSlowBtn();
+renderStats(); renderMap();
+
+/* 启动自检：万一关卡没能渲染出来，给出醒目提示，而不是留一片空白让人以为是记录丢了 */
+(function(){
+  try{
+    const box=$('levelMap');
+    if(box && box!==__MISS && box.querySelectorAll('.lv').length===0 && LEVELS.length>0){
+      const lost=$('stFood')?(' · 缺少元素：'+MISSING_IDS.join('，')):'';
+      box.innerHTML='<div style="padding:14px;border-radius:12px;background:#FDECEC;border:1px solid #EFA0A0;'+
+        'color:#8A2B2B;font-size:13px;line-height:1.7">关卡没能显示出来，请截图告诉我这个情况。'+lost+'</div>';
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
