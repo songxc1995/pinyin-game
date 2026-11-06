@@ -1,2 +1,13 @@
-audio/
+# macOS
 .DS_Store
+
+# Swift Package Manager / Xcode build caches
+.build/
+PinyinKitchen.swiftpm/.build/
+PinyinKitchen.swiftpm/.swiftpm/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+DerivedData/
+
+# Local packaged app bundle (generated via ./build-mac-app.sh)
+*.app/
