@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct MainContainerView: View {
     @StateObject private var engine = GameEngine()
+    private let eyeTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     public init() {}
 
@@ -11,9 +12,9 @@ public struct MainContainerView: View {
 
     public var body: some View {
         ZStack {
-            // 温暖奶油料理城背景渐变
+            // 柔和护眼豆沙米黄纸张背景（告别刺眼纯白眩光）
             LinearGradient(
-                colors: [Color(hex: "#FFFDF9"), Color(hex: "#FFF5E5"), Color(hex: "#FFEBD2")],
+                colors: [Color(hex: "#F6F1E3"), Color(hex: "#EFE6D2"), Color(hex: "#E8DCC4")],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -22,6 +23,11 @@ public struct MainContainerView: View {
             VStack(spacing: 0) {
                 // 顶部彩色料理城遮阳棚条
                 awningStripeBar
+
+                // 顶部常驻儿童护眼卫士状态条
+                EyeCareTopBarView(engine: engine)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 6)
 
                 ZStack {
                     switch engine.screenState {
@@ -38,20 +44,55 @@ public struct MainContainerView: View {
                     }
                 }
                 .padding(.horizontal, 18)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .frame(maxWidth: 1240, maxHeight: .infinity)
             }
 
             // 选火候弹窗
             if let lvNum = engine.firePickerLevel {
-                firePickerOverlay(levelNumber: lvNum)
+                firePickerOverlay(levelNumber: levelNumberClamped(lvNum))
             }
 
             // 蝴蝶进化全屏庆典弹窗
             if let upgrade = engine.pendingUpgrades.first {
                 butterflyUpgradeOverlay(upgrade)
             }
+
+            // 20-20-20 森林绿洲护眼休息弹窗
+            if engine.eyeRestActive {
+                EyeRestOverlayView(engine: engine)
+            }
+
+            // 每日时长上限 / 睡前打烊锁屏弹窗
+            if let lockReason = engine.playLock {
+                PlayLockOverlayView(engine: engine, reason: lockReason)
+            }
+
+            // 家长护眼设置中心面板
+            if engine.showParentSettings {
+                ParentEyeCareSettingsSheet(engine: engine)
+            }
+
+            // 家长乘法口诀验证门
+            if let gatePurpose = engine.parentGate {
+                ParentGateOverlayView(engine: engine, purpose: gatePurpose)
+            }
+
+            // 全局防蓝光暖光护眼滤镜层（不拦截任何点击）
+            if engine.effectiveWarmFilterOpacity > 0 {
+                Color(hex: "#FFB74D")
+                    .opacity(engine.effectiveWarmFilterOpacity)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
         }
+        .onReceive(eyeTimer) { _ in
+            engine.tickEyeCareSecond()
+        }
+    }
+
+    private func levelNumberClamped(_ n: Int) -> Int {
+        max(1, min(engine.currentMaxStageCount, n))
     }
 
     // MARK: - 顶部遮阳棚装饰条

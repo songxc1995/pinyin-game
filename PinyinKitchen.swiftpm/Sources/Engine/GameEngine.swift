@@ -37,6 +37,19 @@ public struct DailyQuestItem: Identifiable, Sendable {
     public var isCompleted: Bool { current >= goal }
 }
 
+/// 游戏被锁定的原因（每日时长用完 / 睡前打烊）
+public enum PlayLockReason: Sendable, Equatable {
+    case dailyLimit
+    case bedtime
+}
+
+/// 家长验证门用途
+public enum ParentGatePurpose: Sendable, Equatable {
+    case settings
+    case skipRest
+    case extendTime
+}
+
 @MainActor
 public final class GameEngine: ObservableObject {
     @Published public var progress: GameProgress
@@ -79,8 +92,27 @@ public final class GameEngine: ObservableObject {
     @Published public var numericInput: String = ""
     @Published public var numericSmartOptions: [String] = []
     @Published public var sentencePickedIndices: [Int] = []
+    /// 鲜果积木的展示顺序（打乱后的原始下标，避免按答案顺序排列）
+    @Published public var sentenceDisplayOrder: [Int] = []
+    /// 选择题打乱后的展示选项（原始数据中正确答案常排在第一位）
+    @Published public var displayOptions: [String] = []
     @Published public var pickedChoiceOption: String? = nil
     @Published public var showMathExplanation: Bool = false
+
+    // MARK: - 护眼与健康游戏状态
+    @Published public var eyeRestActive: Bool = false
+    @Published public var restRemaining: Int = 0
+    @Published public var playLock: PlayLockReason? = nil
+    @Published public var timeWarning: String? = nil
+    @Published public var parentGate: ParentGatePurpose? = nil
+    @Published public var showParentSettings: Bool = false
+    private var continuousPlaySeconds: Int = 0
+    private var unsavedPlaySeconds: Int = 0
+    private var bedtimeOverrideUntil: Date? = nil
+    private var warnedDate: String = ""
+
+    /// 每开一局 / 返回主页自增，防止上一局遗留的延时任务篡改新一局的进度
+    private var roundGeneration: Int = 0
 
     @Published public var isLocked: Bool = false
     @Published public var isBlindRevealed: Bool = false
@@ -112,7 +144,9 @@ public final class GameEngine: ObservableObject {
         "小熊团团：拼音屋撒四声调料瓶，数学坊玩十格阵和数墙，英语吧拼鲜果句子积木！",
         "小熊团团：挑战「大火」模式，通关蝴蝶奖励翻倍哦！",
         "小熊团团：在 Mac 上可直接按数字和字母答题，iPad 上小手点一点超丝滑！",
-        "小熊团团：三科全部严格同步上海沪教版一年级上/下册教材哦！"
+        "小熊团团：三科全部严格同步上海沪教版一年级上/下册教材哦！",
+        "小熊团团：眼睛离屏幕要有一臂远（约 50 厘米），坐直身体再闯关！",
+        "小熊团团：每玩 20 分钟，小熊会提醒你看看远处，让眼睛休息一下～"
     ]
 
     public static let praiseLines: [String] = [
@@ -186,7 +220,14 @@ public final class GameEngine: ObservableObject {
     }
 
     public func resetAllProgress() {
+        // 护眼设置与今日游戏时长属于家长管控，清空学习记录时保留
+        let keepEye = progress.eyeCare
+        let keepPlay = progress.playSeconds
+        let keepBonus = progress.bonusMinutes
         progress = GameProgress()
+        progress.eyeCare = keepEye
+        progress.playSeconds = keepPlay
+        progress.bonusMinutes = keepBonus
         saveProgress()
         audio.sfxTap()
     }
@@ -295,13 +336,60 @@ public final class GameEngine: ObservableObject {
     }
 
     public var currentMathStageDef: MathStageDefinition {
-        let idx = max(0, min(HujiaoCurriculumRepository.mathStages.count - 1, currentLevelNumber - 1))
+        // 错题特训 / 全明星模式下题目来自不同关卡，按题目反查所属关卡
+        let stageId = currentCurriculumQuestion.flatMap { HujiaoCurriculumRepository.mathStageId(for: $0) } ?? currentLevelNumber
+        let idx = max(0, min(HujiaoCurriculumRepository.mathStages.count - 1, stageId - 1))
         return HujiaoCurriculumRepository.mathStages[idx]
     }
 
     public var currentEnglishStageDef: EnglishStageDefinition {
-        let idx = max(0, min(HujiaoCurriculumRepository.englishStages.count - 1, currentLevelNumber - 1))
+        let stageId = currentCurriculumQuestion.flatMap { HujiaoCurriculumRepository.englishStageId(for: $0) } ?? currentLevelNumber
+        let idx = max(0, min(HujiaoCurriculumRepository.englishStages.count - 1, stageId - 1))
         return HujiaoCurriculumRepository.englishStages[idx]
+    }
+
+    /// 英语题目的英文音频是否就是答案本身（答题前不能展示/朗读，否则等于直接给答案）
+    public var promptAudioRevealsAnswer: Bool {
+        guard currentSubject == .english,
+              let q = currentCurriculumQuestion,
+              let eng = q.englishAudio, !eng.isEmpty else { return false }
+        if q.type == "sentence" { return true }
+        let a = eng.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let b = q.answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return a == b
+    }
+
+    /// 当前题目是否已经判定完毕（判定后才展示完整讲解与答案）
+    public var isCurrentQuestionJudged: Bool {
+        judgeState != "idle"
+    }
+
+    /// 锦囊内容：答题前给不泄露答案的方法提示，判定后才给完整讲解
+    public var hintText: String {
+        guard let q = currentCurriculumQuestion else { return "" }
+        if isCurrentQuestionJudged { return q.explanation }
+        if currentSubject == .math {
+            return "想一想：\(currentMathStageDef.tip)"
+        }
+        if q.type == "sentence" {
+            return "想一想：英语句子一般先说「谁」，再说「做什么」；首字母大写的单词放最前面，带句号、问号或感叹号的单词放最后面！"
+        }
+        return "想一想：先把题目的中文意思读懂，再点选项旁边的小喇叭逐个听一听，选出最合适的那一个！"
+    }
+
+    /// 仅用于语音朗读的题干清洗（去掉 emoji 与特殊符号）
+    private static func speakableText(_ text: String) -> String {
+        let replaced = text
+            .replacingOccurrences(of: "🧱 句子果粒积木：", with: "")
+            .replacingOccurrences(of: "□", with: "方框")
+            .replacingOccurrences(of: "○", with: "圆圈")
+            .replacingOccurrences(of: "△", with: "三角形")
+            .replacingOccurrences(of: "★", with: "星星")
+            .replacingOccurrences(of: "☆", with: "空心星星")
+        let scalars = replaced.unicodeScalars.filter { s in
+            !(s.properties.isEmojiPresentation || s.value == 0xFE0F || s.value == 0x200D)
+        }
+        return String(String.UnicodeScalarView(scalars))
     }
 
     public var availableInitials: [String] {
@@ -363,6 +451,7 @@ public final class GameEngine: ObservableObject {
     }
 
     public func startLevel(levelNumber: Int, fire: FireDifficulty) {
+        roundGeneration += 1
         currentSubject = .pinyin
         progress.touchStreak()
         saveProgress()
@@ -406,6 +495,7 @@ public final class GameEngine: ObservableObject {
     }
 
     public func startCurriculumStage(subject: SubjectKind, stageId: Int, fire: FireDifficulty) {
+        roundGeneration += 1
         currentSubject = subject
         progress.touchStreak()
         saveProgress()
@@ -466,6 +556,7 @@ public final class GameEngine: ObservableObject {
     }
 
     public func startSpecialMode(_ type: SpecialModeType) {
+        roundGeneration += 1
         progress.touchStreak()
         saveProgress()
 
@@ -530,6 +621,8 @@ public final class GameEngine: ObservableObject {
     }
 
     public func goHome() {
+        roundGeneration += 1
+        audio.stopAllSpeech()
         screenState = .home
         mascotLine = Self.mascotTips.randomElement() ?? mascotLine
     }
@@ -554,8 +647,16 @@ public final class GameEngine: ObservableObject {
         numericInput = ""
         numericSmartOptions = []
         sentencePickedIndices = []
+        sentenceDisplayOrder = []
+        displayOptions = []
         pickedChoiceOption = nil
         showMathExplanation = false
+
+        // 切题间隙检查是否到达每日时长上限或睡前打烊
+        checkPlayLockStatus(allowDuringQuestion: true)
+        guard playLock == nil else { return }
+
+        let gen = roundGeneration
 
         if currentSubject == .pinyin {
             guard let word = currentWord else {
@@ -585,7 +686,7 @@ public final class GameEngine: ObservableObject {
             let slow = progress.tts.slow
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 140_000_000)
-                if self.currentWord == word && self.screenState == .playing {
+                if self.roundGeneration == gen && self.currentWord == word && self.screenState == .playing && !self.eyeRestActive {
                     self.audio.speakText(ch, slow: slow)
                 }
             }
@@ -596,6 +697,17 @@ public final class GameEngine: ObservableObject {
             }
             currentCustomer = AnimalCustomer.all[(questionIndex + currentLevelNumber) % AnimalCustomer.all.count]
             customerMood = .waiting
+
+            if q.type == "choice" {
+                displayOptions = q.options.shuffled()
+            } else if q.type == "sentence" {
+                var order = Array(0..<q.options.count).shuffled()
+                let answerJoined = q.answer.trimmingCharacters(in: .whitespacesAndNewlines)
+                if q.options.count > 1 && order.map({ q.options[$0] }).joined(separator: " ") == answerJoined {
+                    order.swapAt(0, 1)
+                }
+                sentenceDisplayOrder = order
+            }
 
             if currentSubject == .math {
                 if q.type == "numeric" {
@@ -608,14 +720,14 @@ public final class GameEngine: ObservableObject {
                 if q.type == "sentence" {
                     chefBubble = "按顺序点击鲜果单词块，放进料理杯拼出完整英文句子！"
                 } else {
-                    chefBubble = "听一听地道牛津英语发音，选出正确的鲜果特调卡片吧！"
+                    chefBubble = "先听题干要求，再点选项小喇叭听发音，选出正确的特调卡！"
                 }
             }
 
             let slow = progress.tts.slow
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 150_000_000)
-                guard self.currentCurriculumQuestion == q && self.screenState == .playing else { return }
+                guard self.roundGeneration == gen && self.currentCurriculumQuestion == q && self.screenState == .playing && !self.eyeRestActive else { return }
                 self.speakCurrentCurriculumPrompt(slow: slow)
             }
         }
@@ -650,27 +762,23 @@ public final class GameEngine: ObservableObject {
         guard let q = currentCurriculumQuestion else { return }
         let useSlow = slow ?? progress.tts.slow
         if currentSubject == .english {
-            if let eng = q.englishAudio, !eng.isEmpty {
+            // 若 englishAudio 就是答案本身，答题前只朗读中文题干（避免把答案直接报出来）；判题后可朗读英文答案
+            if let eng = q.englishAudio, !eng.isEmpty, (!promptAudioRevealsAnswer || isCurrentQuestionJudged) {
                 audio.speakEnglish(eng, slow: useSlow)
             } else {
-                audio.speakText(q.prompt, slow: useSlow)
+                audio.speakText(Self.speakableText(q.prompt), slow: useSlow)
             }
         } else {
-            let cleanPrompt = q.prompt
-                .replacingOccurrences(of: "□", with: "方框")
-                .replacingOccurrences(of: "○", with: "圆圈")
-                .replacingOccurrences(of: "★", with: "星星")
-                .replacingOccurrences(of: "☆", with: "星星")
-            audio.speakText(cleanPrompt, slow: useSlow)
+            audio.speakText(Self.speakableText(q.prompt), slow: useSlow)
         }
     }
 
     public func toggleMathExplanationTip() {
-        guard let q = currentCurriculumQuestion else { return }
+        guard currentCurriculumQuestion != nil else { return }
         audio.sfxTap()
         showMathExplanation.toggle()
         if showMathExplanation {
-            audio.speakText(q.explanation, slow: progress.tts.slow)
+            audio.speakText(Self.speakableText(hintText), slow: progress.tts.slow)
         }
     }
 
@@ -689,8 +797,10 @@ public final class GameEngine: ObservableObject {
             audio.speakText(option, slow: progress.tts.slow)
         }
         isLocked = true
+        let gen = roundGeneration
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 240_000_000)
+            guard self.roundGeneration == gen else { return }
             self.judgeCurriculumAnswer(submitted: option)
         }
     }
@@ -721,8 +831,10 @@ public final class GameEngine: ObservableObject {
         audio.sfxSeasoning()
         isLocked = true
         let submitted = numericInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let gen = roundGeneration
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 180_000_000)
+            guard self.roundGeneration == gen else { return }
             self.judgeCurriculumAnswer(submitted: submitted)
         }
     }
@@ -745,8 +857,10 @@ public final class GameEngine: ObservableObject {
         if sentencePickedIndices.count == q.options.count {
             let builtSentence = sentencePickedIndices.map { q.options[$0] }.joined(separator: " ")
             isLocked = true
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 280_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.judgeCurriculumAnswer(submitted: builtSentence)
             }
         }
@@ -850,11 +964,16 @@ public final class GameEngine: ObservableObject {
             }
             saveProgress()
 
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 550_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.potShaking = false
                 try? await Task.sleep(nanoseconds: 1_550_000_000)
-                guard self.screenState == .playing else { return }
+                while self.eyeRestActive {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard self.roundGeneration == gen && self.screenState == .playing else { return }
                 self.questionIndex += 1
                 self.setupCurrentQuestion()
             }
@@ -872,8 +991,8 @@ public final class GameEngine: ObservableObject {
                 showMathExplanation = true
                 audio.sfxBad()
 
-                chefBubble = "差一点点！看看「算理小锦囊」，再试一次吧！"
-                tipMessage = "💡 锦囊提示：\(q.explanation)（本局还能重做 \(retryLeft) 次）"
+                chefBubble = "差一点点！看看「小锦囊」的方法提示，再试一次吧！"
+                tipMessage = "💡 \(hintText)（本局还能重做 \(retryLeft) 次）"
                 tipStyle = "note"
                 return
             }
@@ -896,11 +1015,16 @@ public final class GameEngine: ObservableObject {
                 audio.speakText("正确答案是 \(q.answer)。\(q.explanation)", slow: true)
             }
 
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 450_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.potNope = false
                 try? await Task.sleep(nanoseconds: 2_100_000_000)
-                guard self.screenState == .playing else { return }
+                while self.eyeRestActive {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard self.roundGeneration == gen && self.screenState == .playing else { return }
                 self.questionIndex += 1
                 self.setupCurrentQuestion()
             }
@@ -1059,7 +1183,7 @@ public final class GameEngine: ObservableObject {
 
     /// Mac 键盘快捷键直连处理（支持拼音、数学数字键盘、选择题 1~4）
     public func handleKeyInput(_ rawKey: String) {
-        guard screenState == .playing, !isLocked else { return }
+        guard screenState == .playing, !isLocked, !eyeRestActive, playLock == nil, parentGate == nil, !showParentSettings else { return }
         let key = rawKey.lowercased()
 
         // 数学与英语键盘直连
@@ -1083,13 +1207,15 @@ public final class GameEngine: ObservableObject {
                     return
                 }
             } else if q.type == "choice" {
-                if let idx = Int(key), idx >= 1 && idx <= q.options.count {
-                    selectCurriculumChoice(q.options[idx - 1])
+                let opts = displayOptions.isEmpty ? q.options : displayOptions
+                if let idx = Int(key), idx >= 1 && idx <= opts.count {
+                    selectCurriculumChoice(opts[idx - 1])
                     return
                 }
             } else if q.type == "sentence" {
-                if let idx = Int(key), idx >= 1 && idx <= q.options.count {
-                    toggleSentenceBlock(at: idx - 1)
+                let order = sentenceDisplayOrder.isEmpty ? Array(0..<q.options.count) : sentenceDisplayOrder
+                if let idx = Int(key), idx >= 1 && idx <= order.count {
+                    toggleSentenceBlock(at: order[idx - 1])
                     return
                 }
                 if key == "\u{08}" || key == "\u{7f}" || key == "delete" || key == "backspace" {
@@ -1188,8 +1314,10 @@ public final class GameEngine: ObservableObject {
         }
         if ready {
             isLocked = true
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 280_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.judgeCurrentPick()
             }
         }
@@ -1287,11 +1415,16 @@ public final class GameEngine: ObservableObject {
             tipStyle = "ok"
             saveProgress()
 
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 550_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.potShaking = false
                 try? await Task.sleep(nanoseconds: 1_550_000_000)
-                guard self.screenState == .playing else { return }
+                while self.eyeRestActive {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard self.roundGeneration == gen && self.screenState == .playing else { return }
                 self.questionIndex += 1
                 self.setupCurrentQuestion()
             }
@@ -1342,11 +1475,16 @@ public final class GameEngine: ObservableObject {
             tipStyle = "no"
             audio.speakText("\(ch)，\(hint.phrase)", slow: true)
 
+            let gen = roundGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 450_000_000)
+                guard self.roundGeneration == gen else { return }
                 self.potNope = false
                 try? await Task.sleep(nanoseconds: 1_950_000_000)
-                guard self.screenState == .playing else { return }
+                while self.eyeRestActive {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard self.roundGeneration == gen && self.screenState == .playing else { return }
                 self.questionIndex += 1
                 self.setupCurrentQuestion()
             }
@@ -1396,6 +1534,7 @@ public final class GameEngine: ObservableObject {
         progress.history.append(
             HistoryEntry(
                 d: GameProgress.todayString(),
+                subj: currentSubject.rawValue,
                 lv: currentLevelNumber,
                 s: stars,
                 r: rightCount,
@@ -1484,5 +1623,164 @@ public final class GameEngine: ObservableObject {
         audio.speakBlending(word: w, phrase: h.phrase, slow: progress.tts.slow) { [weak self] step in
             self?.activeBlendingSlot = step
         }
+    }
+
+    // MARK: - 👁️ 儿童护眼卫士与健康时长管理
+
+    /// 当前护眼暖光滤镜不透明度（支持夜间自动加强）
+    public var effectiveWarmFilterOpacity: Double {
+        guard progress.eyeCare.warmFilter else { return 0.0 }
+        let base: Double
+        switch progress.eyeCare.warmStrength {
+        case 1:  base = 0.06
+        case 3:  base = 0.16
+        default: base = 0.11
+        }
+        let hour = Calendar.current.component(.hour, from: Date())
+        let isNight = (hour >= 19 || hour < 7)
+        let nightBoost = (progress.eyeCare.autoNightWarm && isNight) ? 0.04 : 0.0
+        return min(0.22, base + nightBoost)
+    }
+
+    /// 距离下次 20-20-20 护眼休息还剩多少分钟
+    public var minutesUntilNextEyeRest: Int {
+        let targetSec = max(5, progress.eyeCare.restIntervalMin) * 60
+        let remainSec = max(0, targetSec - continuousPlaySeconds)
+        return max(1, Int(ceil(Double(remainSec) / 60.0)))
+    }
+
+    /// 今日已玩分钟数（向上取整方便展示）
+    public var todayPlayedMinutes: Int {
+        Int(ceil(Double(progress.todayPlaySeconds) / 60.0))
+    }
+
+    /// 每秒心跳：统计用眼时长、触发 20-20-20 望远护眼操、检查每日上限与睡前打烊
+    public func tickEyeCareSecond() {
+        // 如果正在护眼休息倒计时
+        if eyeRestActive {
+            if restRemaining > 0 {
+                restRemaining -= 1
+            }
+            if restRemaining <= 0 {
+                completeEyeRest()
+            }
+            return
+        }
+
+        // 检查睡前打烊与每日上限（若正在答题中，仅在剩 3 分钟时温和提醒，等切题或主页再锁屏）
+        checkPlayLockStatus(allowDuringQuestion: screenState != .playing)
+        guard playLock == nil else { return }
+
+        let today = GameProgress.todayString()
+        progress.playSeconds[today] = (progress.playSeconds[today] ?? 0) + 1
+        unsavedPlaySeconds += 1
+        continuousPlaySeconds += 1
+
+        if unsavedPlaySeconds >= 15 {
+            unsavedPlaySeconds = 0
+            progress.trimPlayTimeHistory()
+            saveProgress()
+        }
+
+        // 距离每日上限还剩 3 分钟时温馨提醒
+        if progress.eyeCare.dailyLimitEnabled {
+            let limitSec = progress.todayAllowedMinutes * 60
+            let usedSec = progress.playSeconds[today] ?? 0
+            let leftSec = limitSec - usedSec
+            if leftSec > 0 && leftSec <= 180 && warnedDate != today {
+                warnedDate = today
+                timeWarning = "⏰ 今日护眼约定时间还剩最后 3 分钟，打完这一关就让眼睛休息吧！"
+            } else if leftSec > 180 {
+                timeWarning = nil
+            }
+        } else {
+            timeWarning = nil
+        }
+
+        // 20-20-20 护眼休息提醒（每玩 N 分钟触发一次望远护眼操）
+        if progress.eyeCare.restReminder {
+            let intervalSec = max(5, progress.eyeCare.restIntervalMin) * 60
+            if continuousPlaySeconds >= intervalSec {
+                startEyeRestBreak()
+            }
+        }
+    }
+
+    public func startEyeRestBreak() {
+        continuousPlaySeconds = 0
+        restRemaining = max(15, progress.eyeCare.restSeconds)
+        eyeRestActive = true
+        audio.stopAllSpeech()
+        audio.sfxSpark()
+        audio.speakText("小熊护眼时间到啦！请抬头看看六米外的远处，眨眨眼睛休息一下吧！", slow: false)
+    }
+
+    public func completeEyeRest() {
+        eyeRestActive = false
+        restRemaining = 0
+        continuousPlaySeconds = 0
+        audio.sfxWin()
+        audio.speakText("眼睛休息好啦，继续保持一臂距离哦！", slow: false)
+    }
+
+    public func checkPlayLockStatus(allowDuringQuestion: Bool) {
+        let now = Date()
+        if let overrideUntil = bedtimeOverrideUntil, now < overrideUntil {
+            playLock = nil
+            return
+        }
+
+        // 1. 检查睡前打烊时间
+        if progress.eyeCare.bedtimeEnabled {
+            let hour = Calendar.current.component(.hour, from: now)
+            let bed = progress.eyeCare.bedtimeHour
+            let wake = progress.eyeCare.wakeHour
+            let isInBedtime: Bool = (bed > wake) ? (hour >= bed || hour < wake) : (hour >= bed && hour < wake)
+            if isInBedtime && allowDuringQuestion {
+                audio.stopAllSpeech()
+                playLock = .bedtime
+                return
+            }
+        }
+
+        // 2. 检查每日时长上限
+        if progress.eyeCare.dailyLimitEnabled {
+            let limitSec = progress.todayAllowedMinutes * 60
+            if progress.todayPlaySeconds >= limitSec && allowDuringQuestion {
+                audio.stopAllSpeech()
+                playLock = .dailyLimit
+                return
+            }
+        }
+
+        playLock = nil
+    }
+
+    public func requestParentGate(_ purpose: ParentGatePurpose) {
+        audio.sfxTap()
+        parentGate = purpose
+    }
+
+    public func handleParentGatePassed(_ purpose: ParentGatePurpose) {
+        parentGate = nil
+        switch purpose {
+        case .settings:
+            showParentSettings = true
+        case .skipRest:
+            completeEyeRest()
+        case .extendTime:
+            grantBonusPlayTime(minutes: 15)
+        }
+    }
+
+    public func grantBonusPlayTime(minutes: Int) {
+        let today = GameProgress.todayString()
+        progress.bonusMinutes[today] = (progress.bonusMinutes[today] ?? 0) + minutes
+        bedtimeOverrideUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        playLock = nil
+        timeWarning = nil
+        continuousPlaySeconds = 0
+        saveProgress()
+        audio.sfxWin()
     }
 }

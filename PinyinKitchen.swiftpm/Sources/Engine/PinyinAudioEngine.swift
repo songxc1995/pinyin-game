@@ -183,6 +183,14 @@ public final class PinyinAudioEngine: ObservableObject {
 
     // MARK: - 语音播报接口
 
+    /// 立即停止所有朗读（护眼休息、打烊时使用）
+    public func stopAllSpeech() {
+        blendingTask?.cancel()
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+    }
+
     public func speakText(_ text: String, slow: Bool = false, rateOverride: Float? = nil) {
         guard !text.isEmpty else { return }
         blendingTask?.cancel()

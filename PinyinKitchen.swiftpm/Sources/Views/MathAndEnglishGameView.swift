@@ -255,7 +255,8 @@ public struct CurriculumGameView: View {
                             .foregroundColor(Color(hex: "#3B2E22"))
                             .fixedSize(horizontal: false, vertical: true)
 
-                        if let eng = q.englishAudio, !eng.isEmpty, engine.currentSubject == .english {
+                        // 仅当英文音频不会直接泄露答案，或者已经判题完毕后，才展示英文原句条
+                        if let eng = q.englishAudio, !eng.isEmpty, engine.currentSubject == .english, (!engine.promptAudioRevealsAnswer || engine.isCurrentQuestionJudged) {
                             HStack(spacing: 8) {
                                 Text("🇬🇧")
                                 Text(eng)
@@ -276,7 +277,12 @@ public struct CurriculumGameView: View {
                             Button {
                                 engine.speakCurrentCurriculumPrompt(slow: false)
                             } label: {
-                                Label(engine.currentSubject == .english ? "🇬🇧 听纯正发音" : "🔊 读题干", systemImage: "speaker.wave.2.fill")
+                                Label(
+                                    engine.currentSubject == .english
+                                        ? ((!engine.promptAudioRevealsAnswer || engine.isCurrentQuestionJudged) ? "🇬🇧 听纯正发音" : "🔊 读题干要求")
+                                        : "🔊 读题干",
+                                    systemImage: "speaker.wave.2.fill"
+                                )
                                     .font(.system(size: 12.5, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 12)
@@ -299,9 +305,9 @@ public struct CurriculumGameView: View {
                                 .buttonStyle(.plain)
 
                                 Button {
-                                    engine.audio.speakText(q.prompt, slow: engine.progress.tts.slow)
+                                    engine.toggleMathExplanationTip()
                                 } label: {
-                                    Text("🇨🇳 听中文题干")
+                                    Text("💡 语法小锦囊")
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundColor(Color(hex: "#5A4634"))
                                         .padding(.horizontal, 11)
@@ -338,7 +344,7 @@ public struct CurriculumGameView: View {
                     if engine.currentSubject == .math {
                         MathVisualAidView(
                             question: q,
-                            showHint: engine.showMathExplanation || engine.judgeState != "idle"
+                            showHint: engine.isCurrentQuestionJudged
                         )
                     } else if q.type == "sentence" {
                         englishSentenceBlenderTray(q)
@@ -347,12 +353,12 @@ public struct CurriculumGameView: View {
                     }
                 }
 
-                // 算理 / 语法小锦囊展开条
-                if engine.showMathExplanation, let q = q {
+                // 算理 / 语法小锦囊展开条（答题前展示思考方法提示，判题后展示完整解析）
+                if engine.showMathExplanation, q != nil {
                     HStack(alignment: .top, spacing: 8) {
                         Text("💡")
                             .font(.system(size: 16))
-                        Text(q.explanation)
+                        Text(engine.hintText)
                             .font(.system(size: 12.5, weight: .bold))
                             .foregroundColor(Color(hex: "#7A2E1D"))
                             .fixedSize(horizontal: false, vertical: true)
@@ -718,19 +724,21 @@ public struct CurriculumGameView: View {
             ? ["🧁", "🍰", "🥐", "🍪"]
             : ["🍹", "🍓", "🍊", "🍑"]
 
+        let opts = engine.displayOptions.isEmpty ? q.options : engine.displayOptions
+
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(engine.currentSubject == .math ? "🧁 请点选正确的烘焙配方卡片" : "🧃 请点选正确的牛津英语特调卡片")
                     .font(.system(size: 15, weight: .heavy))
                     .foregroundColor(Color(hex: "#3B2E22"))
                 Spacer()
-                Text("可按键盘数字 1~\(q.options.count) 快速选择")
+                Text("可按键盘数字 1~\(opts.count) 快速选择")
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundColor(Color(hex: "#8A7765"))
             }
 
             VStack(spacing: 12) {
-                ForEach(Array(q.options.enumerated()), id: \.offset) { idx, opt in
+                ForEach(Array(opts.enumerated()), id: \.offset) { idx, opt in
                     let isRight = (opt == q.answer)
                     let isPicked = (engine.pickedChoiceOption == opt)
                     let showGood = (engine.judgeState == "good" && isRight)
@@ -808,6 +816,7 @@ public struct CurriculumGameView: View {
     // MARK: - 3. 英语鲜果句子积木拼接面板
     private func englishSentenceFruitBlocksPanel(_ q: CurriculumQuestion) -> some View {
         let fruitEmojis = ["🍓", "🍊", "🍑", "🍎", "🍋", "🍇", "🍍", "🥝"]
+        let order = engine.sentenceDisplayOrder.isEmpty ? Array(0..<q.options.count) : engine.sentenceDisplayOrder
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -823,15 +832,16 @@ public struct CurriculumGameView: View {
             }
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 12)], spacing: 12) {
-                ForEach(Array(q.options.enumerated()), id: \.offset) { idx, word in
-                    let isPicked = engine.sentencePickedIndices.contains(idx)
-                    let orderNum = (engine.sentencePickedIndices.firstIndex(of: idx) ?? -1) + 1
+                ForEach(Array(order.enumerated()), id: \.offset) { displayIdx, optIdx in
+                    let word = q.options[optIdx]
+                    let isPicked = engine.sentencePickedIndices.contains(optIdx)
+                    let orderNum = (engine.sentencePickedIndices.firstIndex(of: optIdx) ?? -1) + 1
 
                     Button {
-                        engine.toggleSentenceBlock(at: idx)
+                        engine.toggleSentenceBlock(at: optIdx)
                     } label: {
                         HStack(spacing: 10) {
-                            Text(fruitEmojis[idx % fruitEmojis.count])
+                            Text(fruitEmojis[displayIdx % fruitEmojis.count])
                                 .font(.system(size: 26))
                             Text(word)
                                 .font(.system(size: 20, weight: .black, design: .rounded))

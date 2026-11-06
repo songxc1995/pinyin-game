@@ -1,0 +1,634 @@
+import SwiftUI
+
+// MARK: - 1. 顶部护眼状态快捷胶囊条
+public struct EyeCareTopBarView: View {
+    @ObservedObject public var engine: GameEngine
+
+    public init(engine: GameEngine) {
+        self.engine = engine
+    }
+
+    public var body: some View {
+        HStack(spacing: 10) {
+            // 护眼坐姿与距离提示
+            HStack(spacing: 6) {
+                Text("👁️")
+                    .font(.system(size: 14))
+                Text("护眼小卫士：请保持眼睛离屏幕一臂远（约50厘米）")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Color(hex: "#2E5A36"))
+                    .lineLimit(1)
+            }
+
+            if let warn = engine.timeWarning {
+                Text(warn)
+                    .font(.system(size: 11.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#B25614"))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color(hex: "#FFF3D6")))
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // 一键切换暖光护眼纸张滤镜
+            Button {
+                engine.audio.sfxTap()
+                engine.progress.eyeCare.warmFilter.toggle()
+                engine.saveProgress()
+            } label: {
+                HStack(spacing: 4) {
+                    Text(engine.progress.eyeCare.warmFilter ? "☀️ 暖光护眼:开" : "☀️ 暖光护眼:关")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(engine.progress.eyeCare.warmFilter ? Color(hex: "#8A4B12") : Color(hex: "#5A4634"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(engine.progress.eyeCare.warmFilter ? Color(hex: "#FFECC8") : Color.white.opacity(0.85))
+                        .overlay(Capsule().stroke(Color(hex: "#D9953B").opacity(0.45), lineWidth: 1.2))
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 主动进入 30 秒远眺护眼操
+            Button {
+                engine.startEyeRestBreak()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("🌿 远眺休息 (\(engine.minutesUntilNextEyeRest)分后)")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#246B43"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#E3F6EA"))
+                        .overlay(Capsule().stroke(Color(hex: "#3EA865").opacity(0.45), lineWidth: 1.2))
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 今日已用时长与家长设置入口
+            Button {
+                engine.requestParentGate(.settings)
+            } label: {
+                HStack(spacing: 4) {
+                    Text("⏳ 今日 \(engine.todayPlayedMinutes)/\(engine.progress.todayAllowedMinutes)分 · 🔒家长设置")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#4A358E"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#EFEFFD"))
+                        .overlay(Capsule().stroke(Color(hex: "#7A6EE6").opacity(0.4), lineWidth: 1.2))
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(hex: "#F1F7EE"))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#3EA865").opacity(0.28), lineWidth: 1.2))
+        )
+    }
+}
+
+// MARK: - 2. 20-20-20 森林绿洲护眼休息全屏弹窗
+public struct EyeRestOverlayView: View {
+    @ObservedObject public var engine: GameEngine
+    @State private var breatheScale: Bool = false
+
+    public init(engine: GameEngine) {
+        self.engine = engine
+    }
+
+    public var body: some View {
+        ZStack {
+            // 柔和森林豆沙绿护眼背景（放松睫状肌）
+            LinearGradient(
+                colors: [Color(hex: "#1E4631").opacity(0.88), Color(hex: "#2A5C40").opacity(0.92)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                ZStack {
+                    Circle()
+                        .fill(Color(hex: "#A8E6CF").opacity(0.25))
+                        .frame(width: 136, height: 136)
+                        .scaleEffect(breatheScale ? 1.15 : 0.92)
+                        .animation(
+                            engine.progress.eyeCare.gentleMotion
+                                ? .easeInOut(duration: 2.8).repeatForever(autoreverses: true)
+                                : .easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                            value: breatheScale
+                        )
+
+                    Circle()
+                        .fill(Color(hex: "#DCEDC1"))
+                        .frame(width: 96, height: 96)
+
+                    Text("🌲👀🌿")
+                        .font(.system(size: 34))
+                }
+                .onAppear {
+                    breatheScale = true
+                }
+
+                Text("🌿 小熊护眼时间 · 让眼睛做个深呼吸")
+                    .font(.system(size: 25, weight: .black))
+                    .foregroundColor(Color(hex: "#214E34"))
+
+                Text("你已经认真学习了 \(engine.progress.eyeCare.restIntervalMin) 分钟啦！跟着小熊团团做 3 件护眼小事：")
+                    .font(.system(size: 14.5, weight: .bold))
+                    .foregroundColor(Color(hex: "#3D6B50"))
+                    .multilineTextAlignment(.center)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    eyeStepRow(num: "1", icon: "🏞️", text: "抬头望向窗外或 6 米（20英尺）以外的远处绿植")
+                    eyeStepRow(num: "2", icon: "😌", text: "轻轻闭上眼睛再睁开，慢速眨眼 10 下润润眼")
+                    eyeStepRow(num: "3", icon: "🪑", text: "挺直小背脊，检查眼睛离屏幕是否有一臂远（约50厘米）")
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color.white.opacity(0.78))
+                )
+
+                // 倒计时大圆环
+                HStack(spacing: 10) {
+                    Text("⏳ 护眼倒计时：")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundColor(Color(hex: "#214E34"))
+                    Text("\(engine.restRemaining) 秒")
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundColor(Color(hex: "#1B7A43"))
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#D4F5E2"))
+                        .overlay(Capsule().stroke(Color(hex: "#2FB380"), lineWidth: 2))
+                )
+
+                Button {
+                    engine.requestParentGate(.skipRest)
+                } label: {
+                    Text("🔒 家长验证跳过本次休息")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#5A7A66"))
+                        .padding(.top, 4)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(30)
+            .frame(maxWidth: 540)
+            .background(
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(LinearGradient(colors: [Color(hex: "#F2FBF5"), Color(hex: "#E1F5E8")], startPoint: .top, endPoint: .bottom))
+                    .overlay(RoundedRectangle(cornerRadius: 30).stroke(Color(hex: "#56C596"), lineWidth: 3))
+                    .shadow(color: Color.black.opacity(0.25), radius: 24, y: 10)
+            )
+        }
+    }
+
+    private func eyeStepRow(num: String, icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Text(num)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Color(hex: "#2FB380")))
+            Text(icon)
+                .font(.system(size: 18))
+            Text(text)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(hex: "#214E34"))
+            Spacer()
+        }
+    }
+}
+
+// MARK: - 3. 每日时长到达上限 / 睡前打烊锁屏弹窗
+public struct PlayLockOverlayView: View {
+    @ObservedObject public var engine: GameEngine
+    public let reason: PlayLockReason
+
+    public init(engine: GameEngine, reason: PlayLockReason) {
+        self.engine = engine
+        self.reason = reason
+    }
+
+    public var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "#1B2838").opacity(0.90), Color(hex: "#2C3E50").opacity(0.94)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Text(reason == .bedtime ? "🌙😴✨" : "🏞️⚽🦋")
+                    .font(.system(size: 48))
+
+                Text(reason == .bedtime ? "奇妙料理城打烊休息啦" : "今日护眼约定时间到啦！")
+                    .font(.system(size: 26, weight: .black))
+                    .foregroundColor(Color(hex: "#3B2E22"))
+
+                Text(
+                    reason == .bedtime
+                        ? "现在是夜间休息时间（\(engine.progress.eyeCare.bedtimeHour):00 – 次日 0\(engine.progress.eyeCare.wakeHour):00），小熊团团和小动物们都去睡觉喽，小朋友也要早点休息长高高！"
+                        : "今天你已经在料理城学习了 \(engine.todayPlayedMinutes) 分钟，收获满满！快去户外跑一跑、看看远处的天空和绿树，明天再来闯关吧！"
+                )
+                .font(.system(size: 14.5, weight: .bold))
+                .foregroundColor(Color(hex: "#5A4634"))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 10)
+
+                // 今日收获展示
+                HStack(spacing: 14) {
+                    summaryBadge(icon: "⭐", label: "累计总星", value: "\(engine.progress.totalStars)")
+                    summaryBadge(icon: "📖", label: "料理图鉴", value: "\(engine.progress.totalCollectionCount)")
+                    summaryBadge(icon: "🦋", label: "蝴蝶伙伴", value: "\(engine.progress.bf.count)")
+                }
+                .padding(.vertical, 6)
+
+                HStack(spacing: 14) {
+                    Button {
+                        engine.requestParentGate(.extendTime)
+                    } label: {
+                        Text("🔒 家长验证延长 15 分钟")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 11)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#2FB380")))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        engine.requestParentGate(.settings)
+                    } label: {
+                        Text("⚙️ 家长护眼设置")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundColor(Color(hex: "#4A2E14"))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 11)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#FFF0D6")))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 6)
+            }
+            .padding(30)
+            .frame(maxWidth: 520)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(LinearGradient(colors: [Color(hex: "#FFFDF9"), Color(hex: "#F2EFE6")], startPoint: .top, endPoint: .bottom))
+                    .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color(hex: "#D9953B"), lineWidth: 2.5))
+                    .shadow(color: Color.black.opacity(0.3), radius: 24, y: 10)
+            )
+        }
+    }
+
+    private func summaryBadge(icon: String, label: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(icon)
+                .font(.system(size: 22))
+            Text(value)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundColor(Color(hex: "#4A2E14"))
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(Color(hex: "#8A7765"))
+        }
+        .frame(width: 110)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
+    }
+}
+
+// MARK: - 4. 家长乘法口诀验证门（防止低龄儿童自行关闭护眼锁）
+public struct ParentGateOverlayView: View {
+    @ObservedObject public var engine: GameEngine
+    public let purpose: ParentGatePurpose
+
+    @State private var factorA: Int = Int.random(in: 6...9)
+    @State private var factorB: Int = Int.random(in: 6...9)
+    @State private var options: [Int] = []
+    @State private var errorHint: String? = nil
+
+    public init(engine: GameEngine, purpose: ParentGatePurpose) {
+        self.engine = engine
+        self.purpose = purpose
+    }
+
+    public var body: some View {
+        let answer = factorA * factorB
+
+        return ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    engine.parentGate = nil
+                }
+
+            VStack(spacing: 14) {
+                Text("🔒 家长护眼验证")
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundColor(Color(hex: "#3B2E22"))
+
+                Text("为保护小朋友视力，请家长完成下方乘法验证：")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color(hex: "#7A624B"))
+
+                Text("\(factorA) × \(factorB) = ?")
+                    .font(.system(size: 30, weight: .black, design: .rounded))
+                    .foregroundColor(Color(hex: "#4A358E"))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 28)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#F5F2FF")))
+
+                if let err = errorHint {
+                    Text(err)
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#E25247"))
+                }
+
+                HStack(spacing: 10) {
+                    ForEach(options, id: \.self) { opt in
+                        Button {
+                            if opt == answer {
+                                engine.audio.sfxWin()
+                                engine.handleParentGatePassed(purpose)
+                            } else {
+                                engine.audio.sfxBad()
+                                errorHint = "答案不对哦，请家长来点选～"
+                                regenerateQuestion()
+                            }
+                        } label: {
+                            Text("\(opt)")
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                                .frame(width: 72, height: 48)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color.white)
+                                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#7A6EE6").opacity(0.45), lineWidth: 1.8))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button("取消") {
+                    engine.audio.sfxTap()
+                    engine.parentGate = nil
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Color(hex: "#8A7765"))
+                .padding(.top, 4)
+            }
+            .padding(24)
+            .frame(maxWidth: 420)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color(hex: "#FFFDF9"))
+                    .shadow(color: Color.black.opacity(0.25), radius: 20, y: 8)
+            )
+            .onAppear {
+                regenerateQuestion()
+            }
+        }
+    }
+
+    private func regenerateQuestion() {
+        factorA = Int.random(in: 6...9)
+        factorB = Int.random(in: 6...9)
+        let ans = factorA * factorB
+        var set = Set<Int>([ans])
+        let candidates = [ans - 6, ans - 3, ans + 3, ans + 6, ans + 8, ans - 4]
+        for c in candidates.shuffled() where c > 10 {
+            set.insert(c)
+            if set.count >= 4 { break }
+        }
+        options = Array(set).sorted()
+    }
+}
+
+// MARK: - 5. 家长护眼与健康时长设置面板
+public struct ParentEyeCareSettingsSheet: View {
+    @ObservedObject public var engine: GameEngine
+
+    public init(engine: GameEngine) {
+        self.engine = engine
+    }
+
+    public var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    engine.showParentSettings = false
+                }
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🛡️ 家长护眼与健康时长设置中心")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundColor(Color(hex: "#3B2E22"))
+                        Text("今日已用眼 \(engine.todayPlayedMinutes) 分钟 · 当前上限 \(engine.progress.todayAllowedMinutes) 分钟")
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundColor(Color(hex: "#2B7F4A"))
+                    }
+                    Spacer()
+                    Button {
+                        engine.audio.sfxTap()
+                        engine.showParentSettings = false
+                    } label: {
+                        Text("完成 ✓")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(Color(hex: "#2FB380")))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Divider()
+
+                // 1. 屏幕暖光滤镜与动效减负
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("☀️ 1. 屏幕蓝光过滤与柔和视觉")
+                        .font(.system(size: 14.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#4A2E14"))
+
+                    Toggle("开启纸张暖光护眼滤镜（降低白光眩光与蓝光刺激）", isOn: Binding(
+                        get: { engine.progress.eyeCare.warmFilter },
+                        set: { engine.progress.eyeCare.warmFilter = $0; engine.saveProgress() }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+
+                    if engine.progress.eyeCare.warmFilter {
+                        HStack(spacing: 8) {
+                            Text("暖光浓度：")
+                                .font(.system(size: 12.5, weight: .bold))
+                            ForEach([(1, "轻柔"), (2, "标准推荐"), (3, "强效防蓝光")], id: \.0) { level, title in
+                                let on = (engine.progress.eyeCare.warmStrength == level)
+                                Button {
+                                    engine.progress.eyeCare.warmStrength = level
+                                    engine.saveProgress()
+                                } label: {
+                                    Text(title)
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(on ? .white : Color(hex: "#5A4634"))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(on ? Color(hex: "#D9953B") : Color(hex: "#F5EFE6")))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    Toggle("夜间（19:00后）自动加深暖光保护", isOn: Binding(
+                        get: { engine.progress.eyeCare.autoNightWarm },
+                        set: { engine.progress.eyeCare.autoNightWarm = $0; engine.saveProgress() }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+
+                    Toggle("柔和动效模式（减弱锅具晃动与高频闪烁动画）", isOn: Binding(
+                        get: { engine.progress.eyeCare.gentleMotion },
+                        set: { engine.progress.eyeCare.gentleMotion = $0; engine.saveProgress() }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#FAF6EE")))
+
+                // 2. 20-20-20 远眺休息提醒
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🌿 2. 20-20-20 远眺护眼休息操")
+                        .font(.system(size: 14.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#214E34"))
+
+                    Toggle("定时弹出「远眺 6 米外绿植」护眼休息锁屏", isOn: Binding(
+                        get: { engine.progress.eyeCare.restReminder },
+                        set: { engine.progress.eyeCare.restReminder = $0; engine.saveProgress() }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+
+                    if engine.progress.eyeCare.restReminder {
+                        HStack(spacing: 8) {
+                            Text("每隔多久休息：")
+                                .font(.system(size: 12.5, weight: .bold))
+                            ForEach([15, 20, 30], id: \.self) { mins in
+                                let on = (engine.progress.eyeCare.restIntervalMin == mins)
+                                Button {
+                                    engine.progress.eyeCare.restIntervalMin = mins
+                                    engine.saveProgress()
+                                } label: {
+                                    Text("\(mins) 分钟")
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(on ? .white : Color(hex: "#214E34"))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(on ? Color(hex: "#2FB380") : Color(hex: "#E6F4EC")))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#F1F9F4")))
+
+                // 3. 每日总时长与睡前打烊
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("⏰ 3. 每日时长上限与睡前打烊")
+                        .font(.system(size: 14.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#4A358E"))
+
+                    Toggle("开启每日游戏总时长限制", isOn: Binding(
+                        get: { engine.progress.eyeCare.dailyLimitEnabled },
+                        set: {
+                            engine.progress.eyeCare.dailyLimitEnabled = $0
+                            engine.checkPlayLockStatus(allowDuringQuestion: true)
+                            engine.saveProgress()
+                        }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+
+                    if engine.progress.eyeCare.dailyLimitEnabled {
+                        HStack(spacing: 8) {
+                            Text("每日上限：")
+                                .font(.system(size: 12.5, weight: .bold))
+                            ForEach([20, 30, 40, 60], id: \.self) { mins in
+                                let on = (engine.progress.eyeCare.dailyLimitMin == mins)
+                                Button {
+                                    engine.progress.eyeCare.dailyLimitMin = mins
+                                    engine.checkPlayLockStatus(allowDuringQuestion: true)
+                                    engine.saveProgress()
+                                } label: {
+                                    Text("\(mins) 分钟")
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(on ? .white : Color(hex: "#4A358E"))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(on ? Color(hex: "#7A6EE6") : Color(hex: "#EFEFFD")))
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                engine.grantBonusPlayTime(minutes: 15)
+                            } label: {
+                                Text("🎁 今日临时 +15 分钟")
+                                    .font(.system(size: 12, weight: .heavy))
+                                    .foregroundColor(Color(hex: "#B25614"))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(Color(hex: "#FFF0D6")))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Toggle("睡前自动打烊（晚上 21:00 至次日 07:00 锁屏休息）", isOn: Binding(
+                        get: { engine.progress.eyeCare.bedtimeEnabled },
+                        set: {
+                            engine.progress.eyeCare.bedtimeEnabled = $0
+                            engine.checkPlayLockStatus(allowDuringQuestion: true)
+                            engine.saveProgress()
+                        }
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#F6F4FC")))
+            }
+            .padding(24)
+            .frame(maxWidth: 580)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(hex: "#FFFDF9"))
+                    .shadow(color: Color.black.opacity(0.25), radius: 24, y: 10)
+            )
+        }
+    }
+}

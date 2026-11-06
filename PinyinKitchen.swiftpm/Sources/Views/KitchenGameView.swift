@@ -837,6 +837,16 @@ public struct KitchenGameView: View {
         #if os(macOS)
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 保留系统快捷键（如 Cmd+Q / Cmd+W / Cmd+H）正常生效
+            guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else {
+                return event
+            }
+            if event.keyCode == 51 { // Backspace 退格键
+                Task { @MainActor in
+                    engine.handleKeyInput("backspace")
+                }
+                return nil
+            }
             if let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
                 Task { @MainActor in
                     engine.handleKeyInput(chars)

@@ -348,8 +348,9 @@ public struct LevelMapView: View {
         let locked = !engine.progress.freeUnlockAll && (stg.id > engine.progress.englishUnlocked)
         let stars = engine.progress.starsForLevel(stg.id, subject: .english)
         let stageQuestions = HujiaoCurriculumRepository.questionsForEnglishStage(stg.id)
-        let gotCards = stg.topicWords.filter { (engine.progress.englishCards[$0] ?? 0) > 0 }.count
-        let pct = stg.topicWords.isEmpty ? 0.0 : Double(gotCards) / Double(stg.topicWords.count)
+        let stageFlashcards = HujiaoCurriculumRepository.flashcards(forEnglishStage: stg.id)
+        let gotCards = stageFlashcards.filter { (engine.progress.englishCards[$0.word] ?? 0) > 0 }.count
+        let pct = stageFlashcards.isEmpty ? 0.0 : Double(gotCards) / Double(stageFlashcards.count)
         let badgeColor = Color(hex: "#2FB380")
 
         return Button {
@@ -398,7 +399,7 @@ public struct LevelMapView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(Color(hex: "#F5A623"))
                     }
-                    Text("题库 \(stageQuestions.count) 题 · 闪卡 \(gotCards)/\(stg.topicWords.count)")
+                    Text("题库 \(stageQuestions.count) 题 · 闪卡 \(gotCards)/\(stageFlashcards.count)")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A7765"))
 

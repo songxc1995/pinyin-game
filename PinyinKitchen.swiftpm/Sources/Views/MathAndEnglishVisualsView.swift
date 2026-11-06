@@ -56,30 +56,43 @@ public struct MathVisualAidView: View {
         // 1. 钟表教具 (一下 U3 时间的初步认识)
         if tid.hasPrefix("hjm_g1b_u3_") || p.contains("钟面") || p.contains("时针") || p.contains("分针") || p.contains("时半") {
             let isHalf = p.contains("半") || p.contains("指着6") || p.contains("指着 6")
+            let hourMatch = extractHourBeforeShi(from: p)
             let nums = extractNumbers(from: p)
-            var h = nums.first(where: { (1...12).contains($0) && $0 != 12 }) ?? 8
-            if p.contains("12时") || p.contains("12 时") { h = 12 }
-            return .clock(hour: h, isHalf: isHalf)
+            let fallbackH = nums.first(where: { (1...12).contains($0) && $0 != 12 }) ?? 8
+            let h = hourMatch ?? (p.contains("12时") || p.contains("12 时") ? 12 : fallbackH)
+            return .clock(hour: max(1, min(12, h)), isHalf: isHalf)
         }
 
-        // 2. 数墙金字塔教具 (一下 U7 数墙的秘密)
-        if tid.hasPrefix("hjm_g1b_u7_") || p.contains("数墙") {
+        // 2. 数墙金字塔教具 (一下 U7 数墙的秘密 —— 仅当题干明确提到“数墙”时触发)
+        if p.contains("数墙") {
             let nums = extractNumbers(from: p)
             let ans = Int(question.answer) ?? 10
-            if nums.count >= 3 {
+            if p.contains("底层是4、□、9") && nums.count >= 4 {
+                return .numberWall(
+                    bottom: ["4", showHint ? "\(ans)" : "？", "9"],
+                    mid: ["11", "16"],
+                    top: "27"
+                )
+            } else if p.contains("底层是□、6、□") {
+                return .numberWall(
+                    bottom: [showHint ? "7" : "？", "6", showHint ? "9" : "？"],
+                    mid: ["13", "15"],
+                    top: "28"
+                )
+            } else if nums.count == 3 {
                 let a = nums[0], b = nums[1], c = nums[2]
                 return .numberWall(
                     bottom: ["\(a)", "\(b)", "\(c)"],
-                    mid: ["\(a + b)", "\(b + c)"],
-                    top: showHint ? "\(ans)" : "？"
+                    mid: p.contains("中间层左块") ? [showHint ? "\(a + b)" : "？", "\(b + c)"] : ["\(a + b)", "\(b + c)"],
+                    top: p.contains("中间层左块") ? "\(a + 2 * b + c)" : (showHint ? "\(ans)" : "？")
                 )
             } else if nums.count == 2 {
                 let a = nums[0], b = nums[1]
-                if p.contains("下层") && p.contains("上层") {
+                if p.contains("顶层是") || (p.contains("上层") && p.contains("下层")) {
                     return .numberWall(
-                        bottom: ["\(a)", "？"],
+                        bottom: ["\(min(a, b))", showHint ? "\(ans)" : "？"],
                         mid: [],
-                        top: "\(b)"
+                        top: "\(max(a, b))"
                     )
                 } else {
                     return .numberWall(
@@ -92,10 +105,10 @@ public struct MathVisualAidView: View {
             return .numberWall(bottom: ["3", "4", "5"], mid: ["7", "9"], top: showHint ? "\(ans)" : "？")
         }
 
-        // 3. 厘米直尺教具 (一下 U5 长度比较与测量)
-        if tid.hasPrefix("hjm_g1b_u5_") || p.contains("厘米") || p.contains("直尺") || p.contains("刻度") {
+        // 3. 厘米直尺教具 (一下 U5 直尺/刻度测量题)
+        if p.contains("直尺") || p.contains("刻度") || (tid.hasPrefix("hjm_g1b_u5_") && p.contains("厘米") && !p.contains("剪去") && !p.contains("用去") && !p.contains("第一段")) {
             let nums = extractNumbers(from: p).filter { $0 <= 15 }
-            if nums.count >= 2 {
+            if (p.contains("左端") || p.contains("刻度")) && nums.count >= 2 {
                 let s = min(nums[0], nums[1])
                 let e = max(nums[0], nums[1])
                 return .ruler(startCm: s, endCm: max(s + 1, min(12, e)))
@@ -155,6 +168,19 @@ public struct MathVisualAidView: View {
             guard let r = Range(match.range, in: text) else { return nil }
             return Int(text[r])
         }
+    }
+
+    private func extractHourBeforeShi(from text: String) -> Int? {
+        let pattern = #"(\d+)\s*时"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: nsRange),
+              match.numberOfRanges > 1,
+              let r = Range(match.range(at: 1), in: text),
+              let val = Int(text[r]), (1...12).contains(val) else {
+            return nil
+        }
+        return val
     }
 }
 

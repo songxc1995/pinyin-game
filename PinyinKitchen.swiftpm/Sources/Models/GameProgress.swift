@@ -58,6 +58,55 @@ public struct DailyProgress: Codable, Equatable, Sendable {
     public var claimed: [String: Int]
 }
 
+// MARK: - 护眼与健康游戏设置（家长可调）
+public struct EyeCareSettings: Codable, Equatable, Sendable {
+    /// 护眼暖光滤镜（过滤部分蓝光、降低白色刺眼程度）
+    public var warmFilter: Bool = true
+    /// 暖光强度：1 轻柔 / 2 标准 / 3 强护眼
+    public var warmStrength: Int = 2
+    /// 晚上 19:00 以后自动加强暖光
+    public var autoNightWarm: Bool = true
+    /// 20-20-20 用眼休息提醒
+    public var restReminder: Bool = true
+    /// 连续游戏多少分钟后强制休息
+    public var restIntervalMin: Int = 20
+    /// 每次休息多少秒
+    public var restSeconds: Int = 30
+    /// 每日游戏时长上限
+    public var dailyLimitEnabled: Bool = true
+    public var dailyLimitMin: Int = 40
+    /// 睡前打烊（时间段内不可游戏）
+    public var bedtimeEnabled: Bool = true
+    public var bedtimeHour: Int = 21
+    public var wakeHour: Int = 7
+    /// 柔和动效（减少晃动、闪烁类动画）
+    public var gentleMotion: Bool = true
+
+    public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case warmFilter, warmStrength, autoNightWarm, restReminder, restIntervalMin, restSeconds
+        case dailyLimitEnabled, dailyLimitMin, bedtimeEnabled, bedtimeHour, wakeHour, gentleMotion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = EyeCareSettings()
+        warmFilter = (try? c.decode(Bool.self, forKey: .warmFilter)) ?? d.warmFilter
+        warmStrength = (try? c.decode(Int.self, forKey: .warmStrength)) ?? d.warmStrength
+        autoNightWarm = (try? c.decode(Bool.self, forKey: .autoNightWarm)) ?? d.autoNightWarm
+        restReminder = (try? c.decode(Bool.self, forKey: .restReminder)) ?? d.restReminder
+        restIntervalMin = (try? c.decode(Int.self, forKey: .restIntervalMin)) ?? d.restIntervalMin
+        restSeconds = (try? c.decode(Int.self, forKey: .restSeconds)) ?? d.restSeconds
+        dailyLimitEnabled = (try? c.decode(Bool.self, forKey: .dailyLimitEnabled)) ?? d.dailyLimitEnabled
+        dailyLimitMin = (try? c.decode(Int.self, forKey: .dailyLimitMin)) ?? d.dailyLimitMin
+        bedtimeEnabled = (try? c.decode(Bool.self, forKey: .bedtimeEnabled)) ?? d.bedtimeEnabled
+        bedtimeHour = (try? c.decode(Int.self, forKey: .bedtimeHour)) ?? d.bedtimeHour
+        wakeHour = (try? c.decode(Int.self, forKey: .wakeHour)) ?? d.wakeHour
+        gentleMotion = (try? c.decode(Bool.self, forKey: .gentleMotion)) ?? d.gentleMotion
+    }
+}
+
 public struct GameProgress: Codable, Equatable, Sendable {
     // 语文拼音进度
     public var unlocked: Int = 1
@@ -91,6 +140,11 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public var seasoningMode: Bool = true
     public var daily: DailyProgress = DailyProgress(d: Self.todayString(), rounds: 0, maxCombo: 0, words: 0, claimed: [:])
 
+    // 护眼设置与每日游戏时长（按日期记录秒数 / 家长临时加时分钟数）
+    public var eyeCare: EyeCareSettings = EyeCareSettings()
+    public var playSeconds: [String: Int] = [:]
+    public var bonusMinutes: [String: Int] = [:]
+
     public init() {}
 
     enum CodingKeys: String, CodingKey {
@@ -99,6 +153,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
         case englishUnlocked, englishStars, englishCards
         case freeUnlockAll
         case wrong, wrongMastered, history, streak, bestCombo, bf, cleared, tts, potSkin, blind, seasoningMode, daily
+        case eyeCare, playSeconds, bonusMinutes
     }
 
     public init(from decoder: Decoder) throws {
@@ -126,6 +181,27 @@ public struct GameProgress: Codable, Equatable, Sendable {
         self.seasoningMode = (try? c.decode(Bool.self, forKey: .seasoningMode)) ?? true
         self.daily = (try? c.decode(DailyProgress.self, forKey: .daily))
             ?? DailyProgress(d: Self.todayString(), rounds: 0, maxCombo: 0, words: 0, claimed: [:])
+        self.eyeCare = (try? c.decode(EyeCareSettings.self, forKey: .eyeCare)) ?? EyeCareSettings()
+        self.playSeconds = (try? c.decode([String: Int].self, forKey: .playSeconds)) ?? [:]
+        self.bonusMinutes = (try? c.decode([String: Int].self, forKey: .bonusMinutes)) ?? [:]
+    }
+
+    /// 今日已游戏秒数
+    public var todayPlaySeconds: Int {
+        playSeconds[Self.todayString()] ?? 0
+    }
+
+    /// 今日可游戏总分钟数（上限 + 家长临时加时）
+    public var todayAllowedMinutes: Int {
+        eyeCare.dailyLimitMin + (bonusMinutes[Self.todayString()] ?? 0)
+    }
+
+    /// 仅保留最近 14 天的时长记录
+    public mutating func trimPlayTimeHistory() {
+        guard playSeconds.count > 14 else { return }
+        let keep = Set(playSeconds.keys.sorted().suffix(14))
+        playSeconds = playSeconds.filter { keep.contains($0.key) }
+        bonusMinutes = bonusMinutes.filter { keep.contains($0.key) }
     }
 
     public static func todayString(date: Date = Date()) -> String {
