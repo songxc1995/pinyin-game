@@ -213,6 +213,9 @@ public struct CurriculumGameView: View {
         let q = engine.currentCurriculumQuestion
 
         return VStack(spacing: 10) {
+            // 0. 伴读守护神兽 + 彩虹连击宝箱能量条 + 实时星币
+            CompanionPetStageWidget(engine: engine)
+
             // 1. 森林小动物顾客与题目卡片
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {

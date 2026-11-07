@@ -1270,9 +1270,10 @@ public struct RecordsAndWrongView: View {
     }
 }
 
-// MARK: - 5. 局末结算庆祝视图 (RoundResultView - 支持语数英三科奖励展示)
+// MARK: - 5. 局末结算庆祝视图 (RoundResultView - 支持语数英三科奖励展示 + 三选一神秘宝箱)
 public struct RoundResultView: View {
     @ObservedObject public var engine: GameEngine
+    @State private var chestWiggle: Bool = false
 
     public init(engine: GameEngine) {
         self.engine = engine
@@ -1283,214 +1284,313 @@ public struct RoundResultView: View {
         let r = engine.rightCount
         let st = engine.roundStars
         let themeColor = Color(hex: engine.currentSubject.themeHex)
+        let pet = engine.equippedPet
+        let petStage = engine.equippedPetStage
 
-        return VStack(spacing: 16) {
-            Text(st > 0 ? "🎉 香喷喷出炉通关啦！" : "💪 差一点点，再试一次吧！")
-                .font(.system(size: 26, weight: .black))
-                .foregroundColor(Color(hex: "#5E340B"))
-
-            Text(String(repeating: "★", count: st) + String(repeating: "☆", count: 3 - st))
-                .font(.system(size: 48, weight: .black))
-                .foregroundColor(Color(hex: "#F5A623"))
-                .shadow(color: Color(hex: "#B4640A").opacity(0.25), radius: 2, y: 3)
-
-            Text(resultSummaryText(right: r, total: total))
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(Color(hex: "#7A624B"))
-                .multilineTextAlignment(.center)
-
-            // 1. 语文拼音：新收汉字
-            if !engine.newFoodsInRound.isEmpty {
-                VStack(spacing: 8) {
-                    Text("🍲 本局新端上《中华小菜谱》的汉字（点击可听发音）")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                    HStack(spacing: 8) {
-                        ForEach(engine.newFoodsInRound, id: \.self) { ch in
-                            let h = LevelRepository.hint(for: ch)
-                            Button {
-                                engine.audio.speakText("\(ch)，\(h.phrase)", slow: false)
-                            } label: {
-                                VStack(spacing: 2) {
-                                    Text(ch)
-                                        .font(.system(size: 22, weight: .black))
-                                        .foregroundColor(Color(hex: "#3B2E22"))
-                                    Text(h.emoji)
-                                        .font(.system(size: 13))
-                                }
-                                .frame(width: 54, height: 54)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#F07D2E"), lineWidth: 1.5))
-                            }
-                            .buttonStyle(.plain)
-                        }
+        return ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                HStack(spacing: 14) {
+                    GuardianPetVectorView(species: pet, stage: petStage, size: 62, animated: true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(st > 0 ? "🎉 香喷喷出炉通关啦！" : "💪 差一点点，再试一次吧！")
+                            .font(.system(size: 24, weight: .black))
+                            .foregroundColor(Color(hex: "#5E340B"))
+                        Text("🪙 本局共收获 +\(engine.roundCoinsEarned) 枚料理星币（当前共 \(engine.progress.coins) 🪙 · 扭蛋券 \(engine.progress.gachaTickets) 🎟️）")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#D97706"))
                     }
                 }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#FFF8EE")))
-            }
 
-            // 2. 沪教数学：新收甜点
-            if !engine.newDessertsInRound.isEmpty {
-                VStack(spacing: 8) {
-                    Text("🧁 本局新收入《梦幻甜点柜》的数学甜点（点击听算理秘籍）")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundColor(Color(hex: "#B8336A"))
-                    HStack(spacing: 10) {
-                        ForEach(engine.newDessertsInRound) { ds in
-                            Button {
-                                engine.audio.speakText("\(ds.name)，\(ds.mathSecret)", slow: false)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Text(ds.emoji)
-                                        .font(.system(size: 24))
-                                    Text(ds.name)
-                                        .font(.system(size: 13.5, weight: .heavy))
-                                        .foregroundColor(Color(hex: "#7A1C3E"))
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#E05385"), lineWidth: 1.5))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#FFF4F8")))
-            }
+                Text(String(repeating: "★", count: st) + String(repeating: "☆", count: 3 - st))
+                    .font(.system(size: 44, weight: .black))
+                    .foregroundColor(Color(hex: "#F5A623"))
+                    .shadow(color: Color(hex: "#B4640A").opacity(0.25), radius: 2, y: 3)
 
-            // 3. 牛津英语：新收有声闪卡
-            if !engine.newFlashcardsInRound.isEmpty {
-                VStack(spacing: 8) {
-                    Text("🍹 本局新收入《牛津特调闪卡吧》的单词卡（点击听英语发音）")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundColor(Color(hex: "#156947"))
-                    HStack(spacing: 10) {
-                        ForEach(engine.newFlashcardsInRound) { card in
-                            Button {
-                                engine.audio.speakEnglish("\(card.word). \(card.example)", slow: false)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Text(card.emoji)
-                                        .font(.system(size: 22))
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(card.word)
-                                            .font(.system(size: 14, weight: .black, design: .rounded))
-                                            .foregroundColor(Color(hex: "#156947"))
-                                        Text(card.chinese)
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundColor(Color(hex: "#5A4634"))
+                Text(resultSummaryText(right: r, total: total))
+                    .font(.system(size: 14.5, weight: .bold))
+                    .foregroundColor(Color(hex: "#7A624B"))
+                    .multilineTextAlignment(.center)
+
+                // 🎁 厨神惊喜盲盒 · 三选一翻牌
+                if !engine.mysteryChests.isEmpty {
+                    VStack(spacing: 10) {
+                        Text(engine.openedChestIndex == nil ? "🎁 通关惊喜盲盒！快从下面 3 个金宝箱中点选 1 个开启大奖：" : "🎊 惊喜盲盒已开启！")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundColor(Color(hex: "#B45309"))
+
+                        HStack(spacing: 12) {
+                            ForEach(Array(engine.mysteryChests.enumerated()), id: \.element.id) { idx, chest in
+                                let isChosen = (engine.openedChestIndex == idx)
+                                let isRevealed = (engine.openedChestIndex != nil)
+
+                                Button {
+                                    engine.openMysteryChest(at: idx)
+                                } label: {
+                                    ZStack {
+                                        if isChosen {
+                                            FireworkSparkBurstView(colorHex: chest.accentHex)
+                                        }
+                                        VStack(spacing: 5) {
+                                            Text(isRevealed ? chest.emoji : "🎁")
+                                                .font(.system(size: isChosen ? 36 : 32))
+                                                .rotationEffect(.degrees(!isRevealed && chestWiggle ? (idx % 2 == 0 ? 6 : -6) : 0))
+                                            Text(isRevealed ? chest.title : "神秘金宝箱 #\(idx + 1)")
+                                                .font(.system(size: 13, weight: .heavy))
+                                                .foregroundColor(isChosen ? Color(hex: "#B45309") : Color(hex: "#3B2E22"))
+                                                .lineLimit(1)
+                                            Text(isRevealed ? (isChosen ? "✓ 已收入囊中！" : "未选：\(chest.subtitle)") : "点我翻牌开奖 ✨")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(isChosen ? Color(hex: "#2B7F4A") : Color(hex: "#8A7765"))
+                                                .lineLimit(1)
+                                        }
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(isChosen ? Color(hex: "#FFF8E1") : Color.white)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .stroke(
+                                                            isChosen ? Color(hex: "#F5A623") : Color(hex: "#F5A623").opacity(0.38),
+                                                            lineWidth: isChosen ? 2.8 : 1.5
+                                                        )
+                                                )
+                                        )
+                                        .opacity(isRevealed && !isChosen ? 0.58 : 1.0)
+                                        .scaleEffect(isChosen ? 1.04 : 1.0)
                                     }
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#2FB380"), lineWidth: 1.5))
+                                .buttonStyle(.plain)
+                                .disabled(isRevealed)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#FFFDF5"), Color(hex: "#FEF3C7")],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(hex: "#F5A623").opacity(0.55), lineWidth: 1.8))
+                    )
                 }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#E8FFF5")))
-            }
 
-            // 本局蝴蝶奖励
-            if !engine.rewardedButterfliesInRound.isEmpty {
-                VStack(spacing: 8) {
-                    Text("🦋 通关蝴蝶奖励（点击蝴蝶听名字）")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                    HStack(spacing: 14) {
-                        ForEach(Array(engine.rewardedButterfliesInRound.enumerated()), id: \.offset) { _, sp in
-                            let stg = engine.progress.butterflyStage(for: sp.id)
-                            Button {
-                                engine.audio.sfxSpark()
-                                engine.audio.speakText(sp.name, slow: false)
-                            } label: {
-                                VStack(spacing: 4) {
-                                    ButterflyVectorView(species: sp, stage: stg, size: 68, animated: true)
-                                    Text(sp.name)
-                                        .font(.system(size: 13, weight: .heavy))
-                                        .foregroundColor(Color(hex: "#3B2E22"))
-                                    Text("\(sp.rarityName) · \(ButterflySpecies.stageName(for: stg))")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(Color(hex: "#7A6EE6"))
+                // 1. 语文拼音：新收汉字
+                if !engine.newFoodsInRound.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("🍲 本局新端上《中华小菜谱》的汉字（点击可听发音）")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                        HStack(spacing: 8) {
+                            ForEach(engine.newFoodsInRound, id: \.self) { ch in
+                                let h = LevelRepository.hint(for: ch)
+                                Button {
+                                    engine.audio.speakText("\(ch)，\(h.phrase)", slow: false)
+                                } label: {
+                                    VStack(spacing: 2) {
+                                        Text(ch)
+                                            .font(.system(size: 22, weight: .black))
+                                            .foregroundColor(Color(hex: "#3B2E22"))
+                                        Text(h.emoji)
+                                            .font(.system(size: 13))
+                                    }
+                                    .frame(width: 54, height: 54)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#F07D2E"), lineWidth: 1.5))
                                 }
-                                .padding(10)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#F5B82E").opacity(0.5), lineWidth: 1.5))
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#FFF8EE")))
+                }
+
+                // 2. 沪教数学：新收甜点
+                if !engine.newDessertsInRound.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("🧁 本局新收入《梦幻甜点柜》的数学甜点（点击听算理秘籍）")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#B8336A"))
+                        HStack(spacing: 10) {
+                            ForEach(engine.newDessertsInRound) { ds in
+                                Button {
+                                    engine.audio.speakText("\(ds.name)，\(ds.mathSecret)", slow: false)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(ds.emoji)
+                                            .font(.system(size: 24))
+                                        Text(ds.name)
+                                            .font(.system(size: 13.5, weight: .heavy))
+                                            .foregroundColor(Color(hex: "#7A1C3E"))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#E05385"), lineWidth: 1.5))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#FFF4F8")))
+                }
+
+                // 3. 牛津英语：新收有声闪卡
+                if !engine.newFlashcardsInRound.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("🍹 本局新收入《牛津特调闪卡吧》的单词卡（点击听英语发音）")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#156947"))
+                        HStack(spacing: 10) {
+                            ForEach(engine.newFlashcardsInRound) { card in
+                                Button {
+                                    engine.audio.speakEnglish("\(card.word). \(card.example)", slow: false)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(card.emoji)
+                                            .font(.system(size: 22))
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(card.word)
+                                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                                .foregroundColor(Color(hex: "#156947"))
+                                            Text(card.chinese)
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(Color(hex: "#5A4634"))
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#2FB380"), lineWidth: 1.5))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#E8FFF5")))
+                }
+
+                // 本局蝴蝶奖励
+                if !engine.rewardedButterfliesInRound.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("🦋 通关蝴蝶奖励（点击蝴蝶听名字）")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                        HStack(spacing: 14) {
+                            ForEach(Array(engine.rewardedButterfliesInRound.enumerated()), id: \.offset) { _, sp in
+                                let stg = engine.progress.butterflyStage(for: sp.id)
+                                Button {
+                                    engine.audio.sfxSpark()
+                                    engine.audio.speakText(sp.name, slow: false)
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        ButterflyVectorView(species: sp, stage: stg, size: 68, animated: true)
+                                        Text(sp.name)
+                                            .font(.system(size: 13, weight: .heavy))
+                                            .foregroundColor(Color(hex: "#3B2E22"))
+                                        Text("\(sp.rarityName) · \(ButterflySpecies.stageName(for: stg))")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(Color(hex: "#7A6EE6"))
+                                    }
+                                    .padding(10)
+                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#F5B82E").opacity(0.5), lineWidth: 1.5))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
-            }
 
-            // 底部操作按钮
-            HStack(spacing: 12) {
-                Button {
-                    engine.audio.sfxTap()
-                    if let sp = engine.specialMode {
-                        engine.startSpecialMode(sp)
-                    } else {
-                        engine.firePickerLevel = engine.currentLevelNumber
-                        engine.screenState = .home
-                    }
-                } label: {
-                    Text("🔄 再来一局")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 11)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(themeColor))
-                }
-                .buttonStyle(.plain)
-
-                if engine.specialMode == nil && engine.currentLevelNumber < engine.currentMaxStageCount {
+                // 底部操作按钮
+                HStack(spacing: 12) {
                     Button {
                         engine.audio.sfxTap()
-                        let nextLv = min(engine.currentMaxStageCount, engine.currentLevelNumber + 1)
-                        engine.firePickerLevel = nextLv
-                        engine.screenState = .home
+                        if let sp = engine.specialMode {
+                            engine.startSpecialMode(sp)
+                        } else {
+                            engine.firePickerLevel = engine.currentLevelNumber
+                            engine.screenState = .home
+                        }
                     } label: {
-                        Text("下一关 →")
+                        Text("🔄 再来一局")
                             .font(.system(size: 15, weight: .heavy))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 18)
                             .padding(.vertical, 11)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#3EA865")))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(themeColor))
+                    }
+                    .buttonStyle(.plain)
+
+                    if engine.specialMode == nil && engine.currentLevelNumber < engine.currentMaxStageCount {
+                        Button {
+                            engine.audio.sfxTap()
+                            let nextLv = min(engine.currentMaxStageCount, engine.currentLevelNumber + 1)
+                            engine.firePickerLevel = nextLv
+                            engine.screenState = .home
+                        } label: {
+                            Text("下一关 →")
+                                .font(.system(size: 15, weight: .heavy))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 11)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#3EA865")))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Button {
+                        engine.audio.sfxTap()
+                        engine.activeTab = .paradise
+                        engine.goHome()
+                    } label: {
+                        Text("🎰 去扭蛋抽神兽")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 11)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#E63946")))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        engine.audio.sfxTap()
+                        engine.goHome()
+                    } label: {
+                        Text("🏠 返回选关")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundColor(Color(hex: "#3B2E22"))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 11)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.black.opacity(0.15), lineWidth: 1.5))
                     }
                     .buttonStyle(.plain)
                 }
-
-                Button {
-                    engine.audio.sfxTap()
-                    engine.goHome()
-                } label: {
-                    Text("🏠 返回选关")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundColor(Color(hex: "#3B2E22"))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 11)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.white))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.black.opacity(0.15), lineWidth: 1.5))
-                }
-                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
-            .padding(.top, 6)
+            .padding(24)
+            .frame(maxWidth: 720)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(LinearGradient(colors: [Color.white, Color(hex: "#FFF7EB")], startPoint: .top, endPoint: .bottom))
+                    .overlay(RoundedRectangle(cornerRadius: 28).stroke(themeColor.opacity(0.35), lineWidth: 2))
+                    .shadow(color: Color.black.opacity(0.12), radius: 16, y: 8)
+            )
+            .frame(maxWidth: .infinity)
         }
-        .padding(28)
-        .frame(maxWidth: 660)
-        .background(
-            RoundedRectangle(cornerRadius: 28)
-                .fill(LinearGradient(colors: [Color.white, Color(hex: "#FFF7EB")], startPoint: .top, endPoint: .bottom))
-                .overlay(RoundedRectangle(cornerRadius: 28).stroke(themeColor.opacity(0.35), lineWidth: 2))
-                .shadow(color: Color.black.opacity(0.12), radius: 16, y: 8)
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.24).repeatForever(autoreverses: true)) {
+                chestWiggle = true
+            }
+        }
     }
 
     private func resultSummaryText(right: Int, total: Int) -> String {

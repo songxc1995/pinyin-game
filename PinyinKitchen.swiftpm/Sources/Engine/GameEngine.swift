@@ -8,10 +8,11 @@ public enum AppScreenState: Sendable {
 }
 
 public enum HomeTab: String, CaseIterable, Sendable {
-    case map     = "Map"
-    case recipe  = "Coll"
-    case garden  = "Bf"
-    case records = "Rec"
+    case map      = "Map"
+    case recipe   = "Coll"
+    case paradise = "Paradise"
+    case garden   = "Bf"
+    case records  = "Rec"
 }
 
 public enum SpecialModeType: String, Sendable {
@@ -80,6 +81,18 @@ public final class GameEngine: ObservableObject {
     @Published public var newFlashcardsInRound: [EnglishFlashcard] = []
     @Published public var rewardedButterfliesInRound: [ButterflySpecies] = []
     @Published public var roundStars: Int = 0
+
+    // MARK: - 🪙 局内星币、🌈 彩虹连击宝箱、🎁 局末三选一宝箱、🎰 皇家扭蛋与🦄 守护萌宠状态
+    @Published public var rainbowCharge: Int = 0
+    @Published public var roundCoinsEarned: Int = 0
+    @Published public var floatingCoinGainText: String? = nil
+    @Published public var rainbowChestBurstMessage: String? = nil
+    @Published public var mysteryChests: [MysteryChestItem] = []
+    @Published public var openedChestIndex: Int? = nil
+    @Published public var isSpinningGacha: Bool = false
+    @Published public var activeGachaHatch: GachaHatchEvent? = nil
+    @Published public var petFeedToast: String? = nil
+    @Published public var petHeartBurst: Bool = false
 
     // MARK: - 语文拼音题目交互槽位状态
     @Published public var pickedInitial: String? = nil
@@ -242,6 +255,22 @@ public final class GameEngine: ObservableObject {
         return PotSkin.all[0]
     }
 
+    /// 当前伴读出战的守护萌宠精灵
+    public var equippedPet: GuardianPetSpecies {
+        let id = progress.equippedPetId
+        if (progress.pets[id] ?? 0) > 0, let found = GuardianPetSpecies.all.first(where: { $0.id == id }) {
+            return found
+        }
+        if let firstOwned = GuardianPetSpecies.all.first(where: { (progress.pets[$0.id] ?? 0) > 0 }) {
+            return firstOwned
+        }
+        return GuardianPetSpecies.all[0]
+    }
+
+    public var equippedPetStage: Int {
+        max(1, progress.petStage(for: equippedPet.id))
+    }
+
     public var chefRank: ChefRankInfo {
         ChefRankInfo.compute(totalStars: progress.totalStars)
     }
@@ -288,22 +317,213 @@ public final class GameEngine: ObservableObject {
         progress.ensureDaily()
         guard (progress.daily.claimed[questId] ?? 0) == 0 else { return }
         progress.daily.claimed[questId] = 1
+        progress.coins += 40
+        progress.gachaTickets += 1
         let species = rollButterfly(stars: 3, fire: .high)
         let beforeStage = progress.butterflyStage(for: species.id)
         progress.bf.append(CaughtButterfly(t: species.id, lv: 1, s: 3, d: GameProgress.todayString()))
         let afterStage = progress.butterflyStage(for: species.id)
         let newCount = progress.butterflyCount(for: species.id)
         saveProgress()
-        audio.sfxSpark()
+        audio.sfxChestOpen()
         pendingUpgrades.append(
             ButterflyUpgradeEvent(
                 species: species,
                 fromStage: max(1, beforeStage),
                 toStage: max(1, afterStage),
                 count: newCount,
-                customTitle: afterStage > beforeStage ? nil : "🎁 盲盒开出新蝴蝶！"
+                customTitle: "🎁 领奖成功！+40 星币 · +1 扭蛋券 · 新蝴蝶！"
             )
         )
+    }
+
+    // MARK: - 🎰 皇家扭蛋机孵化、🍓 萌宠喂食进化 & 🏰 游乐园建造
+
+    /// 旋转皇家扭蛋机（支持使用 1 张扭蛋券 或 60 料理星币）
+    public func spinGacha(useTicket: Bool) {
+        guard !isSpinningGacha && activeGachaHatch == nil else { return }
+        if useTicket {
+            guard progress.gachaTickets >= 1 else {
+                audio.sfxBad()
+                petFeedToast = "🎟️ 扭蛋券不够啦，闯关集满彩虹能量或完成每日目标就能领扭蛋券哦！"
+                return
+            }
+            progress.gachaTickets -= 1
+        } else {
+            guard progress.coins >= 60 else {
+                audio.sfxBad()
+                petFeedToast = "🪙 星币还差一点点（需 60 星币），去闯关答题赚星币吧！"
+                return
+            }
+            progress.coins -= 60
+        }
+
+        isSpinningGacha = true
+        petFeedToast = nil
+        audio.sfxGachaCrank()
+
+        // 智能权重：优先偏向未拥有的精灵，保证小朋友成就感满满
+        let unowned = GuardianPetSpecies.all.filter { (progress.pets[$0.id] ?? 0) == 0 }
+        let pickedPet: GuardianPetSpecies
+        if !unowned.isEmpty && Double.random(in: 0..<1) < 0.68 {
+            pickedPet = unowned.randomElement() ?? GuardianPetSpecies.all[0]
+        } else {
+            let roll = Double.random(in: 0..<1)
+            let targetRarity = roll < 0.35 ? 3 : (roll < 0.72 ? 2 : 1)
+            let pool = GuardianPetSpecies.all.filter { $0.rarity == targetRarity }
+            pickedPet = pool.randomElement() ?? GuardianPetSpecies.all[0]
+        }
+
+        let wasOwned = (progress.pets[pickedPet.id] ?? 0) > 0
+        let beforeStage = max(1, progress.petStage(for: pickedPet.id))
+        progress.pets[pickedPet.id] = (progress.pets[pickedPet.id] ?? 0) + 1
+        if progress.equippedPetId.isEmpty {
+            progress.equippedPetId = pickedPet.id
+        }
+        let afterStage = max(1, progress.petStage(for: pickedPet.id))
+        let totalExp = progress.petTotalExp(for: pickedPet.id)
+        saveProgress()
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 680_000_000)
+            self.isSpinningGacha = false
+            self.audio.sfxChestOpen()
+            self.activeGachaHatch = GachaHatchEvent(
+                pet: pickedPet,
+                isNew: !wasOwned,
+                fromStage: beforeStage,
+                toStage: afterStage,
+                totalExp: totalExp
+            )
+            self.audio.speakText("\(pickedPet.name)！\(pickedPet.cheerLine)", slow: false)
+        }
+    }
+
+    /// 投喂守护萌宠美食（消耗 25 星币，亲密经验 +1，满阈值直接升阶进化）
+    public func feedPet(_ petId: String) {
+        let pet = GuardianPetSpecies.byId(petId)
+        guard (progress.pets[petId] ?? 0) > 0 else {
+            audio.sfxBad()
+            petFeedToast = "🥚 这只小精灵还没孵化呢，快去摇左侧的皇家扭蛋机吧！"
+            return
+        }
+        guard progress.coins >= 25 else {
+            audio.sfxBad()
+            petFeedToast = "🪙 投喂美味需要 25 枚星币，去闯一关就能赚得满满当当啦！"
+            return
+        }
+
+        let beforeStage = progress.petStage(for: petId)
+        progress.coins -= 25
+        progress.petFeedExp[petId] = (progress.petFeedExp[petId] ?? 0) + 1
+        let afterStage = progress.petStage(for: petId)
+        let totalExp = progress.petTotalExp(for: petId)
+        saveProgress()
+
+        petHeartBurst = true
+        audio.sfxPetHappy()
+
+        if afterStage > beforeStage {
+            petFeedToast = "👑 太棒啦！「\(pet.name)」吃饱了【\(pet.favoriteFood)】，成功进化为【\(GuardianPetSpecies.stageName(for: afterStage))】！"
+            activeGachaHatch = GachaHatchEvent(
+                pet: pet,
+                isNew: false,
+                fromStage: beforeStage,
+                toStage: afterStage,
+                totalExp: totalExp
+            )
+            audio.speakText("哇！\(pet.name)进化成\(GuardianPetSpecies.stageName(for: afterStage))啦！", slow: false)
+        } else {
+            petFeedToast = "🍓 投喂【\(pet.favoriteFood)】成功！「\(pet.name)」开心地蹭了蹭你（成长值 \(totalExp)）💖"
+            audio.speakText(pet.cheerLine, slow: false)
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            self.petHeartBurst = false
+        }
+    }
+
+    public func equipPet(_ petId: String) {
+        guard (progress.pets[petId] ?? 0) > 0 else { return }
+        progress.equippedPetId = petId
+        saveProgress()
+        audio.sfxPetHappy()
+        let pet = GuardianPetSpecies.byId(petId)
+        petFeedToast = "✨ 已将「\(pet.name)」设为伴读守护精灵，它会陪你一起闯关答题哦！"
+        audio.speakText("我是\(pet.name)，陪你一起闯关！", slow: false)
+    }
+
+    public func unlockCastleAttraction(_ item: CastleAttraction) {
+        if (progress.castleUnlocked[item.id] ?? 0) > 0 {
+            audio.sfxFirework()
+            audio.speakText(item.cheerSpeech, slow: false)
+            petFeedToast = "🎡 \(item.name)：\(item.cheerSpeech)"
+            return
+        }
+        guard progress.coins >= item.costCoins else {
+            audio.sfxBad()
+            petFeedToast = "🪙 点亮「\(item.name)」需要 \(item.costCoins) 星币，去闯关答题赚星币吧！"
+            return
+        }
+        progress.coins -= item.costCoins
+        progress.castleUnlocked[item.id] = 1
+        saveProgress()
+        audio.sfxChestOpen()
+        audio.speakText("恭喜点亮\(item.name)！\(item.cheerSpeech)", slow: false)
+        petFeedToast = "🎉 成功建造「\(item.name)」！快看上方游乐园画布，它已经动起来啦！"
+    }
+
+    /// 局内每答对 1 题发放星币与彩虹能量槽充能
+    public func grantQuestionCorrectReward(wasWrongMastered: Bool) {
+        let petBonus = (equippedPet.id == "fire_dragon") ? 5 : 3
+        let comboBonus = min(comboCount, 6) * 4
+        let masterBonus = wasWrongMastered ? 18 : 0
+        let gain = 15 + comboBonus + petBonus + masterBonus
+
+        progress.coins += gain
+        roundCoinsEarned += gain
+        rainbowCharge += 1
+
+        if rainbowCharge >= 5 {
+            rainbowCharge = 0
+            let chestCoins = 50
+            progress.coins += chestCoins
+            roundCoinsEarned += chestCoins
+            progress.gachaTickets += 1
+            floatingCoinGainText = "🌈 彩虹宝箱爆发 +50🪙 +1🎟️"
+            rainbowChestBurstMessage = "🌈 彩虹能量集满 5 格！惊喜爆出 +50 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+            audio.sfxChestOpen()
+        } else {
+            floatingCoinGainText = "+\(gain) 🪙"
+            rainbowChestBurstMessage = nil
+        }
+    }
+
+    /// 局末三选一神秘宝箱翻牌
+    public func openMysteryChest(at index: Int) {
+        guard openedChestIndex == nil, index >= 0, index < mysteryChests.count else { return }
+        openedChestIndex = index
+        let chosen = mysteryChests[index]
+        switch chosen.rewardType {
+        case "coins":
+            progress.coins += chosen.amount
+            roundCoinsEarned += chosen.amount
+        case "ticket":
+            progress.gachaTickets += chosen.amount
+            progress.coins += 20
+            roundCoinsEarned += 20
+        case "butterfly":
+            let sp = rollButterfly(stars: 3, fire: .high)
+            progress.bf.append(CaughtButterfly(t: sp.id, lv: currentLevelNumber, s: 3, d: GameProgress.todayString()))
+            rewardedButterfliesInRound.append(sp)
+        default:
+            progress.coins += 50
+            roundCoinsEarned += 50
+        }
+        saveProgress()
+        audio.sfxChestOpen()
+        audio.speakText("太棒啦！打开神秘宝箱获得\(chosen.title)！", slow: false)
     }
 
     public func rollButterfly(stars: Int, fire: FireDifficulty) -> ButterflySpecies {
@@ -489,6 +709,12 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedButterfliesInRound = []
+        rainbowCharge = 0
+        roundCoinsEarned = 0
+        floatingCoinGainText = nil
+        rainbowChestBurstMessage = nil
+        mysteryChests = []
+        openedChestIndex = nil
         firePickerLevel = nil
         screenState = .playing
         setupCurrentQuestion()
@@ -550,6 +776,12 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedButterfliesInRound = []
+        rainbowCharge = 0
+        roundCoinsEarned = 0
+        floatingCoinGainText = nil
+        rainbowChestBurstMessage = nil
+        mysteryChests = []
+        openedChestIndex = nil
         firePickerLevel = nil
         screenState = .playing
         setupCurrentQuestion()
@@ -616,6 +848,12 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedButterfliesInRound = []
+        rainbowCharge = 0
+        roundCoinsEarned = 0
+        floatingCoinGainText = nil
+        rainbowChestBurstMessage = nil
+        mysteryChests = []
+        openedChestIndex = nil
         screenState = .playing
         setupCurrentQuestion()
     }
@@ -651,6 +889,8 @@ public final class GameEngine: ObservableObject {
         displayOptions = []
         pickedChoiceOption = nil
         showMathExplanation = false
+        floatingCoinGainText = nil
+        rainbowChestBurstMessage = nil
 
         // 切题间隙检查是否到达每日时长上限或睡前打烊
         checkPlayLockStatus(allowDuringQuestion: true)
@@ -947,12 +1187,14 @@ public final class GameEngine: ObservableObject {
             }
 
             // 错题本消消乐
+            var masteredNow = false
             if (progress.wrong[q.id] ?? 0) > 0 {
                 if retriedCurrent {
                     let left = (progress.wrong[q.id] ?? 1) - 1
                     if left <= 0 {
                         progress.wrongMastered[q.id] = 1
                         progress.wrong.removeValue(forKey: q.id)
+                        masteredNow = true
                     } else {
                         progress.wrong[q.id] = left
                     }
@@ -960,8 +1202,10 @@ public final class GameEngine: ObservableObject {
                     progress.wrongMastered[q.id] = progress.wrong[q.id]
                     progress.wrong.removeValue(forKey: q.id)
                     masteredCount += 1
+                    masteredNow = true
                 }
             }
+            grantQuestionCorrectReward(wasWrongMastered: masteredNow)
             saveProgress()
 
             let gen = roundGeneration
@@ -1386,12 +1630,14 @@ public final class GameEngine: ObservableObject {
                 newFoodsInRound.append(ch)
             }
 
+            var masteredNow = false
             if (progress.wrong[word.id] ?? 0) > 0 {
                 if retriedCurrent {
                     let left = (progress.wrong[word.id] ?? 1) - 1
                     if left <= 0 {
                         progress.wrongMastered[word.id] = 1
                         progress.wrong.removeValue(forKey: word.id)
+                        masteredNow = true
                     } else {
                         progress.wrong[word.id] = left
                     }
@@ -1399,6 +1645,7 @@ public final class GameEngine: ObservableObject {
                     progress.wrongMastered[word.id] = progress.wrong[word.id]
                     progress.wrong.removeValue(forKey: word.id)
                     masteredCount += 1
+                    masteredNow = true
                 }
             }
 
@@ -1413,6 +1660,7 @@ public final class GameEngine: ObservableObject {
             }
             tipMessage = "🍲 咕嘟！变出「\(ch) · \(hint.phrase)」\(extraNote)"
             tipStyle = "ok"
+            grantQuestionCorrectReward(wasWrongMastered: masteredNow)
             saveProgress()
 
             let gen = roundGeneration
@@ -1586,6 +1834,33 @@ public final class GameEngine: ObservableObject {
                     )
                 }
             }
+
+            // 通关额外星币奖励 + 生成局末「三选一神秘宝箱」
+            let clearBonus = isFirstClear ? 50 : (stars * 12)
+            progress.coins += clearBonus
+            roundCoinsEarned += clearBonus
+
+            let chestPool: [MysteryChestItem] = [
+                MysteryChestItem(id: 0, title: "88 枚料理星币福袋", subtitle: "金光闪闪的大袋星币", emoji: "💰", rewardType: "coins", amount: 88, accentHex: "#F5A623"),
+                MysteryChestItem(id: 1, title: "皇家扭蛋券 ×1 + 20星币", subtitle: "可免费孵化 1 只守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385"),
+                MysteryChestItem(id: 2, title: "闪耀稀有蝴蝶盲盒", subtitle: "立刻召唤 1 只漂亮小蝴蝶", emoji: "🦋", rewardType: "butterfly", amount: 1, accentHex: "#7A6EE6"),
+                MysteryChestItem(id: 3, title: "66 枚料理星币礼盒", subtitle: "可投喂萌宠或建造游乐园", emoji: "🪙", rewardType: "coins", amount: 66, accentHex: "#3EA865")
+            ].shuffled()
+            mysteryChests = Array(chestPool.prefix(3)).enumerated().map { idx, item in
+                MysteryChestItem(
+                    id: idx,
+                    title: item.title,
+                    subtitle: item.subtitle,
+                    emoji: item.emoji,
+                    rewardType: item.rewardType,
+                    amount: item.amount,
+                    accentHex: item.accentHex
+                )
+            }
+            openedChestIndex = nil
+        } else {
+            mysteryChests = []
+            openedChestIndex = nil
         }
 
         rewardedButterfliesInRound = gifts

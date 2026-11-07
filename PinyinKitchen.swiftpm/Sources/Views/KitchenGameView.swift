@@ -203,6 +203,9 @@ public struct KitchenGameView: View {
         let hideChar = engine.progress.blind && !engine.isBlindRevealed
 
         return VStack(spacing: 10) {
+            // 0. 伴读守护神兽 + 彩虹连击宝箱能量条 + 实时星币
+            CompanionPetStageWidget(engine: engine)
+
             // 1. 森林小动物顾客点单卡片
             VStack(spacing: 8) {
                 HStack(spacing: 10) {

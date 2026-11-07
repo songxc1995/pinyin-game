@@ -58,6 +58,11 @@ public struct MainContainerView: View {
                 butterflyUpgradeOverlay(upgrade)
             }
 
+            // 皇家扭蛋孵化 & 守护神兽进化全屏庆典弹窗
+            if let hatch = engine.activeGachaHatch {
+                GachaponEggBurstOverlay(engine: engine, event: hatch)
+            }
+
             // 20-20-20 森林绿洲护眼休息弹窗
             if engine.eyeRestActive {
                 EyeRestOverlayView(engine: engine)
@@ -173,12 +178,13 @@ public struct MainContainerView: View {
 
                 Spacer(minLength: 4)
 
-                // 4 大统计胶囊
+                // 5 大统计胶囊（新增星币与守护神兽快捷入口）
                 HStack(spacing: 8) {
                     statPill(icon: "⭐", value: "\(engine.progress.totalStars)", label: "三科总星", color: Color(hex: "#F5A623"), tab: .map)
+                    statPill(icon: "🪙", value: "\(engine.progress.coins)", label: "星币·扭蛋", color: Color(hex: "#E63946"), tab: .paradise)
                     statPill(icon: "📖", value: "\(engine.progress.foodCount + engine.progress.dessertCount + engine.progress.englishCardCount)", label: "料理图鉴", color: Color(hex: "#3EA865"), tab: .recipe)
-                    statPill(icon: "📅", value: "\(engine.progress.streak.n)", label: "连续打卡", color: Color(hex: "#3685D6"), tab: .records)
                     statPill(icon: "🦋", value: "\(engine.progress.bf.count)", label: "小蝴蝶", color: Color(hex: "#7A6EE6"), tab: .garden)
+                    statPill(icon: "📅", value: "\(engine.progress.streak.n)", label: "连续打卡", color: Color(hex: "#3685D6"), tab: .records)
                 }
             }
 
@@ -197,9 +203,10 @@ public struct MainContainerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // 4. 四大主 Tab 切换栏
+            // 4. 五大主 Tab 切换栏（新增 🎡 精灵扭蛋与游乐园）
             HStack(spacing: 8) {
                 tabButton(tab: .map, title: "🍳 \(engine.currentSubject.shortTitle)闯关地图")
+                tabButton(tab: .paradise, title: "🎡 精灵扭蛋与游乐园")
                 tabButton(tab: .recipe, title: "📖 语数英料理图鉴")
                 tabButton(tab: .garden, title: "🦋 蝴蝶生态花园")
                 tabButton(tab: .records, title: "🏆 错题本与成就")
@@ -216,6 +223,8 @@ public struct MainContainerView: View {
                 switch engine.activeTab {
                 case .map:
                     LevelMapView(engine: engine)
+                case .paradise:
+                    RewardParadiseTabView(engine: engine)
                 case .recipe:
                     RecipeBookView(engine: engine)
                 case .garden:
@@ -334,20 +343,29 @@ public struct MainContainerView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 厨神等级与换锅按钮
+    // MARK: - 厨神等级、伴读守护神兽与换锅按钮
     private var chefRankBar: some View {
         let info = engine.chefRank
         let stars = engine.progress.totalStars
+        let pet = engine.equippedPet
+        let petStage = engine.equippedPetStage
 
         return HStack(spacing: 10) {
-            Text("👑")
-                .font(.system(size: 22))
+            Button {
+                engine.audio.sfxPetHappy()
+                engine.activeTab = .paradise
+                engine.audio.speakText("\(pet.name)陪你闯关！", slow: false)
+            } label: {
+                GuardianPetVectorView(species: pet, stage: petStage, size: 42, animated: true)
+            }
+            .buttonStyle(.plain)
+
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(info.name)
                         .font(.system(size: 14, weight: .heavy))
                         .foregroundColor(Color(hex: "#4A2E14"))
-                    Text("🍲 \(engine.currentPotSkin.name)")
+                    Text("🦄 \(pet.name)")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A4B12"))
                         .padding(.horizontal, 7)
@@ -382,8 +400,8 @@ public struct MainContainerView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .frame(maxWidth: 420)
+        .padding(.vertical, 7)
+        .frame(maxWidth: 440)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(LinearGradient(colors: [Color(hex: "#FFF6E5"), Color(hex: "#FFE8C5")], startPoint: .leading, endPoint: .trailing))

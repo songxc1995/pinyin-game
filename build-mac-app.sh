@@ -3,12 +3,46 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PKG_DIR="$SCRIPT_DIR/PinyinKitchen.swiftpm"
+PKG_FILE="$PKG_DIR/Package.swift"
+PKG_BAK="$PKG_DIR/.Package.swift.ipad.bak"
 APP_NAME="满满的奇妙料理城"
 APP_BUNDLE="$SCRIPT_DIR/${APP_NAME}.app"
 OLD_APP_BUNDLE="$SCRIPT_DIR/拼音小厨房.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+# 保持仓库内 Package.swift 为 iPad Swift Playgrounds 专用格式 (.iOSApplication)
+# 在 Mac 命令行编译时临时切换为标准 SwiftPM executable 清单，编译完立即自动还原
+cp "$PKG_FILE" "$PKG_BAK"
+restore_pkg() {
+    if [ -f "$PKG_BAK" ]; then
+        mv "$PKG_BAK" "$PKG_FILE"
+    fi
+}
+trap restore_pkg EXIT
+
+cat > "$PKG_FILE" << 'EOF'
+// swift-tools-version: 5.9
+import PackageDescription
+
+let package = Package(
+    name: "PinyinKitchen",
+    platforms: [
+        .macOS(.v13),
+        .iOS(.v16)
+    ],
+    products: [
+        .executable(name: "PinyinKitchen", targets: ["PinyinKitchen"])
+    ],
+    targets: [
+        .executableTarget(
+            name: "PinyinKitchen",
+            path: "Sources"
+        )
+    ]
+)
+EOF
 
 echo "🍲 正在编译 SwiftUI 原生应用《${APP_NAME}》（沪教一年级语数英冒险屋）..."
 cd "$PKG_DIR"
@@ -47,9 +81,9 @@ cat > "$CONTENTS_DIR/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>3.0.0</string>
+    <string>4.0.0</string>
     <key>CFBundleVersion</key>
-    <string>300</string>
+    <string>400</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>

@@ -145,6 +145,14 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public var playSeconds: [String: Int] = [:]
     public var bonusMinutes: [String: Int] = [:]
 
+    // 🪙 奇妙料理星币、皇家扭蛋券、12 只守护萌宠精灵与童话游乐园建筑
+    public var coins: Int = 120
+    public var gachaTickets: Int = 2
+    public var pets: [String: Int] = ["fire_dragon": 1]
+    public var petFeedExp: [String: Int] = [:]
+    public var equippedPetId: String = "fire_dragon"
+    public var castleUnlocked: [String: Int] = ["fountain": 1]
+
     public init() {}
 
     enum CodingKeys: String, CodingKey {
@@ -154,6 +162,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
         case freeUnlockAll
         case wrong, wrongMastered, history, streak, bestCombo, bf, cleared, tts, potSkin, blind, seasoningMode, daily
         case eyeCare, playSeconds, bonusMinutes
+        case coins, gachaTickets, pets, petFeedExp, equippedPetId, castleUnlocked
     }
 
     public init(from decoder: Decoder) throws {
@@ -184,6 +193,14 @@ public struct GameProgress: Codable, Equatable, Sendable {
         self.eyeCare = (try? c.decode(EyeCareSettings.self, forKey: .eyeCare)) ?? EyeCareSettings()
         self.playSeconds = (try? c.decode([String: Int].self, forKey: .playSeconds)) ?? [:]
         self.bonusMinutes = (try? c.decode([String: Int].self, forKey: .bonusMinutes)) ?? [:]
+        self.coins = (try? c.decode(Int.self, forKey: .coins)) ?? 120
+        self.gachaTickets = (try? c.decode(Int.self, forKey: .gachaTickets)) ?? 2
+        let decodedPets = (try? c.decode([String: Int].self, forKey: .pets)) ?? ["fire_dragon": 1]
+        self.pets = decodedPets.isEmpty ? ["fire_dragon": 1] : decodedPets
+        self.petFeedExp = (try? c.decode([String: Int].self, forKey: .petFeedExp)) ?? [:]
+        self.equippedPetId = (try? c.decode(String.self, forKey: .equippedPetId)) ?? "fire_dragon"
+        let decodedCastle = (try? c.decode([String: Int].self, forKey: .castleUnlocked)) ?? ["fountain": 1]
+        self.castleUnlocked = decodedCastle.isEmpty ? ["fountain": 1] : decodedCastle
     }
 
     /// 今日已游戏秒数
@@ -264,6 +281,36 @@ public struct GameProgress: Codable, Equatable, Sendable {
         return stage >= 3 ? nil : ButterflySpecies.evolutionThresholds[stage + 1]
     }
 
+    // MARK: - 守护萌宠精灵与游乐园辅助方法
+    public var unlockedPetCount: Int {
+        pets.filter { $0.value > 0 }.count
+    }
+
+    public func petTotalExp(for petId: String) -> Int {
+        let gachaCount = pets[petId] ?? 0
+        let feedCount = petFeedExp[petId] ?? 0
+        return gachaCount + feedCount
+    }
+
+    public func petStage(for petId: String) -> Int {
+        let gachaCount = pets[petId] ?? 0
+        guard gachaCount > 0 else { return 0 }
+        let exp = petTotalExp(for: petId)
+        if exp >= GuardianPetSpecies.stageThresholds[3] { return 3 }
+        if exp >= GuardianPetSpecies.stageThresholds[2] { return 2 }
+        return 1
+    }
+
+    public func nextPetStageNeed(for petId: String) -> Int? {
+        let st = petStage(for: petId)
+        guard st > 0 && st < 3 else { return nil }
+        return GuardianPetSpecies.stageThresholds[st + 1]
+    }
+
+    public var unlockedAttractionCount: Int {
+        castleUnlocked.filter { $0.value > 0 }.count
+    }
+
     public mutating func ensureDaily() {
         let t = Self.todayString()
         if daily.d != t {
@@ -301,6 +348,12 @@ public struct GameProgress: Codable, Equatable, Sendable {
         for (k, v) in other.wrong where v > 0 { wrong[k] = (wrong[k] ?? 0) + v; added += 1 }
         for (k, v) in other.wrongMastered where wrongMastered[k] == nil { wrongMastered[k] = v; added += 1 }
 
+        if other.coins > coins { coins = other.coins; added += 1 }
+        if other.gachaTickets > gachaTickets { gachaTickets = other.gachaTickets; added += 1 }
+        for (k, v) in other.pets where v > (pets[k] ?? 0) { pets[k] = v; added += 1 }
+        for (k, v) in other.petFeedExp where v > (petFeedExp[k] ?? 0) { petFeedExp[k] = v; added += 1 }
+        for (k, v) in other.castleUnlocked where v > 0 && castleUnlocked[k] == nil { castleUnlocked[k] = 1; added += 1 }
+
         let existingHist = Set(history.map(\.id))
         for h in other.history where !existingHist.contains(h.id) {
             history.append(h)
@@ -318,7 +371,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
     }
 }
 
-// MARK: - 成就徽章定义（升级为语数英三科全能徽章）
+// MARK: - 成就徽章定义（升级为语数英三科全能徽章 + 精灵游乐园徽章）
 public struct BadgeDefinition: Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -337,6 +390,11 @@ public struct BadgeDefinition: Identifiable, Sendable {
         BadgeDefinition(id: "math10",  title: "🧁 数学甜点师", desc: "收集 10 款数学烘焙甜点", check: { $0.dessertCount >= 10 }),
         BadgeDefinition(id: "eng15",   title: "🧃 双语调饮师", desc: "收集 15 张牛津英语闪卡", check: { $0.englishCardCount >= 15 }),
         BadgeDefinition(id: "day3",    title: "📅 天天来报到", desc: "连续打卡 3 天",      check: { $0.streak.n >= 3 }),
+        BadgeDefinition(id: "pet6",    title: "🎰 扭蛋收藏家", desc: "孵化收集 6 只不同的守护萌宠", check: { $0.unlockedPetCount >= 6 }),
+        BadgeDefinition(id: "petmax",  title: "👑 神兽驯养师", desc: "将 1 只守护萌宠培养进化至 3 阶皇冠神兽", check: { prog in
+            GuardianPetSpecies.all.contains(where: { prog.petStage(for: $0.id) >= 3 })
+        }),
+        BadgeDefinition(id: "castle5", title: "🏰 皇家游乐园主", desc: "在童话游乐园点亮 5 座动态景观建筑", check: { $0.unlockedAttractionCount >= 5 }),
         BadgeDefinition(id: "bfevo",   title: "✨ 进化大师",   desc: "让 1 种蝴蝶完全进化（同种收集 6 只）", check: { prog in
             ButterflySpecies.all.contains(where: { prog.butterflyStage(for: $0.id) >= 3 })
         }),

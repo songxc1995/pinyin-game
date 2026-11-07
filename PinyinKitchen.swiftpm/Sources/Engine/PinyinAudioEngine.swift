@@ -93,6 +93,15 @@ public final class PinyinAudioEngine: ObservableObject {
     }
 
     private func setupAudioEngine() {
+        #if os(iOS)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            // 静默容错
+        }
+        #endif
         let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)
         self.audioFormat = format
         audioEngine.attach(playerNode)
@@ -396,6 +405,57 @@ public final class PinyinAudioEngine: ObservableObject {
             (1318, 0.08, 0.12, "sine", 0.16),
             (1568, 0.16, 0.20, "sine", 0.18),
             (2093, 0.24, 0.34, "sine", 0.20)
+        ])
+    }
+
+    /// 清脆星币入账叮当声
+    public func sfxCoin() {
+        playTones([
+            (1318, 0.00, 0.07, "sine", 0.16),
+            (1760, 0.05, 0.18, "sine", 0.18)
+        ])
+    }
+
+    /// 皇家扭蛋机旋钮齿轮与彩球翻滚声
+    public func sfxGachaCrank() {
+        playTones([
+            (392,  0.00, 0.07, "triangle", 0.15),
+            (494,  0.08, 0.07, "triangle", 0.15),
+            (587,  0.16, 0.08, "triangle", 0.16),
+            (784,  0.25, 0.10, "sine",     0.17),
+            (1046, 0.36, 0.16, "sine",     0.19)
+        ])
+    }
+
+    /// 神秘宝箱 / 扭蛋破壳大爆发凯旋和弦
+    public func sfxChestOpen() {
+        playTones([
+            (523,  0.00, 0.10, "sine", 0.17),
+            (659,  0.07, 0.10, "sine", 0.17),
+            (784,  0.14, 0.12, "sine", 0.18),
+            (1046, 0.22, 0.15, "sine", 0.20),
+            (1318, 0.30, 0.18, "sine", 0.20),
+            (1568, 0.38, 0.36, "sine", 0.22)
+        ])
+    }
+
+    /// 守护萌宠开心撒娇音效
+    public func sfxPetHappy() {
+        playTones([
+            (880,  0.00, 0.08, "sine", 0.16),
+            (1175, 0.07, 0.09, "sine", 0.17),
+            (1397, 0.14, 0.11, "sine", 0.18),
+            (1760, 0.22, 0.22, "sine", 0.19)
+        ])
+    }
+
+    /// 皇家烟花绽放星光音效
+    public func sfxFirework() {
+        playTones([
+            (659,  0.00, 0.08, "sine", 0.14),
+            (988,  0.06, 0.10, "sine", 0.15),
+            (1318, 0.12, 0.14, "sine", 0.17),
+            (1976, 0.18, 0.28, "sine", 0.19)
         ])
     }
 }
