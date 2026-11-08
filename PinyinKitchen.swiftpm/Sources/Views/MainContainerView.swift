@@ -53,9 +53,9 @@ public struct MainContainerView: View {
                 firePickerOverlay(levelNumber: levelNumberClamped(lvNum))
             }
 
-            // 蝴蝶进化全屏庆典弹窗
-            if let upgrade = engine.pendingUpgrades.first {
-                butterflyUpgradeOverlay(upgrade)
+            // 公主华服解锁 & 五阶高定升阶全屏庆典弹窗
+            if let upgrade = engine.pendingFashionUpgrades.first {
+                FashionUpgradeBurstOverlay(engine: engine, event: upgrade)
             }
 
             // 皇家扭蛋孵化 & 守护神兽进化全屏庆典弹窗
@@ -183,12 +183,12 @@ public struct MainContainerView: View {
 
                 Spacer(minLength: 4)
 
-                // 5 大统计胶囊（新增星币与守护神兽快捷入口）
+                // 5 大统计胶囊（星光币·扭蛋 & 公主华服衣橱快捷入口）
                 HStack(spacing: 8) {
                     statPill(icon: "⭐", value: "\(engine.progress.totalStars)", label: "三科总星", color: Color(hex: "#F5A623"), tab: .map)
                     statPill(icon: "🪙", value: "\(engine.progress.coins)", label: "星币·扭蛋", color: Color(hex: "#E63946"), tab: .paradise)
+                    statPill(icon: "👗", value: "\(engine.progress.unlockedFashionCount)/30", label: "公主变装", color: Color(hex: "#E05385"), tab: .garden)
                     statPill(icon: "📖", value: "\(engine.progress.foodCount + engine.progress.dessertCount + engine.progress.englishCardCount)", label: "料理图鉴", color: Color(hex: "#3EA865"), tab: .recipe)
-                    statPill(icon: "🦋", value: "\(engine.progress.bf.count)", label: "小蝴蝶", color: Color(hex: "#7A6EE6"), tab: .garden)
                     statPill(icon: "📅", value: "\(engine.progress.streak.n)", label: "连续打卡", color: Color(hex: "#3685D6"), tab: .records)
                 }
             }
@@ -208,12 +208,12 @@ public struct MainContainerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // 4. 五大主 Tab 切换栏（新增 🎡 精灵扭蛋与游乐园）
+            // 4. 五大主 Tab 切换栏（核心奖励：🎰 精灵扭蛋屋 + 👗 满满公主变装秀）
             HStack(spacing: 8) {
                 tabButton(tab: .map, title: "🍳 \(engine.currentSubject.shortTitle)闯关地图")
-                tabButton(tab: .paradise, title: "🎡 精灵扭蛋与游乐园")
+                tabButton(tab: .paradise, title: "🎰 皇家神兽扭蛋屋")
+                tabButton(tab: .garden, title: "👗 满满公主变装秀")
                 tabButton(tab: .recipe, title: "📖 语数英料理图鉴")
-                tabButton(tab: .garden, title: "🦋 蝴蝶生态花园")
                 tabButton(tab: .records, title: "🏆 错题本与成就")
             }
             .padding(5)
@@ -233,7 +233,7 @@ public struct MainContainerView: View {
                 case .recipe:
                     RecipeBookView(engine: engine)
                 case .garden:
-                    ButterflyGardenView(engine: engine)
+                    PrincessWardrobeTabView(engine: engine)
                 case .records:
                     RecordsAndWrongView(engine: engine)
                 }
@@ -357,6 +357,15 @@ public struct MainContainerView: View {
 
         return HStack(spacing: 10) {
             Button {
+                engine.audio.sfxSpark()
+                engine.activeTab = .garden
+                engine.audio.speakText("满满小公主的魔法衣橱！", slow: false)
+            } label: {
+                PrincessAvatarVectorView(progress: engine.progress, size: 44, animated: true)
+            }
+            .buttonStyle(.plain)
+
+            Button {
                 engine.audio.sfxPetHappy()
                 engine.activeTab = .paradise
                 engine.audio.speakText("\(pet.name)陪你闯关！", slow: false)
@@ -431,7 +440,7 @@ public struct MainContainerView: View {
                             .font(.system(size: 11.5, weight: .bold))
                             .foregroundColor(Color(hex: "#3B2E22"))
                             .lineLimit(1)
-                        Text(q.claimed ? "✓已领蝶" : (q.isCompleted ? "🎁点我领蝶" : "\(q.current)/\(q.goal)"))
+                        Text(q.claimed ? "✓已领华服" : (q.isCompleted ? "🎁点我领礼服" : "\(q.current)/\(q.goal)"))
                             .font(.system(size: 11, weight: .heavy))
                             .foregroundColor(q.claimed ? Color(hex: "#2B7F4A") : (q.isCompleted ? .white : Color(hex: "#8A7765")))
                             .padding(.horizontal, 6)
@@ -568,7 +577,7 @@ public struct MainContainerView: View {
                     .foregroundColor(Color(hex: "#8A7765"))
                     .multilineTextAlignment(.center)
 
-                Text(stageInfo.wrongCount > 0 ? "🎯 这一关还有 \(stageInfo.wrongCount) 道以前错过的题，这次把它们全部拿下！" : "✨ 这一关熟门熟路啦，可以挑战「大火」拿双倍小蝴蝶！")
+                Text(stageInfo.wrongCount > 0 ? "🎯 这一关还有 \(stageInfo.wrongCount) 道以前错过的题，这次把它们全部拿下！" : "✨ 这一关熟门熟路啦，可以挑战「大火」拿双倍公主华服礼盒！")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(Color(hex: "#B25614"))
                     .padding(.horizontal, 12)
@@ -669,54 +678,6 @@ public struct MainContainerView: View {
                 RoundedRectangle(cornerRadius: 26)
                     .fill(Color.white)
                     .shadow(color: Color.black.opacity(0.22), radius: 20, y: 10)
-            )
-        }
-    }
-
-    // MARK: - 蝴蝶进化全屏庆典弹窗
-    private func butterflyUpgradeOverlay(_ event: ButterflyUpgradeEvent) -> some View {
-        ZStack {
-            Color.black.opacity(0.48)
-                .ignoresSafeArea()
-
-            VStack(spacing: 14) {
-                ButterflyVectorView(species: event.species, stage: event.toStage, size: 160, animated: true)
-
-                Text(event.customTitle ?? (event.toStage >= 3 ? "✨ 完全进化啦！" : "🎉 蝴蝶进化啦！"))
-                    .font(.system(size: 24, weight: .black))
-                    .foregroundColor(Color(hex: "#5E340B"))
-
-                Text("\(event.species.name) 已收集 \(event.count) 只 · 当前形态：【\(ButterflySpecies.stageName(for: event.toStage))】")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(hex: "#7A624B"))
-
-                Text(event.toStage >= 3 ? "这是它最华丽的终极形态 ✨" : "继续闯关收集同种蝴蝶，还能再次进化哦！")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "#F07D2E"))
-
-                Button {
-                    engine.audio.sfxTap()
-                    if !engine.pendingUpgrades.isEmpty {
-                        engine.pendingUpgrades.removeFirst()
-                    }
-                } label: {
-                    Text(engine.pendingUpgrades.count > 1 ? "下一只（还有 \(engine.pendingUpgrades.count - 1) 只）" : "太棒了！")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 11)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#F07D2E")))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
-            }
-            .padding(28)
-            .frame(maxWidth: 420)
-            .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(LinearGradient(colors: [Color.white, Color(hex: "#FFF6E5")], startPoint: .top, endPoint: .bottom))
-                    .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color(hex: "#F5B82E"), lineWidth: 2.5))
-                    .shadow(color: Color.black.opacity(0.25), radius: 22, y: 10)
             )
         }
     }

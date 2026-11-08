@@ -64,8 +64,10 @@ public final class GameEngine: ObservableObject {
     @Published public var activeTab: HomeTab = .map
     @Published public var showSkinDrawer: Bool = false
     @Published public var firePickerLevel: Int? = nil
-    @Published public var pendingUpgrades: [ButterflyUpgradeEvent] = []
-    @Published public var mascotLine: String = "小熊团团：欢迎来到《满满的奇妙料理城》，沪教版语数英边玩边学！"
+    @Published public var pendingFashionUpgrades: [FashionUpgradeEvent] = []
+    @Published public var selectedWardrobeCategory: PrincessFashionCategory = .dress
+    @Published public var wardrobeToast: String? = nil
+    @Published public var mascotLine: String = "小熊团团：欢迎来到《满满的奇妙料理城》，闯关赢皇家扭蛋与公主高定华服！"
     @Published public var importExportMessage: String? = nil
     @Published public var showBackupModal: Bool = false
 
@@ -85,7 +87,7 @@ public final class GameEngine: ObservableObject {
     @Published public var newFoodsInRound: [String] = []
     @Published public var newDessertsInRound: [BakeryDessert] = []
     @Published public var newFlashcardsInRound: [EnglishFlashcard] = []
-    @Published public var rewardedButterfliesInRound: [ButterflySpecies] = []
+    @Published public var rewardedFashionInRound: [PrincessFashionItem] = []
     @Published public var roundStars: Int = 0
 
     // MARK: - 🪙 局内星币、🌈 彩虹连击宝箱、🎁 局末三选一宝箱、🎰 皇家扭蛋与🦄 守护萌宠状态
@@ -160,8 +162,8 @@ public final class GameEngine: ObservableObject {
 
     public static let mascotTips: [String] = [
         "小熊团团：欢迎来到《满满的奇妙料理城》，语数英三大工坊随心切换！",
-        "小熊团团：拼音屋撒四声调料瓶，数学坊玩十格阵和数墙，英语吧拼鲜果句子积木！",
-        "小熊团团：挑战「大火」模式，通关蝴蝶奖励翻倍哦！",
+        "小熊团团：闯关收集星币与华服礼盒，为满满公主换上皇冠、宝石项链和神翼吧！",
+        "小熊团团：挑战「大火」模式，通关高定变装礼盒翻倍，还能培养 5 阶至尊神兽！",
         "小熊团团：在 Mac 上可直接按数字和字母答题，iPad 上小手点一点超丝滑！",
         "小熊团团：三科全部严格同步上海沪教版一年级上/下册教材哦！",
         "小熊团团：眼睛离屏幕要有一臂远（约 50 厘米），坐直身体再闯关！",
@@ -401,66 +403,77 @@ public final class GameEngine: ObservableObject {
         progress.ensureDaily()
         guard (progress.daily.claimed[questId] ?? 0) == 0 else { return }
         progress.daily.claimed[questId] = 1
-        progress.coins += 40
-        progress.gachaTickets += 1
-        let species = rollButterfly(stars: 3, fire: .high)
-        let beforeStage = progress.butterflyStage(for: species.id)
-        progress.bf.append(CaughtButterfly(t: species.id, lv: 1, s: 3, d: GameProgress.todayString()))
-        let afterStage = progress.butterflyStage(for: species.id)
-        let newCount = progress.butterflyCount(for: species.id)
+        progress.coins += 35
+        if questId == "q_words" {
+            progress.gachaTickets += 1
+        }
+        let item = rollFashionReward(stars: 3, fire: .high)
+        let wasOwned = progress.fashionCount(for: item.id) > 0
+        let beforeStage = max(1, progress.fashionStage(for: item.id))
+        progress.wardrobe[item.id] = (progress.wardrobe[item.id] ?? 0) + 1
+        if !wasOwned {
+            progress.equippedOutfit[item.category.rawValue] = item.id
+        }
+        let afterStage = max(1, progress.fashionStage(for: item.id))
+        let newCount = progress.fashionCount(for: item.id)
         saveProgress()
         audio.sfxChestOpen()
-        pendingUpgrades.append(
-            ButterflyUpgradeEvent(
-                species: species,
-                fromStage: max(1, beforeStage),
-                toStage: max(1, afterStage),
-                count: newCount,
-                customTitle: "🎁 领奖成功！+40 星币 · +1 扭蛋券 · 新蝴蝶！"
+        pendingFashionUpgrades.append(
+            FashionUpgradeEvent(
+                item: item,
+                isNewUnlock: !wasOwned,
+                fromStage: beforeStage,
+                toStage: afterStage,
+                totalCount: newCount,
+                customTitle: questId == "q_words"
+                    ? "🎁 每日目标达成！+35星币 · +1扭蛋券 · 获赠【\(item.name)】！"
+                    : "🎁 每日目标达成！+35星币 · 获赠【\(item.name)】！"
             )
         )
     }
 
-    // MARK: - 🎰 皇家扭蛋机孵化、🍓 萌宠喂食进化 & 🏰 游乐园建造
+    // MARK: - 🎰 皇家扭蛋机孵化（5阶神兽进化）、👗 满满公主高定变装 & 🏰 游乐园建造
 
-    /// 旋转皇家扭蛋机（支持使用 1 张扭蛋券 或 60 料理星币）
+    /// 旋转皇家扭蛋机（需 1 张皇家扭蛋券 或 120 料理星币，重复抽中自动转化为 +2 神兽成长值）
     public func spinGacha(useTicket: Bool) {
         guard !isSpinningGacha && activeGachaHatch == nil else { return }
         if useTicket {
             guard progress.gachaTickets >= 1 else {
                 audio.sfxBad()
-                petFeedToast = "🎟️ 扭蛋券不够啦，闯关集满彩虹能量或完成每日目标就能领扭蛋券哦！"
+                petFeedToast = "🎟️ 扭蛋券不够啦！在大火模式集满彩虹能量或完成每日答题目标就能获得扭蛋券哦！"
                 return
             }
             progress.gachaTickets -= 1
         } else {
-            guard progress.coins >= 60 else {
+            guard progress.coins >= 120 else {
                 audio.sfxBad()
-                petFeedToast = "🪙 星币还差一点点（需 60 星币），去闯关答题赚星币吧！"
+                petFeedToast = "🪙 旋转皇家扭蛋需要 120 星币（当前 \(progress.coins) 星币），去闯关答题攒星币吧！"
                 return
             }
-            progress.coins -= 60
+            progress.coins -= 120
         }
 
         isSpinningGacha = true
         petFeedToast = nil
         audio.sfxGachaCrank()
 
-        // 智能权重：优先偏向未拥有的精灵，保证小朋友成就感满满
-        let unowned = GuardianPetSpecies.all.filter { (progress.pets[$0.id] ?? 0) == 0 }
+        // 真实 RPG 稀有度权重：16% 神话(3星)、36% 传说(2星)、48% 史诗(1星)
+        let roll = Double.random(in: 0..<1)
+        let targetRarity = roll < 0.16 ? 3 : (roll < 0.52 ? 2 : 1)
+        let rarityPool = GuardianPetSpecies.all.filter { $0.rarity == targetRarity }
+        let unownedInTier = rarityPool.filter { (progress.pets[$0.id] ?? 0) == 0 }
+
         let pickedPet: GuardianPetSpecies
-        if !unowned.isEmpty && Double.random(in: 0..<1) < 0.68 {
-            pickedPet = unowned.randomElement() ?? GuardianPetSpecies.all[0]
+        if !unownedInTier.isEmpty && Double.random(in: 0..<1) < 0.45 {
+            pickedPet = unownedInTier.randomElement() ?? rarityPool[0]
         } else {
-            let roll = Double.random(in: 0..<1)
-            let targetRarity = roll < 0.35 ? 3 : (roll < 0.72 ? 2 : 1)
-            let pool = GuardianPetSpecies.all.filter { $0.rarity == targetRarity }
-            pickedPet = pool.randomElement() ?? GuardianPetSpecies.all[0]
+            pickedPet = rarityPool.randomElement() ?? GuardianPetSpecies.all[0]
         }
 
         let wasOwned = (progress.pets[pickedPet.id] ?? 0) > 0
         let beforeStage = max(1, progress.petStage(for: pickedPet.id))
-        progress.pets[pickedPet.id] = (progress.pets[pickedPet.id] ?? 0) + 1
+        // 若抽到已拥有的守护萌宠，直接获得 +2 点高额神兽成长值，加速冲击 5 阶至尊幻兽！
+        progress.pets[pickedPet.id] = (progress.pets[pickedPet.id] ?? 0) + (wasOwned ? 2 : 1)
         if progress.equippedPetId.isEmpty {
             progress.equippedPetId = pickedPet.id
         }
@@ -483,7 +496,7 @@ public final class GameEngine: ObservableObject {
         }
     }
 
-    /// 投喂守护萌宠美食（消耗 25 星币，亲密经验 +1，满阈值直接升阶进化）
+    /// 投喂守护萌宠美食（投喂星币随阶位 1~5 阶递增：35 -> 50 -> 70 -> 95 星币，越往后越难、进化越炫酷）
     public func feedPet(_ petId: String) {
         let pet = GuardianPetSpecies.byId(petId)
         guard (progress.pets[petId] ?? 0) > 0 else {
@@ -491,14 +504,15 @@ public final class GameEngine: ObservableObject {
             petFeedToast = "🥚 这只小精灵还没孵化呢，快去摇左侧的皇家扭蛋机吧！"
             return
         }
-        guard progress.coins >= 25 else {
+        let beforeStage = progress.petStage(for: petId)
+        let cost = GuardianPetSpecies.feedCost(for: beforeStage)
+        guard progress.coins >= cost else {
             audio.sfxBad()
-            petFeedToast = "🪙 投喂美味需要 25 枚星币，去闯一关就能赚得满满当当啦！"
+            petFeedToast = "🪙 当前 \(beforeStage) 阶投喂【\(pet.favoriteFood)】需要 \(cost) 星币，去闯关答题赚星币吧！"
             return
         }
 
-        let beforeStage = progress.petStage(for: petId)
-        progress.coins -= 25
+        progress.coins -= cost
         progress.petFeedExp[petId] = (progress.petFeedExp[petId] ?? 0) + 1
         let afterStage = progress.petStage(for: petId)
         let totalExp = progress.petTotalExp(for: petId)
@@ -508,7 +522,7 @@ public final class GameEngine: ObservableObject {
         audio.sfxPetHappy()
 
         if afterStage > beforeStage {
-            petFeedToast = "👑 太棒啦！「\(pet.name)」吃饱了【\(pet.favoriteFood)】，成功进化为【\(GuardianPetSpecies.stageName(for: afterStage))】！"
+            petFeedToast = "👑 华丽蜕变！「\(pet.name)」突破至 \(afterStage) 阶【\(GuardianPetSpecies.stageName(for: afterStage))】！解锁：\(GuardianPetSpecies.stageVisualPerk(for: afterStage))！"
             activeGachaHatch = GachaHatchEvent(
                 pet: pet,
                 isNew: false,
@@ -516,9 +530,10 @@ public final class GameEngine: ObservableObject {
                 toStage: afterStage,
                 totalExp: totalExp
             )
-            audio.speakText("哇！\(pet.name)进化成\(GuardianPetSpecies.stageName(for: afterStage))啦！", slow: false)
+            audio.speakText("太酷啦！\(pet.name)进化成\(GuardianPetSpecies.stageName(for: afterStage))啦！", slow: false)
         } else {
-            petFeedToast = "🍓 投喂【\(pet.favoriteFood)】成功！「\(pet.name)」开心地蹭了蹭你（成长值 \(totalExp)）💖"
+            let nextNeed = progress.nextPetStageNeed(for: petId) ?? totalExp
+            petFeedToast = "🍓 投喂【\(pet.favoriteFood)】成功！「\(pet.name)」成长值 \(totalExp)/\(nextNeed) 💖"
             audio.speakText(pet.cheerLine, slow: false)
         }
 
@@ -534,8 +549,99 @@ public final class GameEngine: ObservableObject {
         saveProgress()
         audio.sfxPetHappy()
         let pet = GuardianPetSpecies.byId(petId)
-        petFeedToast = "✨ 已将「\(pet.name)」设为伴读守护精灵，它会陪你一起闯关答题哦！"
-        audio.speakText("我是\(pet.name)，陪你一起闯关！", slow: false)
+        petFeedToast = "✨ 已将「\(pet.name)」设为伴读守护精灵，它会和满满公主一起闯关答题哦！"
+        audio.speakText("我是\(pet.name)，陪满满公主一起闯关！", slow: false)
+    }
+
+    // MARK: - 👗 满满公主换装穿戴、星币解锁与 5 阶高定织造升阶
+
+    public func equipFashionItem(_ item: PrincessFashionItem) {
+        guard progress.fashionCount(for: item.id) > 0 else {
+            unlockOrUpgradeFashionItem(item)
+            return
+        }
+        progress.equippedOutfit[item.category.rawValue] = item.id
+        saveProgress()
+        audio.sfxSpark()
+        let st = progress.fashionStage(for: item.id)
+        wardrobeToast = "👗 满满已换上 \(st) 阶【\(item.name)】，华丽值高达 \(progress.totalGlamourScore) 分！"
+        audio.speakText("换上\(item.name)，真漂亮！", slow: false)
+    }
+
+    public func unlockOrUpgradeFashionItem(_ item: PrincessFashionItem) {
+        let currentCount = progress.fashionCount(for: item.id)
+        if currentCount == 0 {
+            // 首次解锁：检查总星数门槛与星币
+            if progress.totalStars < item.needStars {
+                audio.sfxBad()
+                wardrobeToast = "⭐ 解锁【\(item.name)】需要先累计拿到 \(item.needStars) 颗星星（当前 \(progress.totalStars) 颗），快去闯关摘星吧！"
+                return
+            }
+            guard progress.coins >= item.costCoins else {
+                audio.sfxBad()
+                wardrobeToast = "🪙 裁制【\(item.name)】需要 \(item.costCoins) 星币（当前 \(progress.coins) 星币），去闯关赚星币吧！"
+                return
+            }
+            progress.coins -= item.costCoins
+            progress.wardrobe[item.id] = 1
+            progress.equippedOutfit[item.category.rawValue] = item.id
+            saveProgress()
+            audio.sfxChestOpen()
+            wardrobeToast = "🎉 成功解锁并穿戴【\(item.name)】！继续收集或高定织造可升至 5 阶传世神装！"
+            pendingFashionUpgrades.append(
+                FashionUpgradeEvent(
+                    item: item,
+                    isNewUnlock: true,
+                    fromStage: 1,
+                    toStage: 1,
+                    totalCount: 1,
+                    customTitle: "👗 喜获新装！满满公主换上了【\(item.name)】！"
+                )
+            )
+            audio.speakText("太美啦！成功解锁\(item.name)！", slow: false)
+        } else {
+            // 已拥有：执行高定织造（+1 升阶经验），越往后升阶所需次数与星币越高，外观越华丽
+            let beforeStage = progress.fashionStage(for: item.id)
+            guard beforeStage < PrincessFashionItem.maxStage else {
+                audio.sfxSpark()
+                progress.equippedOutfit[item.category.rawValue] = item.id
+                saveProgress()
+                wardrobeToast = "🌈【\(item.name)】已经达到最高 5 阶「传世神装」啦！"
+                return
+            }
+            let craftCost = PrincessFashionItem.upgradeCraftCost(for: beforeStage, tier: item.tier)
+            guard progress.coins >= craftCost else {
+                audio.sfxBad()
+                wardrobeToast = "🪙 高定织造【\(item.name)】需要 \(craftCost) 星币（当前 \(progress.coins) 星币），去闯关答题赚星币吧！"
+                return
+            }
+            progress.coins -= craftCost
+            progress.wardrobe[item.id] = currentCount + 1
+            progress.equippedOutfit[item.category.rawValue] = item.id
+            let afterStage = progress.fashionStage(for: item.id)
+            let newCount = progress.fashionCount(for: item.id)
+            saveProgress()
+
+            if afterStage > beforeStage {
+                audio.sfxChestOpen()
+                wardrobeToast = "👑 高定升阶！【\(item.name)】华丽蜕变为 \(afterStage) 阶「\(PrincessFashionItem.stageName(for: afterStage))」！"
+                pendingFashionUpgrades.append(
+                    FashionUpgradeEvent(
+                        item: item,
+                        isNewUnlock: false,
+                        fromStage: beforeStage,
+                        toStage: afterStage,
+                        totalCount: newCount,
+                        customTitle: nil
+                    )
+                )
+                audio.speakText("哇！\(item.name)华丽升阶为\(PrincessFashionItem.stageName(for: afterStage))！", slow: false)
+            } else {
+                audio.sfxSpark()
+                let need = progress.nextFashionStageNeed(for: item.id) ?? newCount
+                wardrobeToast = "🧵 高定织造成功！【\(item.name)】华丽度 \(newCount)/\(need)（再织造 \(max(1, need - newCount)) 次即可升入 \(beforeStage + 1) 阶）✨"
+            }
+        }
     }
 
     public func unlockCastleAttraction(_ item: CastleAttraction) {
@@ -558,25 +664,36 @@ public final class GameEngine: ObservableObject {
         petFeedToast = "🎉 成功建造「\(item.name)」！快看上方游乐园画布，它已经动起来啦！"
     }
 
-    /// 局内每答对 1 题发放星币与彩虹能量槽充能
+    /// 局内每答对 1 题发放星币与彩虹能量槽充能（紧凑递进经济：需集满 8 格能量才爆彩虹宝箱，答错回锅扣减能量）
     public func grantQuestionCorrectReward(wasWrongMastered: Bool) {
-        let petBonus = (equippedPet.id == "fire_dragon") ? 5 : 3
-        let comboBonus = min(comboCount, 6) * 4
-        let masterBonus = wasWrongMastered ? 18 : 0
-        let gain = 15 + comboBonus + petBonus + masterBonus
+        let baseCoin: Int
+        switch currentFire {
+        case .low:  baseCoin = 5
+        case .mid:  baseCoin = 7
+        case .high: baseCoin = 10
+        }
+        let petStageBonus = equippedPetStage + (equippedPet.id == "fire_dragon" ? 2 : 0)
+        let comboBonus = min(comboCount, 5) * 2
+        let masterBonus = wasWrongMastered ? 10 : 0
+        let gain = baseCoin + comboBonus + petStageBonus + masterBonus
 
         progress.coins += gain
         roundCoinsEarned += gain
         rainbowCharge += 1
 
-        if rainbowCharge >= 5 {
+        if rainbowCharge >= 8 {
             rainbowCharge = 0
-            let chestCoins = 50
+            let chestCoins = 35
             progress.coins += chestCoins
             roundCoinsEarned += chestCoins
-            progress.gachaTickets += 1
-            floatingCoinGainText = "🌈 彩虹宝箱爆发 +50🪙 +1🎟️"
-            rainbowChestBurstMessage = "🌈 彩虹能量集满 5 格！惊喜爆出 +50 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+            if currentFire == .high || comboCount >= 6 {
+                progress.gachaTickets += 1
+                floatingCoinGainText = "🌈 彩虹宝箱 +35🪙 +1🎟️"
+                rainbowChestBurstMessage = "🌈 连续集满 8 格彩虹能量！爆出 +35 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+            } else {
+                floatingCoinGainText = "🌈 彩虹宝箱 +35🪙"
+                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！惊喜爆出 +35 🪙 料理星币！（挑战大火或 6 连击还能掉扭蛋券哦）"
+            }
             audio.sfxChestOpen()
         } else {
             floatingCoinGainText = "+\(gain) 🪙"
@@ -595,31 +712,58 @@ public final class GameEngine: ObservableObject {
             roundCoinsEarned += chosen.amount
         case "ticket":
             progress.gachaTickets += chosen.amount
-            progress.coins += 20
-            roundCoinsEarned += 20
-        case "butterfly":
-            let sp = rollButterfly(stars: 3, fire: .high)
-            progress.bf.append(CaughtButterfly(t: sp.id, lv: currentLevelNumber, s: 3, d: GameProgress.todayString()))
-            rewardedButterfliesInRound.append(sp)
+            progress.coins += 15
+            roundCoinsEarned += 15
+        case "fashion":
+            let item = chosen.fashionItemId.map { PrincessFashionItem.byId($0) } ?? rollFashionReward(stars: 3, fire: .high)
+            let wasOwned = progress.fashionCount(for: item.id) > 0
+            let beforeStage = max(1, progress.fashionStage(for: item.id))
+            progress.wardrobe[item.id] = (progress.wardrobe[item.id] ?? 0) + 1
+            if !wasOwned {
+                progress.equippedOutfit[item.category.rawValue] = item.id
+            }
+            let afterStage = max(1, progress.fashionStage(for: item.id))
+            rewardedFashionInRound.append(item)
+            if !wasOwned || afterStage > beforeStage {
+                pendingFashionUpgrades.append(
+                    FashionUpgradeEvent(
+                        item: item,
+                        isNewUnlock: !wasOwned,
+                        fromStage: beforeStage,
+                        toStage: afterStage,
+                        totalCount: progress.fashionCount(for: item.id),
+                        customTitle: !wasOwned ? "🎁 宝箱爆出新华服【\(item.name)】！" : nil
+                    )
+                )
+            }
         default:
-            progress.coins += 50
-            roundCoinsEarned += 50
+            progress.coins += 35
+            roundCoinsEarned += 35
         }
         saveProgress()
         audio.sfxChestOpen()
         audio.speakText("太棒啦！打开神秘宝箱获得\(chosen.title)！", slow: false)
     }
 
-    public func rollButterfly(stars: Int, fire: FireDifficulty) -> ButterflySpecies {
+    /// 根据本局星级与火候难度抽取满满公主变装服饰（高星级 + 大火更容易掉落高级华丽/皇家神话服饰）
+    public func rollFashionReward(stars: Int, fire: FireDifficulty) -> PrincessFashionItem {
         let x = Double.random(in: 0..<1)
-        var targetRarity = 1
-        if stars >= 3 {
-            targetRarity = x < fire.rareBoost ? 3 : (x < fire.rareBoost + 0.30 ? 2 : 1)
+        let maxAllowedTier: Int
+        if stars >= 3 && fire == .high {
+            maxAllowedTier = x < 0.22 ? 4 : (x < 0.58 ? 3 : 2)
+        } else if stars >= 3 {
+            maxAllowedTier = x < 0.10 ? 4 : (x < 0.42 ? 3 : (x < 0.78 ? 2 : 1))
         } else if stars == 2 {
-            targetRarity = x < fire.rareBoost ? 2 : 1
+            maxAllowedTier = x < 0.25 ? 3 : (x < 0.65 ? 2 : 1)
+        } else {
+            maxAllowedTier = x < 0.35 ? 2 : 1
         }
-        let pool = ButterflySpecies.all.filter { $0.rarity == targetRarity }
-        return pool.randomElement() ?? ButterflySpecies.all[0]
+        let tierPool = PrincessFashionItem.all.filter { $0.tier == maxAllowedTier }
+        let unowned = tierPool.filter { progress.fashionCount(for: $0.id) == 0 && progress.totalStars >= max(0, $0.needStars - 10) }
+        if !unowned.isEmpty && Double.random(in: 0..<1) < 0.45 {
+            return unowned.randomElement() ?? tierPool[0]
+        }
+        return tierPool.randomElement() ?? PrincessFashionItem.all[0]
     }
 
     // MARK: - 当前题目与卡片数据
@@ -792,7 +936,7 @@ public final class GameEngine: ObservableObject {
         newFoodsInRound = []
         newDessertsInRound = []
         newFlashcardsInRound = []
-        rewardedButterfliesInRound = []
+        rewardedFashionInRound = []
         rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
@@ -859,7 +1003,7 @@ public final class GameEngine: ObservableObject {
         newFoodsInRound = []
         newDessertsInRound = []
         newFlashcardsInRound = []
-        rewardedButterfliesInRound = []
+        rewardedFashionInRound = []
         rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
@@ -931,7 +1075,7 @@ public final class GameEngine: ObservableObject {
         newFoodsInRound = []
         newDessertsInRound = []
         newFlashcardsInRound = []
-        rewardedButterfliesInRound = []
+        rewardedFashionInRound = []
         rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
@@ -1311,6 +1455,7 @@ public final class GameEngine: ObservableObject {
                 retryLeft -= 1
                 retriedCurrent = true
                 comboCount = 0
+                rainbowCharge = max(0, rainbowCharge - 2)
                 isLocked = false
                 customerMood = .burnt
                 pickedChoiceOption = nil
@@ -1326,6 +1471,7 @@ public final class GameEngine: ObservableObject {
             }
 
             comboCount = 0
+            rainbowCharge = max(0, rainbowCharge - 2)
             judgeState = "bad"
             customerMood = .burnt
             potNope = true
@@ -1425,7 +1571,7 @@ public final class GameEngine: ObservableObject {
             pickedBaseFinal = base
             pickedTone = nil
             pickedTonedFinal = nil
-            audio.speakBaseFinal(base, slow: progress.tts.slow)
+            audio.speakBaseFinal(base, initial: pickedInitial, slow: progress.tts.slow)
             tipMessage = "🧂 请点击下方「四声调料瓶」（或按键盘 1~4）给 \(base) 加上声调！"
             tipStyle = "note"
             chefBubble = "最后一步：撒上第几声调料呢？"
@@ -1452,7 +1598,7 @@ public final class GameEngine: ObservableObject {
         pickedTone = tone
         let toned = PinyinHelper.applyTone(base: base, tone: tone)
         pickedTonedFinal = toned
-        audio.speakTonedFinal(toned, slow: progress.tts.slow)
+        audio.speakTonedFinal(toned, initial: pickedInitial, slow: progress.tts.slow)
         checkIfReadyToJudge()
     }
 
@@ -1475,7 +1621,7 @@ public final class GameEngine: ObservableObject {
         pickedBaseFinal = PinyinHelper.stripTone(toned)
         pickedTone = PinyinHelper.toneNumber(of: toned)
         pickedTonedFinal = toned
-        audio.speakTonedFinal(toned, slow: progress.tts.slow)
+        audio.speakTonedFinal(toned, initial: pickedInitial, slow: progress.tts.slow)
         checkIfReadyToJudge()
     }
 
@@ -1765,6 +1911,7 @@ public final class GameEngine: ObservableObject {
                 retryLeft -= 1
                 retriedCurrent = true
                 comboCount = 0
+                rainbowCharge = max(0, rainbowCharge - 2)
                 isLocked = false
                 customerMood = .burnt
                 audio.sfxBad()
@@ -1790,6 +1937,7 @@ public final class GameEngine: ObservableObject {
             }
 
             comboCount = 0
+            rainbowCharge = max(0, rainbowCharge - 2)
             judgeState = "bad"
             customerMood = .burnt
             potNope = true
@@ -1823,7 +1971,7 @@ public final class GameEngine: ObservableObject {
         }
     }
 
-    // MARK: - 局末结算与蝴蝶进化（三科共享奖励与星星体系）
+    // MARK: - 局末结算与公主华服变装掉落（三科共享奖励与星星体系）
 
     private func finishRound() {
         let total = totalQuestionCountInRound
@@ -1878,8 +2026,8 @@ public final class GameEngine: ObservableObject {
             progress.history = Array(progress.history.suffix(60))
         }
 
-        var gifts: [ButterflySpecies] = []
-        var upgrades: [ButterflyUpgradeEvent] = []
+        var gifts: [PrincessFashionItem] = []
+        var upgrades: [FashionUpgradeEvent] = []
         if rightCount >= 4 {
             let clearKey = "\(currentSubject.rawValue)_\(currentLevelNumber)"
             let isFirstClear = (specialMode == nil && (progress.cleared[clearKey] ?? 0) == 0)
@@ -1887,48 +2035,70 @@ public final class GameEngine: ObservableObject {
                 progress.cleared[clearKey] = 1
             }
             for _ in 0..<currentFire.butterflyRolls {
-                gifts.append(rollButterfly(stars: stars, fire: currentFire))
+                gifts.append(rollFashionReward(stars: stars, fire: currentFire))
             }
             if isFirstClear {
-                gifts.append(rollButterfly(stars: stars, fire: currentFire))
+                gifts.append(rollFashionReward(stars: stars, fire: currentFire))
             }
 
             var stageBefore: [String: Int] = [:]
+            var countBefore: [String: Int] = [:]
             for g in gifts where stageBefore[g.id] == nil {
-                stageBefore[g.id] = progress.butterflyStage(for: g.id)
+                stageBefore[g.id] = progress.fashionStage(for: g.id)
+                countBefore[g.id] = progress.fashionCount(for: g.id)
             }
             for g in gifts {
-                progress.bf.append(CaughtButterfly(t: g.id, lv: currentLevelNumber, s: stars, d: GameProgress.todayString()))
+                progress.wardrobe[g.id] = (progress.wardrobe[g.id] ?? 0) + 1
+                // 若当前槽位装备的是更低稀有度且新获得了更高阶或新部位，可自动为公主换上新衣
+                let catKey = g.category.rawValue
+                if let currentId = progress.equippedOutfit[catKey],
+                   let currentItem = PrincessFashionItem.item(for: currentId),
+                   g.rarity > currentItem.rarity && (countBefore[g.id] ?? 0) == 0 {
+                    progress.equippedOutfit[catKey] = g.id
+                }
             }
 
             var checked = Set<String>()
             for g in gifts where !checked.contains(g.id) {
                 checked.insert(g.id)
+                let c0 = countBefore[g.id] ?? 0
                 let b0 = max(1, stageBefore[g.id] ?? 1)
-                let b1 = progress.butterflyStage(for: g.id)
-                if b1 > b0 {
+                let b1 = progress.fashionStage(for: g.id)
+                if c0 == 0 {
                     upgrades.append(
-                        ButterflyUpgradeEvent(
-                            species: g,
+                        FashionUpgradeEvent(
+                            item: g,
+                            isNewUnlock: true,
+                            fromStage: 0,
+                            toStage: 1,
+                            totalCount: progress.fashionCount(for: g.id),
+                            customTitle: "👗 通关解锁新装 · \(g.name)！"
+                        )
+                    )
+                } else if b1 > b0 {
+                    upgrades.append(
+                        FashionUpgradeEvent(
+                            item: g,
+                            isNewUnlock: false,
                             fromStage: b0,
                             toStage: b1,
-                            count: progress.butterflyCount(for: g.id),
+                            totalCount: progress.fashionCount(for: g.id),
                             customTitle: nil
                         )
                     )
                 }
             }
 
-            // 通关额外星币奖励 + 生成局末「三选一神秘宝箱」
-            let clearBonus = isFirstClear ? 50 : (stars * 12)
+            // 通关额外星币奖励（精细化难度梯度）+ 生成局末「三选一神秘宝箱」
+            let clearBonus = isFirstClear ? 35 : (stars * 8)
             progress.coins += clearBonus
             roundCoinsEarned += clearBonus
 
             let chestPool: [MysteryChestItem] = [
-                MysteryChestItem(id: 0, title: "88 枚料理星币福袋", subtitle: "金光闪闪的大袋星币", emoji: "💰", rewardType: "coins", amount: 88, accentHex: "#F5A623"),
-                MysteryChestItem(id: 1, title: "皇家扭蛋券 ×1 + 20星币", subtitle: "可免费孵化 1 只守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385"),
-                MysteryChestItem(id: 2, title: "闪耀稀有蝴蝶盲盒", subtitle: "立刻召唤 1 只漂亮小蝴蝶", emoji: "🦋", rewardType: "butterfly", amount: 1, accentHex: "#7A6EE6"),
-                MysteryChestItem(id: 3, title: "66 枚料理星币礼盒", subtitle: "可投喂萌宠或建造游乐园", emoji: "🪙", rewardType: "coins", amount: 66, accentHex: "#3EA865")
+                MysteryChestItem(id: 0, title: "58 枚星光币福袋", subtitle: "金光闪闪的裁缝星光币", emoji: "💰", rewardType: "coins", amount: 58, accentHex: "#F5A623"),
+                MysteryChestItem(id: 1, title: "皇家扭蛋券 ×1 + 15星币", subtitle: "可免费孵化 1 只五阶守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385"),
+                MysteryChestItem(id: 2, title: "高定华服变装盲盒", subtitle: "立刻获得 1 件公主礼服或皇冠首饰", emoji: "👗", rewardType: "fashion", amount: 1, accentHex: "#7A6EE6"),
+                MysteryChestItem(id: 3, title: "38 枚星光币礼盒", subtitle: "可升级高定礼服或投喂神兽", emoji: "🪙", rewardType: "coins", amount: 38, accentHex: "#3EA865")
             ].shuffled()
             mysteryChests = Array(chestPool.prefix(3)).enumerated().map { idx, item in
                 MysteryChestItem(
@@ -1947,7 +2117,7 @@ public final class GameEngine: ObservableObject {
             openedChestIndex = nil
         }
 
-        rewardedButterfliesInRound = gifts
+        rewardedFashionInRound = gifts
         saveProgress()
         screenState = .result
 
@@ -1957,7 +2127,7 @@ public final class GameEngine: ObservableObject {
                 self.audio.sfxSpark()
                 if !upgrades.isEmpty {
                     try? await Task.sleep(nanoseconds: 650_000_000)
-                    self.pendingUpgrades.append(contentsOf: upgrades)
+                    self.pendingFashionUpgrades.append(contentsOf: upgrades)
                 }
             }
         }

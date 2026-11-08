@@ -228,20 +228,46 @@ public final class PinyinAudioEngine: ObservableObject {
         speakText(callout, slow: slow, rateOverride: slow ? 0.42 : 0.52)
     }
 
-    /// 点读无调韵母母体本音（如点 ai 读「哀」）
-    public func speakBaseFinal(_ baseFinal: String, slow: Bool = false) {
-        let callout = Self.baseFinalCallouts[baseFinal] ?? baseFinal
+    /// 点读无调韵母母体本音（如点 ai 读「哀」；若跟在 j/q/x 后面，u/un 读作 ü/ün 的本音「迂/晕」）
+    public func speakBaseFinal(_ baseFinal: String, initial: String? = nil, slow: Bool = false) {
+        let isJQX = ["j", "q", "x"].contains(initial ?? "")
+        let effectiveBase: String
+        if isJQX && baseFinal == "u" {
+            effectiveBase = "ü"
+        } else if isJQX && baseFinal == "un" {
+            effectiveBase = "ün"
+        } else {
+            effectiveBase = baseFinal
+        }
+        let callout = Self.baseFinalCallouts[effectiveBase] ?? effectiveBase
         speakText(callout, slow: slow, rateOverride: slow ? 0.40 : 0.49)
     }
 
-    /// 点读带调韵母或四声调料瓶（如点 á 读二声，或者如果已选声母则直接预读合成音）
-    public func speakTonedFinal(_ tonedFinal: String, previewCharacter: String? = nil, slow: Bool = false) {
+    /// 点读带调韵母或四声调料瓶（如点 á 读二声；若已选 j/q/x，则 ū/ú/ǔ/ù 按 ǖ/ǘ/ǚ/ǜ 读音）
+    public func speakTonedFinal(_ tonedFinal: String, initial: String? = nil, previewCharacter: String? = nil, slow: Bool = false) {
         if let ch = previewCharacter, !ch.isEmpty {
             speakText(ch, slow: slow)
             return
         }
-        let callout = Self.tonedFinalCallouts[tonedFinal] ?? Self.baseFinalCallouts[PinyinHelper.stripTone(tonedFinal)] ?? tonedFinal
+        let effectiveToned = Self.normalizeJQXFinalForSpeech(tonedFinal: tonedFinal, initial: initial)
+        let callout = Self.tonedFinalCallouts[effectiveToned] ?? Self.baseFinalCallouts[PinyinHelper.stripTone(effectiveToned)] ?? tonedFinal
         speakText(callout, slow: slow)
+    }
+
+    /// 当声母为 j/q/x 时，去两点的 u/un 还原为 ü/ün 的真实读音
+    public static func normalizeJQXFinalForSpeech(tonedFinal: String, initial: String?) -> String {
+        guard ["j", "q", "x"].contains(initial ?? "") else { return tonedFinal }
+        switch tonedFinal {
+        case "ū": return "ǖ"
+        case "ú": return "ǘ"
+        case "ǔ": return "ǚ"
+        case "ù": return "ǜ"
+        case "ūn": return "ǖn"
+        case "ún": return "ǘn"
+        case "ǔn": return "ǚn"
+        case "ùn": return "ǜn"
+        default: return tonedFinal
+        }
     }
 
     /// 核心教学升级：播放「声母 + (介音) + 韵母 → 汉字，词语」真实拼读连读过程，并驱动 UI 高亮对应槽位
@@ -289,9 +315,10 @@ public final class PinyinAudioEngine: ObservableObject {
                 guard !Task.isCancelled else { return }
             }
 
-            // 3. 读带调韵母
+            // 3. 读带调韵母（若为 j/q/x + u/un，自动按 ü/ün 真实读音播报）
             onHighlightStep("f")
-            let finCallout = Self.tonedFinalCallouts[word.tonedFinal] ?? word.character
+            let effectiveToned = Self.normalizeJQXFinalForSpeech(tonedFinal: word.tonedFinal, initial: word.initial)
+            let finCallout = Self.tonedFinalCallouts[effectiveToned] ?? word.character
             speakUtteranceImmediate(finCallout, slow: slow, rateOverride: slow ? 0.42 : 0.50)
             try? await Task.sleep(nanoseconds: stepDelay + 70_000_000)
             guard !Task.isCancelled else { return }

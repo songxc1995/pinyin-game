@@ -191,7 +191,7 @@ public enum FireDifficulty: String, CaseIterable, Codable, Sendable {
         switch self {
         case .low:  return "第一次玩这一关，选它最稳"
         case .mid:  return "大多数时候选这个，刚刚好"
-        case .high: return "🦋 蝴蝶翻倍！稀有蝶更容易出"
+        case .high: return "👗 华服礼盒翻倍！高定衣饰更容易出"
         }
     }
 }
@@ -206,10 +206,13 @@ public struct ChefRankInfo: Sendable {
 
     public static func compute(totalStars: Int) -> ChefRankInfo {
         let ranks: [(min: Int, name: String)] = [
-            (0,  "洗菜小学徒"),
-            (6,  "掌勺小厨"),
-            (14, "熟练大厨"),
-            (24, "神厨小当家")
+            (0,  "🎀 甜心小学徒"),
+            (8,  "🍓 掌勺小厨娘"),
+            (18, "🧁 星光甜点师"),
+            (30, "🪄 魔法料理师"),
+            (45, "👑 皇家小主厨"),
+            (62, "💎 璀璨料理公主"),
+            (80, "🌈 传奇全能女王")
         ]
         var lv = 0
         for (i, r) in ranks.enumerated() where totalStars >= r.min {

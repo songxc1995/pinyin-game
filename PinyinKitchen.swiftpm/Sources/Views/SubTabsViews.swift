@@ -1345,12 +1345,13 @@ public struct RoundResultView: View {
         return ScrollView(showsIndicators: false) {
             VStack(spacing: 14) {
                 HStack(spacing: 14) {
+                    PrincessAvatarVectorView(progress: engine.progress, size: 66, animated: true)
                     GuardianPetVectorView(species: pet, stage: petStage, size: 62, animated: true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(st > 0 ? "🎉 香喷喷出炉通关啦！" : "💪 差一点点，再试一次吧！")
                             .font(.system(size: 24, weight: .black))
                             .foregroundColor(Color(hex: "#5E340B"))
-                        Text("🪙 本局共收获 +\(engine.roundCoinsEarned) 枚料理星币（当前共 \(engine.progress.coins) 🪙 · 扭蛋券 \(engine.progress.gachaTickets) 🎟️）")
+                        Text("🪙 本局共收获 +\(engine.roundCoinsEarned) 枚星光币（当前共 \(engine.progress.coins) 🪙 · 扭蛋券 \(engine.progress.gachaTickets) 🎟️）")
                             .font(.system(size: 13, weight: .heavy))
                             .foregroundColor(Color(hex: "#D97706"))
                     }
@@ -1532,36 +1533,49 @@ public struct RoundResultView: View {
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#E8FFF5")))
                 }
 
-                // 本局蝴蝶奖励
-                if !engine.rewardedButterfliesInRound.isEmpty {
+                // 本局公主华服与首饰变装掉落
+                if !engine.rewardedFashionInRound.isEmpty {
                     VStack(spacing: 8) {
-                        Text("🦋 通关蝴蝶奖励（点击蝴蝶听名字）")
+                        Text("👗 通关公主华服与首饰礼盒（点击可直接给满满小公主穿戴并听介绍）")
                             .font(.system(size: 13, weight: .heavy))
-                            .foregroundColor(Color(hex: "#8A7765"))
+                            .foregroundColor(Color(hex: "#BE185D"))
                         HStack(spacing: 14) {
-                            ForEach(Array(engine.rewardedButterfliesInRound.enumerated()), id: \.offset) { _, sp in
-                                let stg = engine.progress.butterflyStage(for: sp.id)
+                            ForEach(Array(engine.rewardedFashionInRound.enumerated()), id: \.offset) { _, fashion in
+                                let stg = engine.progress.fashionStage(for: fashion.id)
                                 Button {
-                                    engine.audio.sfxSpark()
-                                    engine.audio.speakText(sp.name, slow: false)
+                                    engine.equipFashionItem(fashion)
                                 } label: {
                                     VStack(spacing: 4) {
-                                        ButterflyVectorView(species: sp, stage: stg, size: 68, animated: true)
-                                        Text(sp.name)
+                                        ZStack {
+                                            Circle()
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [Color(hex: fashion.secondaryHex), Color(hex: fashion.primaryHex).opacity(0.35)],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                                .frame(width: 60, height: 60)
+                                            Text(fashion.icon)
+                                                .font(.system(size: 32))
+                                        }
+                                        Text(fashion.name)
                                             .font(.system(size: 13, weight: .heavy))
                                             .foregroundColor(Color(hex: "#3B2E22"))
-                                        Text("\(sp.rarityName) · \(ButterflySpecies.stageName(for: stg))")
+                                        Text("\(fashion.rarityName) · Lv.\(stg) \(PrincessFashionItem.stageName(for: stg))")
                                             .font(.system(size: 11, weight: .bold))
-                                            .foregroundColor(Color(hex: "#7A6EE6"))
+                                            .foregroundColor(Color(hex: "#E05385"))
                                     }
                                     .padding(10)
                                     .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#F5B82E").opacity(0.5), lineWidth: 1.5))
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#E05385").opacity(0.45), lineWidth: 1.5))
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
                     }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: "#FFF0F5")))
                 }
 
                 // 底部操作按钮
@@ -1603,6 +1617,20 @@ public struct RoundResultView: View {
 
                     Button {
                         engine.audio.sfxTap()
+                        engine.activeTab = .garden
+                        engine.goHome()
+                    } label: {
+                        Text("👗 去公主换装")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 11)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#E05385")))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        engine.audio.sfxTap()
                         engine.activeTab = .paradise
                         engine.goHome()
                     } label: {
@@ -1632,7 +1660,7 @@ public struct RoundResultView: View {
                 .padding(.top, 4)
             }
             .padding(24)
-            .frame(maxWidth: 720)
+            .frame(maxWidth: 740)
             .background(
                 RoundedRectangle(cornerRadius: 28)
                     .fill(LinearGradient(colors: [Color.white, Color(hex: "#FFF7EB")], startPoint: .top, endPoint: .bottom))
@@ -1654,10 +1682,10 @@ public struct RoundResultView: View {
             s += "，成功消灭了 \(engine.masteredCount) 道以前错过的题！"
         }
         if right >= 4 {
-            let count = engine.rewardedButterfliesInRound.count
-            s += count > 1 ? "，太棒了，飞来了 \(count) 只漂亮的小蝴蝶！" : "，吸引来了一只漂亮的小蝴蝶！"
+            let count = engine.rewardedFashionInRound.count
+            s += count > 1 ? "，太棒了，获得了 \(count) 件高定公主华服与首饰锦缎！" : "，获得了一件漂亮的公主华服礼盒！"
         } else {
-            s += "，答对 4 道题就有小蝴蝶飞过来哦！"
+            s += "，答对 4 道题就有公主华服礼盒送给你哦！"
         }
         return s
     }

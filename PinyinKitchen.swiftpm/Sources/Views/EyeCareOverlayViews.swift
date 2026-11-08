@@ -281,7 +281,7 @@ public struct PlayLockOverlayView: View {
                 HStack(spacing: 14) {
                     summaryBadge(icon: "⭐", label: "累计总星", value: "\(engine.progress.totalStars)")
                     summaryBadge(icon: "📖", label: "料理图鉴", value: "\(engine.progress.totalCollectionCount)")
-                    summaryBadge(icon: "🦋", label: "蝴蝶伙伴", value: "\(engine.progress.bf.count)")
+                    summaryBadge(icon: "👗", label: "公主衣橱", value: "\(engine.progress.unlockedFashionCount)/30")
                 }
                 .padding(.vertical, 6)
 
@@ -699,9 +699,9 @@ public struct BackupAndRestoreOverlayView: View {
                 // 当前存档概览条
                 HStack(spacing: 12) {
                     statTag(icon: "⭐", title: "总星数", val: "\(engine.progress.totalStars)")
-                    statTag(icon: "🪙", title: "料理星币", val: "\(engine.progress.coins)")
+                    statTag(icon: "🪙", title: "星光币", val: "\(engine.progress.coins)")
                     statTag(icon: "🦄", title: "守护萌宠", val: "\(engine.progress.unlockedPetCount)/12")
-                    statTag(icon: "🦋", title: "小蝴蝶", val: "\(engine.progress.bf.count)只")
+                    statTag(icon: "👗", title: "公主华服", val: "\(engine.progress.unlockedFashionCount)/30")
                     statTag(icon: "📖", title: "图鉴总数", val: "\(engine.progress.totalCollectionCount)")
                 }
 

@@ -114,12 +114,12 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public var food: [String: Int] = [:]
 
     // 沪教版数学进度
-    public var mathUnlocked: Int = 2
+    public var mathUnlocked: Int = 1
     public var mathStars: [String: Int] = [:]
     public var desserts: [String: Int] = [:]
 
     // 沪教牛津英语进度
-    public var englishUnlocked: Int = 2
+    public var englishUnlocked: Int = 1
     public var englishStars: [String: Int] = [:]
     public var englishCards: [String: Int] = [:]
 
@@ -145,13 +145,34 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public var playSeconds: [String: Int] = [:]
     public var bonusMinutes: [String: Int] = [:]
 
-    // 🪙 奇妙料理星币、皇家扭蛋券、12 只守护萌宠精灵与童话游乐园建筑
-    public var coins: Int = 120
-    public var gachaTickets: Int = 2
+    // 🪙 奇妙料理星币、皇家扭蛋券、12 只守护萌宠精灵、👗 满满公主变装衣橱与童话游乐园建筑
+    public var coins: Int = 90
+    public var gachaTickets: Int = 1
     public var pets: [String: Int] = ["fire_dragon": 1]
     public var petFeedExp: [String: Int] = [:]
     public var equippedPetId: String = "fire_dragon"
     public var castleUnlocked: [String: Int] = ["fountain": 1]
+
+    /// 满满公主高定变装衣橱（itemId -> 累计拥有/高定织造次数，支持 1~5 阶华丽蜕变）
+    public var wardrobe: [String: Int] = Self.defaultWardrobe
+    /// 当前穿戴的 5 大部位（category.rawValue -> itemId）
+    public var equippedOutfit: [String: String] = Self.defaultEquippedOutfit
+
+    public static let defaultWardrobe: [String: Int] = [
+        "dress_0": 1,
+        "hair_0": 1,
+        "jewel_0": 1,
+        "wings_0": 1,
+        "wand_0": 1
+    ]
+
+    public static let defaultEquippedOutfit: [String: String] = [
+        PrincessFashionCategory.dress.rawValue: "dress_0",
+        PrincessFashionCategory.hairTiara.rawValue: "hair_0",
+        PrincessFashionCategory.jewelry.rawValue: "jewel_0",
+        PrincessFashionCategory.wings.rawValue: "wings_0",
+        PrincessFashionCategory.wand.rawValue: "wand_0"
+    ]
 
     public init() {}
 
@@ -163,6 +184,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
         case wrong, wrongMastered, history, streak, bestCombo, bf, cleared, tts, potSkin, blind, seasoningMode, daily
         case eyeCare, playSeconds, bonusMinutes
         case coins, gachaTickets, pets, petFeedExp, equippedPetId, castleUnlocked
+        case wardrobe, equippedOutfit
     }
 
     public init(from decoder: Decoder) throws {
@@ -170,10 +192,10 @@ public struct GameProgress: Codable, Equatable, Sendable {
         self.unlocked = (try? c.decode(Int.self, forKey: .unlocked)) ?? 1
         self.stars = (try? c.decode([String: Int].self, forKey: .stars)) ?? [:]
         self.food = (try? c.decode([String: Int].self, forKey: .food)) ?? [:]
-        self.mathUnlocked = (try? c.decode(Int.self, forKey: .mathUnlocked)) ?? 2
+        self.mathUnlocked = (try? c.decode(Int.self, forKey: .mathUnlocked)) ?? 1
         self.mathStars = (try? c.decode([String: Int].self, forKey: .mathStars)) ?? [:]
         self.desserts = (try? c.decode([String: Int].self, forKey: .desserts)) ?? [:]
-        self.englishUnlocked = (try? c.decode(Int.self, forKey: .englishUnlocked)) ?? 2
+        self.englishUnlocked = (try? c.decode(Int.self, forKey: .englishUnlocked)) ?? 1
         self.englishStars = (try? c.decode([String: Int].self, forKey: .englishStars)) ?? [:]
         self.englishCards = (try? c.decode([String: Int].self, forKey: .englishCards)) ?? [:]
         self.freeUnlockAll = (try? c.decode(Bool.self, forKey: .freeUnlockAll)) ?? true
@@ -193,14 +215,34 @@ public struct GameProgress: Codable, Equatable, Sendable {
         self.eyeCare = (try? c.decode(EyeCareSettings.self, forKey: .eyeCare)) ?? EyeCareSettings()
         self.playSeconds = (try? c.decode([String: Int].self, forKey: .playSeconds)) ?? [:]
         self.bonusMinutes = (try? c.decode([String: Int].self, forKey: .bonusMinutes)) ?? [:]
-        self.coins = (try? c.decode(Int.self, forKey: .coins)) ?? 120
-        self.gachaTickets = (try? c.decode(Int.self, forKey: .gachaTickets)) ?? 2
+        self.coins = (try? c.decode(Int.self, forKey: .coins)) ?? 90
+        self.gachaTickets = (try? c.decode(Int.self, forKey: .gachaTickets)) ?? 1
         let decodedPets = (try? c.decode([String: Int].self, forKey: .pets)) ?? ["fire_dragon": 1]
         self.pets = decodedPets.isEmpty ? ["fire_dragon": 1] : decodedPets
         self.petFeedExp = (try? c.decode([String: Int].self, forKey: .petFeedExp)) ?? [:]
         self.equippedPetId = (try? c.decode(String.self, forKey: .equippedPetId)) ?? "fire_dragon"
         let decodedCastle = (try? c.decode([String: Int].self, forKey: .castleUnlocked)) ?? ["fountain": 1]
         self.castleUnlocked = decodedCastle.isEmpty ? ["fountain": 1] : decodedCastle
+
+        var decodedWardrobe = (try? c.decode([String: Int].self, forKey: .wardrobe)) ?? Self.defaultWardrobe
+        for (k, v) in Self.defaultWardrobe where (decodedWardrobe[k] ?? 0) < v {
+            decodedWardrobe[k] = v
+        }
+        // 兼容旧版存档：如果旧存档里抓过蝴蝶且还没解锁过新衣服，自动将旧蝴蝶一对一折算为初级/进阶礼服首饰奖励！
+        if decodedWardrobe.count <= Self.defaultWardrobe.count && !self.bf.isEmpty {
+            let bonusPool = PrincessFashionItem.all.filter { $0.tier <= 2 }
+            for (idx, _) in self.bf.enumerated() {
+                let item = bonusPool[idx % bonusPool.count]
+                decodedWardrobe[item.id] = (decodedWardrobe[item.id] ?? 0) + 1
+            }
+        }
+        self.wardrobe = decodedWardrobe
+
+        var decodedEquipped = (try? c.decode([String: String].self, forKey: .equippedOutfit)) ?? Self.defaultEquippedOutfit
+        for (catKey, defId) in Self.defaultEquippedOutfit where decodedEquipped[catKey] == nil {
+            decodedEquipped[catKey] = defId
+        }
+        self.equippedOutfit = decodedEquipped
     }
 
     /// 今日已游戏秒数
@@ -281,7 +323,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
         return stage >= 3 ? nil : ButterflySpecies.evolutionThresholds[stage + 1]
     }
 
-    // MARK: - 守护萌宠精灵与游乐园辅助方法
+    // MARK: - 守护萌宠精灵（5阶进化）与游乐园辅助方法
     public var unlockedPetCount: Int {
         pets.filter { $0.value > 0 }.count
     }
@@ -296,15 +338,74 @@ public struct GameProgress: Codable, Equatable, Sendable {
         let gachaCount = pets[petId] ?? 0
         guard gachaCount > 0 else { return 0 }
         let exp = petTotalExp(for: petId)
-        if exp >= GuardianPetSpecies.stageThresholds[3] { return 3 }
-        if exp >= GuardianPetSpecies.stageThresholds[2] { return 2 }
+        for st in stride(from: GuardianPetSpecies.maxStage, through: 1, by: -1) {
+            if exp >= GuardianPetSpecies.stageThresholds[st] {
+                return st
+            }
+        }
         return 1
     }
 
     public func nextPetStageNeed(for petId: String) -> Int? {
         let st = petStage(for: petId)
-        guard st > 0 && st < 3 else { return nil }
+        guard st > 0 && st < GuardianPetSpecies.maxStage else { return nil }
         return GuardianPetSpecies.stageThresholds[st + 1]
+    }
+
+    // MARK: - 👗 满满公主高定变装衣橱（5阶华丽升级）辅助方法
+    public var unlockedFashionCount: Int {
+        wardrobe.filter { $0.value > 0 }.count
+    }
+
+    public func fashionCount(for itemId: String) -> Int {
+        wardrobe[itemId] ?? 0
+    }
+
+    public func fashionStage(for itemId: String) -> Int {
+        let count = fashionCount(for: itemId)
+        guard count > 0 else { return 0 }
+        for st in stride(from: PrincessFashionItem.maxStage, through: 1, by: -1) {
+            if count >= PrincessFashionItem.stageThresholds[st] {
+                return st
+            }
+        }
+        return 1
+    }
+
+    public func nextFashionStageNeed(for itemId: String) -> Int? {
+        let st = fashionStage(for: itemId)
+        guard st > 0 && st < PrincessFashionItem.maxStage else { return nil }
+        return PrincessFashionItem.stageThresholds[st + 1]
+    }
+
+    public func equippedItem(for category: PrincessFashionCategory) -> PrincessFashionItem {
+        if let id = equippedOutfit[category.rawValue],
+           fashionCount(for: id) > 0,
+           let found = PrincessFashionItem.all.first(where: { $0.id == id }) {
+            return found
+        }
+        return PrincessFashionItem.defaultItem(for: category)
+    }
+
+    public func equippedItemStage(for category: PrincessFashionCategory) -> Int {
+        let item = equippedItem(for: category)
+        return max(1, fashionStage(for: item.id))
+    }
+
+    /// 全身最高华服阶位（用于驱动人物整体光环与舞台特效）
+    public var maxEquippedFashionStage: Int {
+        PrincessFashionCategory.allCases.map { equippedItemStage(for: $0) }.max() ?? 1
+    }
+
+    /// 全身总华丽值评分（品阶 + 升阶等级综合评分）
+    public var totalGlamourScore: Int {
+        var score = 0
+        for cat in PrincessFashionCategory.allCases {
+            let item = equippedItem(for: cat)
+            let st = equippedItemStage(for: cat)
+            score += item.tier * 25 + st * 20
+        }
+        return score
     }
 
     public var unlockedAttractionCount: Int {
@@ -353,6 +454,8 @@ public struct GameProgress: Codable, Equatable, Sendable {
         for (k, v) in other.pets where v > (pets[k] ?? 0) { pets[k] = v; added += 1 }
         for (k, v) in other.petFeedExp where v > (petFeedExp[k] ?? 0) { petFeedExp[k] = v; added += 1 }
         for (k, v) in other.castleUnlocked where v > 0 && castleUnlocked[k] == nil { castleUnlocked[k] = 1; added += 1 }
+        for (k, v) in other.wardrobe where v > (wardrobe[k] ?? 0) { wardrobe[k] = v; added += 1 }
+        for (k, v) in other.equippedOutfit where !v.isEmpty { equippedOutfit[k] = v }
 
         let existingHist = Set(history.map(\.id))
         for h in other.history where !existingHist.contains(h.id) {
@@ -395,15 +498,13 @@ public struct BadgeDefinition: Identifiable, Sendable {
         BadgeDefinition(id: "eng15",   title: "🧃 双语调饮师", desc: "收集 15 张牛津英语闪卡", check: { $0.englishCardCount >= 15 }),
         BadgeDefinition(id: "day3",    title: "📅 天天来报到", desc: "连续打卡 3 天",      check: { $0.streak.n >= 3 }),
         BadgeDefinition(id: "pet6",    title: "🎰 扭蛋收藏家", desc: "孵化收集 6 只不同的守护萌宠", check: { $0.unlockedPetCount >= 6 }),
-        BadgeDefinition(id: "petmax",  title: "👑 神兽驯养师", desc: "将 1 只守护萌宠培养进化至 3 阶皇冠神兽", check: { prog in
-            GuardianPetSpecies.all.contains(where: { prog.petStage(for: $0.id) >= 3 })
+        BadgeDefinition(id: "petmax",  title: "👑 至尊驯兽师", desc: "将 1 只守护萌宠培养进化至 5 阶至尊幻兽", check: { prog in
+            GuardianPetSpecies.all.contains(where: { prog.petStage(for: $0.id) >= 5 })
         }),
         BadgeDefinition(id: "castle5", title: "🏰 皇家游乐园主", desc: "在童话游乐园点亮 5 座动态景观建筑", check: { $0.unlockedAttractionCount >= 5 }),
-        BadgeDefinition(id: "bfevo",   title: "✨ 进化大师",   desc: "让 1 种蝴蝶完全进化（同种收集 6 只）", check: { prog in
-            ButterflySpecies.all.contains(where: { prog.butterflyStage(for: $0.id) >= 3 })
-        }),
-        BadgeDefinition(id: "bfall",   title: "🏛️ 蝴蝶馆长",   desc: "集齐全部 20 种蝴蝶", check: { prog in
-            Set(prog.bf.map(\.t)).count >= ButterflySpecies.all.count
+        BadgeDefinition(id: "dress12", title: "👗 百变小公主", desc: "在变装衣橱解锁 12 件漂亮礼服、皇冠或首饰", check: { $0.unlockedFashionCount >= 12 }),
+        BadgeDefinition(id: "dressmax", title: "🌈 传世高定女王", desc: "将任意 1 件华服或皇冠首饰升阶至 5 阶【传世神装】", check: { prog in
+            PrincessFashionItem.all.contains(where: { prog.fashionStage(for: $0.id) >= 5 })
         })
     ]
 }
