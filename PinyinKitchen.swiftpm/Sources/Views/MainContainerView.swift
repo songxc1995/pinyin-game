@@ -78,6 +78,11 @@ public struct MainContainerView: View {
                 ParentEyeCareSettingsSheet(engine: engine)
             }
 
+            // 跨设备存档备份与一键导出面板（顶部栏与记录页随时可唤起）
+            if engine.showBackupModal {
+                BackupAndRestoreOverlayView(engine: engine)
+            }
+
             // 家长乘法口诀验证门
             if let gatePurpose = engine.parentGate {
                 ParentGateOverlayView(engine: engine, purpose: gatePurpose)

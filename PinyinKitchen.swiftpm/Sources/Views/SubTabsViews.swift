@@ -1038,7 +1038,107 @@ public struct RecordsAndWrongView: View {
 
         return ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                // 1. 语数英三科错题糊锅本
+                // 1. 跨端存档备份与重置（置顶醒目展示，iPad 一键复制/恢复/导出文件）
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("💾 存档保存与导出备份（iPad / Mac 互通）")
+                                .font(.system(size: 17, weight: .heavy))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                            Text("每答完一题都会自动保存在当前 iPad / Mac！如要在 iPad 更新版本或跨设备同步，请点下方按钮一键备份：")
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundColor(Color(hex: "#8A7765"))
+                        }
+                        Spacer()
+                        Text("✅ 已开启三重自动保存")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundColor(Color(hex: "#246B43"))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color(hex: "#E3F6EA")))
+                    }
+
+                    if let msg = engine.importExportMessage {
+                        Text(msg)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(msg.hasPrefix("❌") || msg.hasPrefix("⚠️") ? Color(hex: "#D63B2F") : Color(hex: "#2B7F4A"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: "#E8F6EE")))
+                    }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            engine.copySaveToClipboard()
+                        } label: {
+                            Text("📋 一键复制存档码")
+                                .font(.system(size: 13.5, weight: .black))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#F07D2E")))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            engine.restoreSaveFromClipboard()
+                        } label: {
+                            Text("📌 一键从剪贴板恢复")
+                                .font(.system(size: 13.5, weight: .black))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#2FB380")))
+                        }
+                        .buttonStyle(.plain)
+
+                        if let fileURL = engine.exportBackupFileURL() {
+                            ShareLink(item: fileURL) {
+                                Text("📤 导出到「文件」/ 微信")
+                                    .font(.system(size: 13.5, weight: .bold))
+                                    .foregroundColor(Color(hex: "#4A358E"))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#EFEFFD")))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button {
+                            engine.showBackupModal = true
+                        } label: {
+                            Text("📝 查看/粘贴 JSON")
+                                .font(.system(size: 13.5, weight: .bold))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FFF0D6")))
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button {
+                            showResetConfirm = true
+                        } label: {
+                            Text("🗑️ 清空记录")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(Color(hex: "#E25247"))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FDECEB")))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(0.95))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color(hex: "#F07D2E").opacity(0.35), lineWidth: 1.5))
+                )
+
+                // 2. 语数英三科错题糊锅本
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -1080,7 +1180,7 @@ public struct RecordsAndWrongView: View {
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 20).fill(Color.white.opacity(0.92)))
 
-                // 2. 11 大全能厨神成就徽章
+                // 3. 12 大全能厨神成就徽章
                 VStack(alignment: .leading, spacing: 10) {
                     Text("🏅 奇妙料理城 · 全能成就徽章")
                         .font(.system(size: 17, weight: .heavy))
@@ -1108,51 +1208,6 @@ public struct RecordsAndWrongView: View {
                                     )
                             )
                         }
-                    }
-                }
-                .padding(16)
-                .background(RoundedRectangle(cornerRadius: 20).fill(Color.white.opacity(0.92)))
-
-                // 3. 跨端存档备份与重置
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("💾 跨设备存档备份（兼容 JSON 导入导出）")
-                        .font(.system(size: 17, weight: .heavy))
-                        .foregroundColor(Color(hex: "#3B2E22"))
-                    Text("进度已自动保存在当前 Mac / iPad。你也可以导出 JSON 备份，或将其他设备的 JSON 记录合并导入！")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundColor(Color(hex: "#8A7765"))
-
-                    if let msg = engine.importExportMessage {
-                        Text(msg)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(Color(hex: "#2B7F4A"))
-                    }
-
-                    HStack(spacing: 10) {
-                        Button {
-                            jsonInputText = engine.exportJSONString()
-                            showJSONSheet = true
-                        } label: {
-                            Text("📤 导出 / 📥 导入 JSON 记录")
-                                .font(.system(size: 13.5, weight: .bold))
-                                .foregroundColor(Color(hex: "#3B2E22"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FFF0D6")))
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            showResetConfirm = true
-                        } label: {
-                            Text("🗑️ 清空全部本地记录")
-                                .font(.system(size: 13.5, weight: .bold))
-                                .foregroundColor(Color(hex: "#E25247"))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FDECEB")))
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(16)

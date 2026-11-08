@@ -366,7 +366,11 @@ public struct GameProgress: Codable, Equatable, Sendable {
             streak.n = other.streak.n; added += 1
         }
         if other.bestCombo > bestCombo { bestCombo = other.bestCombo; added += 1 }
-        if !other.bf.isEmpty { bf.append(contentsOf: other.bf); added += other.bf.count }
+        let existingBfUIDs = Set(bf.map(\.uid))
+        for b in other.bf where !existingBfUIDs.contains(b.uid) {
+            bf.append(b)
+            added += 1
+        }
         return added
     }
 }

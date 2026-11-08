@@ -1,5 +1,10 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 public enum AppScreenState: Sendable {
     case home
@@ -62,6 +67,7 @@ public final class GameEngine: ObservableObject {
     @Published public var pendingUpgrades: [ButterflyUpgradeEvent] = []
     @Published public var mascotLine: String = "小熊团团：欢迎来到《满满的奇妙料理城》，沪教版语数英边玩边学！"
     @Published public var importExportMessage: String? = nil
+    @Published public var showBackupModal: Bool = false
 
     // MARK: - 局内闯关通用状态
     @Published public var currentLevelNumber: Int = 1
@@ -173,7 +179,7 @@ public final class GameEngine: ObservableObject {
         saveProgress()
     }
 
-    // MARK: - 存档持久化与导入导出
+    // MARK: - 存档持久化与导入导出（iPad / Mac 多重本地自动保存 + 一键备份导出）
 
     private static func saveFileURL() -> URL? {
         guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -184,18 +190,45 @@ public final class GameEngine: ObservableObject {
         return appDir.appendingPathComponent("progress_v2.json")
     }
 
+    private static func documentsSaveFileURL() -> URL? {
+        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return dir.appendingPathComponent("PinyinKitchen_progress_v2.json")
+    }
+
     private static func loadProgress(key: String) -> GameProgress {
         let decoder = JSONDecoder()
+        var merged = GameProgress()
+        var foundAny = false
+
+        // 依次读取 ApplicationSupport、Documents、UserDefaults 并合并，确保 iPad / Mac 任意路径存档都不丢失
         if let url = saveFileURL(),
            let data = try? Data(contentsOf: url),
            let loaded = try? decoder.decode(GameProgress.self, from: data) {
-            return loaded
+            merged = loaded
+            foundAny = true
+        }
+        if let docURL = documentsSaveFileURL(),
+           let data = try? Data(contentsOf: docURL),
+           let loaded = try? decoder.decode(GameProgress.self, from: data) {
+            if foundAny {
+                _ = merged.merge(from: loaded)
+            } else {
+                merged = loaded
+                foundAny = true
+            }
         }
         if let data = UserDefaults.standard.data(forKey: key),
            let loaded = try? decoder.decode(GameProgress.self, from: data) {
-            return loaded
+            if foundAny {
+                _ = merged.merge(from: loaded)
+            } else {
+                merged = loaded
+                foundAny = true
+            }
         }
-        return GameProgress()
+        return merged
     }
 
     public func saveProgress() {
@@ -205,6 +238,9 @@ public final class GameEngine: ObservableObject {
         UserDefaults.standard.set(data, forKey: storageKey)
         if let url = Self.saveFileURL() {
             try? data.write(to: url, options: .atomic)
+        }
+        if let docURL = Self.documentsSaveFileURL() {
+            try? data.write(to: docURL, options: .atomic)
         }
     }
 
@@ -218,6 +254,54 @@ public final class GameEngine: ObservableObject {
         return str
     }
 
+    /// 生成可供 iPad「文件(Files)」/ AirDrop / 微信 分享导出的 .json 备份文件 URL
+    public func exportBackupFileURL() -> URL? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(progress) else { return nil }
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("满满的奇妙料理城_存档备份.json")
+        try? data.write(to: fileURL, options: .atomic)
+        return fileURL
+    }
+
+    /// 一键复制存档 JSON 到 iPad / Mac 剪贴板
+    @discardableResult
+    public func copySaveToClipboard() -> String {
+        let str = exportJSONString()
+        #if canImport(UIKit)
+        UIPasteboard.general.string = str
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(str, forType: .string)
+        #endif
+        audio.sfxWin()
+        let msg = "✅ 存档已复制到剪贴板！可粘贴到备忘录或微信保存，换设备/更新后点「从剪贴板恢复」即可。"
+        importExportMessage = msg
+        return msg
+    }
+
+    /// 一键从 iPad / Mac 剪贴板读取并合并恢复存档
+    @discardableResult
+    public func restoreSaveFromClipboard() -> String {
+        var clipStr: String? = nil
+        #if canImport(UIKit)
+        clipStr = UIPasteboard.general.string
+        #elseif canImport(AppKit)
+        clipStr = NSPasteboard.general.string(forType: .string)
+        #endif
+        guard let raw = clipStr?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty,
+              let data = raw.data(using: .utf8) else {
+            audio.sfxBad()
+            let msg = "⚠️ 剪贴板里还没有存档内容，请先复制备份的 JSON 文本。"
+            importExportMessage = msg
+            return msg
+        }
+        let res = importJSONData(data)
+        importExportMessage = res
+        return res
+    }
+
     public func importJSONData(_ data: Data) -> String {
         let decoder = JSONDecoder()
         do {
@@ -225,10 +309,10 @@ public final class GameEngine: ObservableObject {
             let count = progress.merge(from: incoming)
             saveProgress()
             audio.sfxWin()
-            return count > 0 ? "✅ 成功合并 \(count) 项学习记录与蝴蝶！" : "ℹ️ 这份记录里没有新的内容"
+            return count > 0 ? "✅ 成功合并恢复 \(count) 项学习记录、星币与奖励！" : "ℹ️ 这份存档里的进度已全部包含在当前记录中"
         } catch {
             audio.sfxBad()
-            return "❌ 导入失败：文件格式不正确（\(error.localizedDescription)）"
+            return "❌ 导入失败：存档格式不正确（请确认复制了完整的 JSON 内容）"
         }
     }
 

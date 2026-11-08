@@ -72,6 +72,27 @@ public struct EyeCareTopBarView: View {
             }
             .buttonStyle(.plain)
 
+            // 一键打开存档备份/导出弹窗（iPad / Mac 随时可见）
+            Button {
+                engine.audio.sfxTap()
+                engine.importExportMessage = nil
+                engine.showBackupModal = true
+            } label: {
+                HStack(spacing: 4) {
+                    Text("💾 存档备份")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#B25614"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: "#FFF3D6"))
+                        .overlay(Capsule().stroke(Color(hex: "#F07D2E").opacity(0.45), lineWidth: 1.2))
+                )
+            }
+            .buttonStyle(.plain)
+
             // 今日已用时长与家长设置入口
             Button {
                 engine.requestParentGate(.settings)
@@ -630,5 +651,189 @@ public struct ParentEyeCareSettingsSheet: View {
                     .shadow(color: Color.black.opacity(0.25), radius: 24, y: 10)
             )
         }
+    }
+}
+
+// MARK: - 6. iPad / Mac 跨端存档备份、一键复制与文件导出中心
+public struct BackupAndRestoreOverlayView: View {
+    @ObservedObject public var engine: GameEngine
+    @State private var jsonText: String = ""
+
+    public init(engine: GameEngine) {
+        self.engine = engine
+    }
+
+    public var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    engine.showBackupModal = false
+                }
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("💾 存档备份与导出中心（iPad / Mac 互通）")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundColor(Color(hex: "#3B2E22"))
+                        Text("本机每答一题都会自动保存！如在 iPad 更新版本或跨设备游玩，可一键复制存档码或导出到「文件」App。")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundColor(Color(hex: "#7A624B"))
+                    }
+                    Spacer()
+                    Button {
+                        engine.audio.sfxTap()
+                        engine.showBackupModal = false
+                    } label: {
+                        Text("关闭 ✕")
+                            .font(.system(size: 13.5, weight: .heavy))
+                            .foregroundColor(Color(hex: "#5A4634"))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(Color(hex: "#F3ECE0")))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // 当前存档概览条
+                HStack(spacing: 12) {
+                    statTag(icon: "⭐", title: "总星数", val: "\(engine.progress.totalStars)")
+                    statTag(icon: "🪙", title: "料理星币", val: "\(engine.progress.coins)")
+                    statTag(icon: "🦄", title: "守护萌宠", val: "\(engine.progress.unlockedPetCount)/12")
+                    statTag(icon: "🦋", title: "小蝴蝶", val: "\(engine.progress.bf.count)只")
+                    statTag(icon: "📖", title: "图鉴总数", val: "\(engine.progress.totalCollectionCount)")
+                }
+
+                if let msg = engine.importExportMessage {
+                    Text(msg)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(msg.hasPrefix("❌") || msg.hasPrefix("⚠️") ? Color(hex: "#D63B2F") : Color(hex: "#246B43"))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#E8F6EE")))
+                }
+
+                // iPad 最省心的一键操作栏
+                HStack(spacing: 10) {
+                    Button {
+                        engine.copySaveToClipboard()
+                        jsonText = engine.exportJSONString()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("📋 一键复制存档码")
+                                .font(.system(size: 14, weight: .black))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(LinearGradient(colors: [Color(hex: "#F07D2E"), Color(hex: "#E05A1B")], startPoint: .top, endPoint: .bottom))
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        engine.restoreSaveFromClipboard()
+                        jsonText = engine.exportJSONString()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("📌 一键从剪贴板恢复")
+                                .font(.system(size: 14, weight: .black))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(LinearGradient(colors: [Color(hex: "#2FB380"), Color(hex: "#208B60")], startPoint: .top, endPoint: .bottom))
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    if let fileURL = engine.exportBackupFileURL() {
+                        ShareLink(item: fileURL) {
+                            HStack(spacing: 6) {
+                                Text("📤 导出到「文件」/ 微信")
+                                    .font(.system(size: 14, weight: .black))
+                            }
+                            .foregroundColor(Color(hex: "#4A358E"))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 11)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(hex: "#EFEFFD"))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#7A6EE6").opacity(0.45), lineWidth: 1.5))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("📝 存档 JSON 文本框（也可手动粘贴 JSON 到下方后点右侧「手动合并导入」）：")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "#7A624B"))
+
+                    TextEditor(text: $jsonText)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .frame(height: 170)
+                        .padding(6)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.12), lineWidth: 1))
+                }
+
+                HStack {
+                    Text("💡 提示：在 iPad 备忘录里粘贴保存一份存档码，以后随时点「一键从剪贴板恢复」就能找回全部进度！")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                    Spacer()
+                    Button {
+                        if let data = jsonText.data(using: .utf8) {
+                            engine.importExportMessage = engine.importJSONData(data)
+                            jsonText = engine.exportJSONString()
+                        }
+                    } label: {
+                        Text("📥 手动合并导入下方文本")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundColor(Color(hex: "#3B2E22"))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FFECC8")))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 660)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(hex: "#FFFDF9"))
+                    .shadow(color: Color.black.opacity(0.28), radius: 24, y: 10)
+            )
+            .onAppear {
+                jsonText = engine.exportJSONString()
+            }
+        }
+    }
+
+    private func statTag(icon: String, title: String, val: String) -> some View {
+        HStack(spacing: 6) {
+            Text(icon)
+                .font(.system(size: 16))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundColor(Color(hex: "#8A7765"))
+                Text(val)
+                    .font(.system(size: 13.5, weight: .black, design: .rounded))
+                    .foregroundColor(Color(hex: "#3B2E22"))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FAF5EB")))
     }
 }
