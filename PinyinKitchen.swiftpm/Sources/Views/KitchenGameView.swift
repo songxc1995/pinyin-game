@@ -4,31 +4,67 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+#if os(macOS)
+private final class KitchenKeyMonitorGuard: @unchecked Sendable {
+    var isBlocked: Bool = false
+}
+#endif
+
 public struct KitchenGameView: View {
     @ObservedObject public var engine: GameEngine
     @State private var isDropTargeted: Bool = false
     #if os(macOS)
     @State private var keyMonitor: Any? = nil
+    @State private var modalGuard = KitchenKeyMonitorGuard()
     #endif
 
     public init(engine: GameEngine) {
         self.engine = engine
     }
 
+    private var gentleMotion: Bool {
+        engine.progress.eyeCare.gentleMotion
+    }
+
+    private var isInputBlockedByModal: Bool {
+        engine.screenState != .playing
+            || engine.showBackupModal
+            || engine.eyeRestActive
+            || engine.parentGate != nil
+            || engine.playLock != nil
+            || engine.showParentSettings
+            || engine.firePickerLevel != nil
+            || engine.activeGachaHatch != nil
+            || !engine.activeGachaBatch.isEmpty
+            || !engine.pendingFashionUpgrades.isEmpty
+            || engine.dailyWheelResult != nil
+    }
+
     public var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             topGameBar
             hudStatusStrip
 
-            // 核心升级：iPad 横屏与 Mac 宽屏「左右分栏」一屏零滚动工作台
+            if engine.isFeverMode {
+                feverBannerBar
+            }
+
+            // 核心升级：iPad 横屏与 Mac 宽屏「左右双独立滚动分栏」适配各类窗口高度不裁切
             GeometryReader { geo in
                 let isWide = geo.size.width >= 760
                 if isWide {
                     HStack(alignment: .top, spacing: 18) {
-                        leftStageColumn
-                            .frame(width: geo.size.width * 0.44)
-                        rightShelfColumn
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        ScrollView(showsIndicators: false) {
+                            leftStageColumn
+                                .padding(.bottom, 12)
+                        }
+                        .frame(width: geo.size.width * 0.44)
+
+                        ScrollView(showsIndicators: false) {
+                            rightShelfColumn
+                                .padding(.bottom, 12)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
                     ScrollView(showsIndicators: false) {
@@ -36,21 +72,82 @@ public struct KitchenGameView: View {
                             leftStageColumn
                             rightShelfColumn
                         }
+                        .padding(.bottom, 12)
                     }
                 }
             }
         }
         .onAppear {
+            #if os(macOS)
+            modalGuard.isBlocked = isInputBlockedByModal
+            #endif
             installKeyboardMonitor()
+        }
+        .onCompatChange(of: isInputBlockedByModal) { blocked in
+            #if os(macOS)
+            modalGuard.isBlocked = blocked
+            #endif
         }
         .onDisappear {
             removeKeyboardMonitor()
         }
     }
 
+    private var feverBannerBar: some View {
+        HStack(spacing: 8) {
+            Text("🔥 5连击烈焰狂热模式！")
+                .font(.system(size: 13, weight: .black))
+                .foregroundColor(.white)
+            Text("手感滚烫中 · 每题星币奖励 ×1.5 加成！")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color(hex: "#FFF4E3"))
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#FF7043"), Color(hex: "#E52E71")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(hex: "#FFD54F").opacity(0.85), lineWidth: 1.5)
+        )
+        .shadow(color: Color(hex: "#FF7043").opacity(gentleMotion ? 0.14 : 0.30), radius: 6, y: 2)
+    }
+
     // MARK: - 顶部关卡栏
     private var topGameBar: some View {
-        HStack(spacing: 12) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                topBarBackAndTitle
+                Spacer(minLength: 8)
+                topBarActionToggles
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                topBarBackAndTitle
+                ScrollView(.horizontal, showsIndicators: false) {
+                    topBarActionToggles
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.92))
+                .shadow(color: Color(hex: "#D78741").opacity(0.14), radius: 6, y: 3)
+        )
+    }
+
+    private var topBarBackAndTitle: some View {
+        HStack(spacing: 10) {
             Button {
                 engine.audio.sfxTap()
                 engine.goHome()
@@ -75,13 +172,17 @@ public struct KitchenGameView: View {
                 Text(headerTitle)
                     .font(.system(size: 17, weight: .heavy))
                     .foregroundColor(Color(hex: "#3B2E22"))
+                    .lineLimit(1)
                 Text(headerSubtitle)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(Color(hex: "#8A7765"))
+                    .lineLimit(1)
             }
+        }
+    }
 
-            Spacer()
-
+    private var topBarActionToggles: some View {
+        HStack(spacing: 8) {
             // 四声调料瓶减负模式 vs 传统卡片切换
             Button {
                 engine.audio.sfxTap()
@@ -127,64 +228,76 @@ public struct KitchenGameView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.white.opacity(0.92))
-                .shadow(color: Color(hex: "#D78741").opacity(0.14), radius: 6, y: 3)
-        )
     }
 
     // MARK: - 局内 HUD 状态条
     private var hudStatusStrip: some View {
-        HStack(spacing: 12) {
-            Text("第 \(engine.questionIndex + 1) / \(max(1, engine.questionQueue.count)) 道菜")
-                .font(.system(size: 13.5, weight: .heavy))
-                .foregroundColor(Color(hex: "#4A2E14"))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                Text("第 \(engine.questionIndex + 1) / \(max(1, engine.questionQueue.count)) 道菜")
+                    .font(.system(size: 13.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#4A2E14"))
 
-            Text(engine.specialMode != nil ? (engine.specialMode == .wrong ? "🛠️ 错题营" : "⚡ 全明星") : "🔥 \(engine.currentFire.name)")
-                .font(.system(size: 12, weight: .heavy))
-                .foregroundColor(engine.currentFire == .high ? Color(hex: "#E25247") : Color(hex: "#B25614"))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule().fill(engine.currentFire == .high ? Color(hex: "#FDECEB") : Color(hex: "#FFF0E2"))
-                )
-
-            // 星星进度
-            Text(String(repeating: "★", count: engine.rightCount) + String(repeating: "☆", count: max(0, engine.questionQueue.count - engine.rightCount)))
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color(hex: "#F5A623"))
-
-            if engine.comboCount >= 2 {
-                Text("🔥 连击 \(engine.comboCount) 次")
+                Text(engine.specialMode != nil ? (engine.specialMode == .wrong ? "🛠️ 错题营" : "⚡ 全明星") : "🔥 \(engine.currentFire.name)")
                     .font(.system(size: 12, weight: .heavy))
-                    .foregroundColor(.white)
+                    .foregroundColor(engine.currentFire == .high ? Color(hex: "#E25247") : Color(hex: "#B25614"))
                     .padding(.horizontal, 9)
                     .padding(.vertical, 3)
                     .background(
-                        Capsule().fill(
-                            LinearGradient(colors: [Color(hex: "#FF8A00"), Color(hex: "#E52E71")], startPoint: .leading, endPoint: .trailing)
-                        )
+                        Capsule().fill(engine.currentFire == .high ? Color(hex: "#FDECEB") : Color(hex: "#FFF0E2"))
                     )
-            }
 
-            Spacer()
+                // 星星进度
+                Text(String(repeating: "★", count: engine.rightCount) + String(repeating: "☆", count: max(0, engine.questionQueue.count - engine.rightCount)))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(hex: "#F5A623"))
 
-            // 回锅机会圆点
-            HStack(spacing: 5) {
-                Text("回锅机会")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color(hex: "#8A7765"))
-                let maxRetry = engine.currentFire.retryAllowance
-                ForEach(0..<maxRetry, id: \.self) { i in
-                    let used = i < (maxRetry - engine.retryLeft)
-                    Circle()
-                        .fill(used ? Color.gray.opacity(0.28) : Color(hex: "#3EA865"))
-                        .frame(width: 10, height: 10)
+                if engine.comboCount >= 2 {
+                    Text(engine.isFeverMode ? "🔥 狂热连击 ×\(engine.comboCount)" : "🔥 连击 \(engine.comboCount) 次")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(
+                                LinearGradient(
+                                    colors: engine.isFeverMode ? [Color(hex: "#FF5722"), Color(hex: "#D81B60")] : [Color(hex: "#FF8A00"), Color(hex: "#E52E71")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        )
                 }
+
+                if engine.phoenixShieldsRemaining > 0 {
+                    Text("🛡️ 连击护盾 ×\(engine.phoenixShieldsRemaining)")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#B45309"))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: "#FEF3C7"))
+                                .overlay(Capsule().stroke(Color(hex: "#F59E0B").opacity(0.6), lineWidth: 1))
+                        )
+                }
+
+                // 回锅机会圆点
+                HStack(spacing: 5) {
+                    Text("回锅机会")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                    let maxRetry = engine.currentFire.retryAllowance
+                    ForEach(0..<maxRetry, id: \.self) { i in
+                        let used = i < (maxRetry - engine.retryLeft)
+                        Circle()
+                            .fill(used ? Color.gray.opacity(0.28) : Color(hex: "#3EA865"))
+                            .frame(width: 10, height: 10)
+                    }
+                }
+                .padding(.leading, 6)
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
@@ -396,7 +509,10 @@ public struct KitchenGameView: View {
                 RoundedRectangle(cornerRadius: 22)
                     .fill(
                         RadialGradient(
-                            colors: [Color(hex: "#FFE5B8").opacity(0.55), Color.white.opacity(0.45)],
+                            colors: [
+                                (engine.isFeverMode ? Color(hex: "#FFD180") : Color(hex: "#FFE5B8")).opacity(0.58),
+                                Color.white.opacity(0.45)
+                            ],
                             center: .bottom,
                             startRadius: 10,
                             endRadius: 200
@@ -405,10 +521,24 @@ public struct KitchenGameView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 22)
                             .stroke(
-                                isDropTargeted ? Color(hex: "#3EA865") : Color.black.opacity(0.08),
-                                style: StrokeStyle(lineWidth: isDropTargeted ? 3 : 1.5, dash: isDropTargeted ? [7, 4] : [])
+                                isDropTargeted
+                                    ? Color(hex: "#3EA865")
+                                    : (engine.isFeverMode ? Color(hex: "#FF6B35").opacity(0.85) : Color.black.opacity(0.08)),
+                                style: StrokeStyle(
+                                    lineWidth: (isDropTargeted || engine.isFeverMode) ? 3 : 1.5,
+                                    dash: isDropTargeted ? [7, 4] : []
+                                )
                             )
                     )
+
+                if engine.floatingCoinBurst > 0 {
+                    CustomConfettiBurstView(
+                        burstID: engine.floatingCoinBurst,
+                        isFever: engine.isFeverMode,
+                        gentleMotion: gentleMotion
+                    )
+                    .offset(y: -70)
+                }
 
                 VStack(spacing: 4) {
                     if let praise = engine.praisePopup {
@@ -474,10 +604,11 @@ public struct KitchenGameView: View {
                                 skin: engine.currentPotSkin,
                                 isShaking: engine.potShaking,
                                 isNope: engine.potNope,
-                                isHot: engine.comboCount >= 3,
+                                isHot: engine.comboCount >= 3 || engine.isFeverMode,
                                 steamOn: engine.steamActive,
                                 fire: engine.currentFire,
-                                size: 156
+                                size: 156,
+                                gentleMotion: gentleMotion
                             )
                         }
                         .buttonStyle(.plain)
@@ -488,6 +619,18 @@ public struct KitchenGameView: View {
                     .padding(.bottom, 10)
                 }
                 .padding(.top, 8)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let coinText = engine.floatingCoinGainText, engine.floatingCoinBurst > 0 {
+                    CoinBurstPillView(
+                        text: coinText,
+                        isFever: engine.isFeverMode,
+                        gentleMotion: gentleMotion
+                    )
+                    .id(engine.floatingCoinBurst)
+                    .padding(.top, 10)
+                    .padding(.trailing, 12)
+                }
             }
             .frame(minHeight: 175, maxHeight: 215)
 
@@ -633,23 +776,23 @@ public struct KitchenGameView: View {
                                 text: base,
                                 isSelected: engine.pickedBaseFinal == base,
                                 isCorrectHint: showAnswerHint && word?.baseFinal == base,
-                                isDimmed: showAnswerHint && word?.baseFinal != base
+                                isDimmed: showAnswerHint && word?.baseFinal != base,
+                                gentleMotion: gentleMotion
                             ) {
                                 engine.selectBaseFinal(base)
                             }
                         }
                     } else {
-                        ScrollView {
-                            FlowLayoutGrid(items: engine.availableTonedFinals) { toned in
-                                PinyinIngredientCardView(
-                                    kind: "f",
-                                    text: toned,
-                                    isSelected: engine.pickedTonedFinal == toned,
-                                    isCorrectHint: showAnswerHint && word?.tonedFinal == toned,
-                                    isDimmed: showAnswerHint && word?.tonedFinal != toned
-                                ) {
-                                    engine.selectDirectTonedFinal(toned)
-                                }
+                        FlowLayoutGrid(items: engine.availableTonedFinals) { toned in
+                            PinyinIngredientCardView(
+                                kind: "f",
+                                text: toned,
+                                isSelected: engine.pickedTonedFinal == toned,
+                                isCorrectHint: showAnswerHint && word?.tonedFinal == toned,
+                                isDimmed: showAnswerHint && word?.tonedFinal != toned,
+                                gentleMotion: gentleMotion
+                            ) {
+                                engine.selectDirectTonedFinal(toned)
                             }
                         }
                     }
@@ -666,7 +809,8 @@ public struct KitchenGameView: View {
                             text: ini,
                             isSelected: engine.pickedInitial == ini,
                             isCorrectHint: showAnswerHint && word?.initial == ini,
-                            isDimmed: showAnswerHint && word?.initial != ini
+                            isDimmed: showAnswerHint && word?.initial != ini,
+                            gentleMotion: gentleMotion
                         ) {
                             engine.selectInitial(ini)
                         }
@@ -685,7 +829,8 @@ public struct KitchenGameView: View {
                                 text: med,
                                 isSelected: engine.pickedMedial == med,
                                 isCorrectHint: showAnswerHint && word?.medial == med,
-                                isDimmed: showAnswerHint && word?.medial != med
+                                isDimmed: showAnswerHint && word?.medial != med,
+                                gentleMotion: gentleMotion
                             ) {
                                 engine.selectMedial(med)
                             }
@@ -707,26 +852,25 @@ public struct KitchenGameView: View {
                                 text: base,
                                 isSelected: engine.pickedBaseFinal == base,
                                 isCorrectHint: showAnswerHint && word?.baseFinal == base,
-                                isDimmed: showAnswerHint && word?.baseFinal != base
+                                isDimmed: showAnswerHint && word?.baseFinal != base,
+                                gentleMotion: gentleMotion
                             ) {
                                 engine.selectBaseFinal(base)
                             }
                         }
                     } else {
-                        ScrollView {
-                            FlowLayoutGrid(items: engine.availableTonedFinals) { toned in
-                                PinyinIngredientCardView(
-                                    kind: "f",
-                                    text: toned,
-                                    isSelected: engine.pickedTonedFinal == toned,
-                                    isCorrectHint: showAnswerHint && word?.tonedFinal == toned,
-                                    isDimmed: showAnswerHint && word?.tonedFinal != toned
-                                ) {
-                                    engine.selectDirectTonedFinal(toned)
-                                }
+                        FlowLayoutGrid(items: engine.availableTonedFinals) { toned in
+                            PinyinIngredientCardView(
+                                kind: "f",
+                                text: toned,
+                                isSelected: engine.pickedTonedFinal == toned,
+                                isCorrectHint: showAnswerHint && word?.tonedFinal == toned,
+                                isDimmed: showAnswerHint && word?.tonedFinal != toned,
+                                gentleMotion: gentleMotion
+                            ) {
+                                engine.selectDirectTonedFinal(toned)
                             }
                         }
-                        .frame(maxHeight: 220)
                     }
                 }
             }
@@ -746,7 +890,8 @@ public struct KitchenGameView: View {
                                 medial: engine.pickedMedial,
                                 mode: engine.currentMode,
                                 isSelected: engine.pickedTone == bottle.id,
-                                isCorrectHint: showAnswerHint && word?.toneNumber == bottle.id
+                                isCorrectHint: showAnswerHint && word?.toneNumber == bottle.id,
+                                gentleMotion: gentleMotion
                             ) {
                                 engine.selectTone(bottle.id)
                             }
@@ -808,7 +953,7 @@ public struct KitchenGameView: View {
 
     private var headerSubtitle: String {
         if let sp = engine.specialMode {
-            return sp == .wrong ? "把以前错过的字全部攻克！" : "已解锁关卡混合出题 · 通关送蝴蝶"
+            return sp == .wrong ? "把以前错过的字全部攻克！" : "已解锁关卡混合出题 · 冲榜赢高定与星币"
         }
         return "\(engine.currentLevelDef.subtitle) · \(engine.currentFire.name)（\(engine.currentFire.desc)）"
     }
@@ -839,19 +984,30 @@ public struct KitchenGameView: View {
     private func installKeyboardMonitor() {
         #if os(macOS)
         guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak engine] event in
             // 保留系统快捷键（如 Cmd+Q / Cmd+W / Cmd+H）正常生效
             guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else {
                 return event
             }
+            // 有任何弹窗/护眼/家长锁/备份输入框激活，或焦点处于文本输入控件时，禁止劫持键盘！
+            guard !modalGuard.isBlocked else {
+                return event
+            }
+            if let responder = NSApp.keyWindow?.firstResponder, responder is NSTextView || responder is NSText {
+                return event
+            }
+            guard let engine = engine else { return event }
+
             if event.keyCode == 51 { // Backspace 退格键
                 Task { @MainActor in
+                    guard !self.isInputBlockedByModal else { return }
                     engine.handleKeyInput("backspace")
                 }
                 return nil
             }
             if let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
                 Task { @MainActor in
+                    guard !self.isInputBlockedByModal else { return }
                     engine.handleKeyInput(chars)
                 }
                 return nil

@@ -3,10 +3,17 @@ import SwiftUI
 import AppKit
 #endif
 
+#if os(macOS)
+private final class CurriculumKeyMonitorGuard: @unchecked Sendable {
+    var isBlocked: Bool = false
+}
+#endif
+
 public struct CurriculumGameView: View {
     @ObservedObject public var engine: GameEngine
     #if os(macOS)
     @State private var keyMonitor: Any? = nil
+    @State private var modalGuard = CurriculumKeyMonitorGuard()
     #endif
 
     public init(engine: GameEngine) {
@@ -17,19 +24,48 @@ public struct CurriculumGameView: View {
         Color(hex: engine.currentSubject.themeHex)
     }
 
+    private var gentleMotion: Bool {
+        engine.progress.eyeCare.gentleMotion
+    }
+
+    private var isInputBlockedByModal: Bool {
+        engine.screenState != .playing
+            || engine.showBackupModal
+            || engine.eyeRestActive
+            || engine.parentGate != nil
+            || engine.playLock != nil
+            || engine.showParentSettings
+            || engine.firePickerLevel != nil
+            || engine.activeGachaHatch != nil
+            || !engine.activeGachaBatch.isEmpty
+            || !engine.pendingFashionUpgrades.isEmpty
+            || engine.dailyWheelResult != nil
+    }
+
     public var body: some View {
-        VStack(spacing: 11) {
+        VStack(spacing: 10) {
             topGameBar
             hudStatusStrip
+
+            if engine.isFeverMode {
+                feverBannerBar
+            }
 
             GeometryReader { geo in
                 let isWide = geo.size.width >= 760
                 if isWide {
                     HStack(alignment: .top, spacing: 18) {
-                        leftStageColumn
-                            .frame(width: geo.size.width * 0.46)
-                        rightInteractiveColumn
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        ScrollView(showsIndicators: false) {
+                            leftStageColumn
+                                .padding(.bottom, 12)
+                        }
+                        .frame(width: geo.size.width * 0.46)
+
+                        ScrollView(showsIndicators: false) {
+                            rightInteractiveColumn
+                                .padding(.bottom, 12)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else {
                     ScrollView(showsIndicators: false) {
@@ -37,21 +73,75 @@ public struct CurriculumGameView: View {
                             leftStageColumn
                             rightInteractiveColumn
                         }
+                        .padding(.bottom, 12)
                     }
                 }
             }
         }
         .onAppear {
+            #if os(macOS)
+            modalGuard.isBlocked = isInputBlockedByModal
+            #endif
             installKeyboardMonitor()
+        }
+        .onCompatChange(of: isInputBlockedByModal) { blocked in
+            #if os(macOS)
+            modalGuard.isBlocked = blocked
+            #endif
         }
         .onDisappear {
             removeKeyboardMonitor()
         }
     }
 
+    private var feverBannerBar: some View {
+        HStack(spacing: 8) {
+            Text("🔥 5连击烈焰狂热模式！")
+                .font(.system(size: 13, weight: .black))
+                .foregroundColor(.white)
+            Text("答对爆发中 · 每题星币奖励 ×1.5 加成！")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color(hex: "#FFF4E3"))
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "#FF7043"), Color(hex: "#E52E71")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(hex: "#FFD54F").opacity(0.85), lineWidth: 1.5)
+        )
+        .shadow(color: Color(hex: "#FF7043").opacity(gentleMotion ? 0.14 : 0.28), radius: 6, y: 2)
+    }
+
     // MARK: - 顶部导航栏
     private var topGameBar: some View {
-        HStack(spacing: 12) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                backAndTitleCluster
+                Spacer(minLength: 8)
+                topActionButtonsCluster
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                backAndTitleCluster
+                ScrollView(.horizontal, showsIndicators: false) {
+                    topActionButtonsCluster
+                }
+            }
+        }
+    }
+
+    private var backAndTitleCluster: some View {
+        HStack(spacing: 10) {
             Button {
                 engine.audio.sfxTap()
                 engine.goHome()
@@ -77,6 +167,7 @@ public struct CurriculumGameView: View {
                     Text(stageTitle)
                         .font(.system(size: 17, weight: .heavy))
                         .foregroundColor(Color(hex: "#3B2E22"))
+                        .lineLimit(1)
                     Text(stageBadgeTag)
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundColor(.white)
@@ -89,9 +180,11 @@ public struct CurriculumGameView: View {
                     .foregroundColor(Color(hex: "#8A7765"))
                     .lineLimit(1)
             }
+        }
+    }
 
-            Spacer()
-
+    private var topActionButtonsCluster: some View {
+        HStack(spacing: 8) {
             // 算理 / 语法小锦囊按钮
             Button {
                 engine.toggleMathExplanationTip()
@@ -166,10 +259,11 @@ public struct CurriculumGameView: View {
         let current = min(total, engine.questionIndex + 1)
         let pct = Double(engine.questionIndex) / Double(total)
 
-        return HStack(spacing: 14) {
-            Text("📋 订单 \(current) / \(total)")
+        return HStack(spacing: 12) {
+            Text("📋 订单 \(current)/\(total)")
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundColor(Color(hex: "#5A3818"))
+                .fixedSize()
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -177,27 +271,54 @@ public struct CurriculumGameView: View {
                     Capsule()
                         .fill(LinearGradient(colors: [themeColor, Color(hex: "#FFB347")], startPoint: .leading, endPoint: .trailing))
                         .frame(width: geo.size.width * pct)
-                        .animation(.easeOut(duration: 0.25), value: pct)
+                        .animation(gentleMotion ? .easeOut(duration: 0.18) : .easeOut(duration: 0.25), value: pct)
                 }
             }
+            .frame(minWidth: 60)
             .frame(height: 10)
 
-            Text("✓ 答对 \(engine.rightCount)")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(Color(hex: "#2B7F4A"))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Text("✓ 答对 \(engine.rightCount)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color(hex: "#2B7F4A"))
 
-            if engine.comboCount >= 2 {
-                Text("🔥 连击 ×\(engine.comboCount)")
-                    .font(.system(size: 12.5, weight: .heavy))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(themeColor))
+                    if engine.comboCount >= 2 {
+                        Text(engine.isFeverMode ? "🔥 狂热 ×\(engine.comboCount)" : "🔥 连击 ×\(engine.comboCount)")
+                            .font(.system(size: 12.5, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(
+                                    LinearGradient(
+                                        colors: engine.isFeverMode ? [Color(hex: "#FF5722"), Color(hex: "#D81B60")] : [themeColor, Color(hex: "#FF8A00")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                            )
+                    }
+
+                    if engine.phoenixShieldsRemaining > 0 {
+                        Text("🛡️ 护盾×\(engine.phoenixShieldsRemaining)")
+                            .font(.system(size: 11.5, weight: .heavy))
+                            .foregroundColor(Color(hex: "#B45309"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "#FEF3C7"))
+                                    .overlay(Capsule().stroke(Color(hex: "#F59E0B").opacity(0.6), lineWidth: 1))
+                            )
+                    }
+
+                    Text("回锅余量 \(engine.retryLeft)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                }
             }
-
-            Text("回锅余量 \(engine.retryLeft)")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(Color(hex: "#8A7765"))
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -384,55 +505,65 @@ public struct CurriculumGameView: View {
             )
 
             // 3. 烘焙烤箱 / 鲜果料理机舞台
-            VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(engine.currentSubject == .math ? "🧁 团团烘焙师：" : "🧃 团团调饮师：")
-                        .font(.system(size: 12.5, weight: .heavy))
-                        .foregroundColor(themeColor)
-                    Text(engine.chefBubble)
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundColor(Color(hex: "#4A2E14"))
-                        .lineLimit(2)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.9)))
-
-                if engine.currentSubject == .math {
-                    MathOvenVectorView(
-                        shaking: engine.potShaking,
-                        nope: engine.potNope,
-                        steamActive: engine.steamActive,
-                        dishPopup: engine.dishPopup
-                    )
-                } else {
-                    EnglishBlenderVectorView(
-                        shaking: engine.potShaking,
-                        nope: engine.potNope,
-                        steamActive: engine.steamActive,
-                        dishPopup: engine.dishPopup
+            ZStack {
+                if engine.floatingCoinBurst > 0 {
+                    CustomConfettiBurstView(
+                        burstID: engine.floatingCoinBurst,
+                        isFever: engine.isFeverMode,
+                        gentleMotion: gentleMotion
                     )
                 }
 
-                if !engine.tipMessage.isEmpty {
-                    Text(engine.tipMessage)
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundColor(
-                            engine.tipStyle == "ok" ? Color(hex: "#2B7F4A") :
-                                (engine.tipStyle == "no" ? Color(hex: "#E25247") : Color(hex: "#B25614"))
+                VStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(engine.currentSubject == .math ? "🧁 团团烘焙师：" : "🧃 团团调饮师：")
+                            .font(.system(size: 12.5, weight: .heavy))
+                            .foregroundColor(themeColor)
+                        Text(engine.chefBubble)
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundColor(Color(hex: "#4A2E14"))
+                            .lineLimit(2)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.9)))
+
+                    if engine.currentSubject == .math {
+                        MathOvenVectorView(
+                            shaking: engine.potShaking,
+                            nope: engine.potNope,
+                            steamActive: engine.steamActive,
+                            dishPopup: engine.dishPopup
                         )
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(
-                                    engine.tipStyle == "ok" ? Color(hex: "#E6F7ED") :
-                                        (engine.tipStyle == "no" ? Color(hex: "#FDECEB") : Color(hex: "#FFF5E0"))
-                                )
+                    } else {
+                        EnglishBlenderVectorView(
+                            shaking: engine.potShaking,
+                            nope: engine.potNope,
+                            steamActive: engine.steamActive,
+                            dishPopup: engine.dishPopup
                         )
+                    }
+
+                    if !engine.tipMessage.isEmpty {
+                        Text(engine.tipMessage)
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundColor(
+                                engine.tipStyle == "ok" ? Color(hex: "#2B7F4A") :
+                                    (engine.tipStyle == "no" ? Color(hex: "#E25247") : Color(hex: "#B25614"))
+                            )
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        engine.tipStyle == "ok" ? Color(hex: "#E6F7ED") :
+                                            (engine.tipStyle == "no" ? Color(hex: "#FDECEB") : Color(hex: "#FFF5E0"))
+                                    )
+                            )
+                    }
                 }
             }
             .padding(12)
@@ -440,8 +571,26 @@ public struct CurriculumGameView: View {
             .background(
                 RoundedRectangle(cornerRadius: 22)
                     .fill(Color.white.opacity(0.85))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(themeColor.opacity(0.2), lineWidth: 1.5))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(
+                                engine.isFeverMode ? Color(hex: "#FF6B35").opacity(0.85) : themeColor.opacity(0.2),
+                                lineWidth: engine.isFeverMode ? 2.8 : 1.5
+                            )
+                    )
             )
+            .overlay(alignment: .topTrailing) {
+                if let coinText = engine.floatingCoinGainText, engine.floatingCoinBurst > 0 {
+                    CoinBurstPillView(
+                        text: coinText,
+                        isFever: engine.isFeverMode,
+                        gentleMotion: gentleMotion
+                    )
+                    .id(engine.floatingCoinBurst)
+                    .padding(.top, 8)
+                    .padding(.trailing, 10)
+                }
+            }
         }
     }
 
@@ -748,69 +897,76 @@ public struct CurriculumGameView: View {
                     let showHintRight = (engine.judgeState == "bad" && isRight)
                     let showWrongPick = (engine.judgeState == "bad" && isPicked && !isRight)
 
-                    Button {
-                        engine.selectCurriculumChoice(opt)
-                    } label: {
-                        HStack(spacing: 14) {
-                            ZStack {
-                                Circle()
-                                    .fill(themeColor.opacity(0.15))
-                                    .frame(width: 42, height: 42)
-                                Text("\(idx + 1)")
-                                    .font(.system(size: 18, weight: .black, design: .rounded))
-                                    .foregroundColor(themeColor)
-                            }
-
-                            Text(icons[idx % icons.count])
-                                .font(.system(size: 26))
-
-                            Text(opt)
-                                .font(.system(size: 21, weight: .heavy, design: .rounded))
-                                .foregroundColor(
-                                    showGood || showHintRight ? Color(hex: "#2B7F4A") :
-                                        (showWrongPick ? Color(hex: "#E25247") : Color(hex: "#3B2E22"))
-                                )
-                                .multilineTextAlignment(.leading)
-
-                            Spacer()
-
-                            // 独立发音试听小喇叭
-                            Button {
-                                let hasLatin = opt.range(of: "[A-Za-z]", options: .regularExpression) != nil
-                                if hasLatin {
-                                    engine.audio.speakEnglish(opt, slow: engine.progress.tts.slow)
-                                } else {
-                                    engine.audio.speakText(opt, slow: engine.progress.tts.slow)
+                    // 同级并列按钮设计，彻底消除 Button 嵌套吞事件问题
+                    HStack(spacing: 10) {
+                        Button {
+                            engine.selectCurriculumChoice(opt)
+                        } label: {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(themeColor.opacity(0.15))
+                                        .frame(width: 42, height: 42)
+                                    Text("\(idx + 1)")
+                                        .font(.system(size: 18, weight: .black, design: .rounded))
+                                        .foregroundColor(themeColor)
                                 }
-                            } label: {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(themeColor)
-                                    .padding(9)
-                                    .background(Circle().fill(Color.white))
+
+                                Text(icons[idx % icons.count])
+                                    .font(.system(size: 26))
+
+                                Text(opt)
+                                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                                    .foregroundColor(
+                                        showGood || showHintRight ? Color(hex: "#2B7F4A") :
+                                            (showWrongPick ? Color(hex: "#E25247") : Color(hex: "#3B2E22"))
+                                    )
+                                    .multilineTextAlignment(.leading)
+
+                                Spacer(minLength: 4)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.vertical, 16)
+                            .padding(.leading, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(
-                                    showGood || showHintRight ? Color(hex: "#E6F7ED") :
-                                        (showWrongPick ? Color(hex: "#FDECEB") : Color(hex: "#FCF9F5"))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .stroke(
-                                            showGood || showHintRight ? Color(hex: "#3EA865") :
-                                                (showWrongPick ? Color(hex: "#E25247") : themeColor.opacity(0.35)),
-                                            lineWidth: (showGood || showHintRight || showWrongPick) ? 2.6 : 1.8
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
-                        )
+                        .buttonStyle(.plain)
+
+                        // 独立同级发音试听小喇叭
+                        Button {
+                            let hasLatin = opt.range(of: "[A-Za-z]", options: .regularExpression) != nil
+                            if hasLatin {
+                                engine.audio.speakEnglish(opt, slow: engine.progress.tts.slow)
+                            } else {
+                                engine.audio.speakText(opt, slow: engine.progress.tts.slow)
+                            }
+                        } label: {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(themeColor)
+                                .padding(10)
+                                .background(Circle().fill(Color.white))
+                                .overlay(Circle().stroke(themeColor.opacity(0.22), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 14)
                     }
-                    .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(
+                                showGood || showHintRight ? Color(hex: "#E6F7ED") :
+                                    (showWrongPick ? Color(hex: "#FDECEB") : Color(hex: "#FCF9F5"))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(
+                                        showGood || showHintRight ? Color(hex: "#3EA865") :
+                                            (showWrongPick ? Color(hex: "#E25247") : themeColor.opacity(0.35)),
+                                        lineWidth: (showGood || showHintRight || showWrongPick) ? 2.6 : 1.8
+                                    )
+                            )
+                            .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
+                    )
                 }
             }
         }
@@ -896,26 +1052,39 @@ public struct CurriculumGameView: View {
     private func installKeyboardMonitor() {
         #if os(macOS)
         guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
-                if event.keyCode == 51 {
-                    Task { @MainActor in
-                        engine.handleKeyInput("backspace")
-                    }
-                    return nil
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak engine] event in
+            guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else {
+                return event
+            }
+            // 有任何弹窗/护眼/家长锁/备份输入框激活，或焦点处于文本输入控件时，禁止劫持键盘！
+            guard !modalGuard.isBlocked else {
+                return event
+            }
+            if let responder = NSApp.keyWindow?.firstResponder, responder is NSTextView || responder is NSText {
+                return event
+            }
+            guard let engine = engine else { return event }
+
+            if event.keyCode == 51 {
+                Task { @MainActor in
+                    guard !self.isInputBlockedByModal else { return }
+                    engine.handleKeyInput("backspace")
                 }
-                if event.keyCode == 36 || event.keyCode == 76 {
-                    Task { @MainActor in
-                        engine.handleKeyInput("return")
-                    }
-                    return nil
+                return nil
+            }
+            if event.keyCode == 36 || event.keyCode == 76 {
+                Task { @MainActor in
+                    guard !self.isInputBlockedByModal else { return }
+                    engine.handleKeyInput("return")
                 }
-                if let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
-                    Task { @MainActor in
-                        engine.handleKeyInput(chars)
-                    }
-                    return nil
+                return nil
+            }
+            if let chars = event.charactersIgnoringModifiers, !chars.isEmpty {
+                Task { @MainActor in
+                    guard !self.isInputBlockedByModal else { return }
+                    engine.handleKeyInput(chars)
                 }
+                return nil
             }
             return event
         }

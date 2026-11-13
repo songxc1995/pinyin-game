@@ -19,8 +19,8 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.songxc1995.pinyinkitchen",
             teamIdentifier: "",
-            displayVersion: "4.0",
-            bundleVersion: "400",
+            displayVersion: "5.0",
+            bundleVersion: "500",
             appIcon: .placeholder(icon: .bowl),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [

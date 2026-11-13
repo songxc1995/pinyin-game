@@ -2,12 +2,22 @@ import SwiftUI
 
 public struct MainContainerView: View {
     @StateObject private var engine = GameEngine()
+    @State private var showMilestoneDrawer: Bool = false
+    @State private var showDailyWheelModal: Bool = false
     private let eyeTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     public init() {}
 
     private var themeColor: Color {
         Color(hex: engine.currentSubject.themeHex)
+    }
+
+    private var gentleMotion: Bool {
+        engine.progress.eyeCare.gentleMotion
+    }
+
+    private var claimableGiftCount: Int {
+        engine.claimableStarMilestones.count + engine.claimableRankMilestones.count
     }
 
     public var body: some View {
@@ -53,39 +63,93 @@ public struct MainContainerView: View {
                 firePickerOverlay(levelNumber: levelNumberClamped(lvNum))
             }
 
+            // 星星之路（10~90★）& 厨神段位晋升大礼中心弹窗
+            if showMilestoneDrawer {
+                StarPathAndRankGiftOverlay(engine: engine, isPresented: $showMilestoneDrawer)
+            }
+
+            // 每日幸运大转盘弹窗
+            if showDailyWheelModal {
+                DailyLuckyWheelModal(engine: engine, isPresented: $showDailyWheelModal)
+            } else if let wheelWin = engine.dailyWheelResult {
+                dailyWheelResultFallbackOverlay(wheelWin)
+            }
+
             // 公主华服解锁 & 五阶高定升阶全屏庆典弹窗
             if let upgrade = engine.pendingFashionUpgrades.first {
                 FashionUpgradeBurstOverlay(engine: engine, event: upgrade)
             }
 
-            // 皇家扭蛋孵化 & 守护神兽进化全屏庆典弹窗
-            if let hatch = engine.activeGachaHatch {
+            // 皇家扭蛋孵化 & 守护神兽进化全屏庆典弹窗（支持十连批量 & 单抽）
+            if !engine.activeGachaBatch.isEmpty {
+                GachaponEggBurstOverlay(engine: engine, events: engine.activeGachaBatch)
+            } else if let hatch = engine.activeGachaHatch {
                 GachaponEggBurstOverlay(engine: engine, event: hatch)
             }
 
-            // 20-20-20 森林绿洲护眼休息弹窗
-            if engine.eyeRestActive {
-                EyeRestOverlayView(engine: engine)
-            }
-
-            // 每日时长上限 / 睡前打烊锁屏弹窗
-            if let lockReason = engine.playLock {
-                PlayLockOverlayView(engine: engine, reason: lockReason)
-            }
-
-            // 家长护眼设置中心面板
-            if engine.showParentSettings {
-                ParentEyeCareSettingsSheet(engine: engine)
-            }
-
-            // 跨设备存档备份与一键导出面板（顶部栏与记录页随时可唤起）
+            // 跨设备存档备份与一键导出面板
             if engine.showBackupModal {
                 BackupAndRestoreOverlayView(engine: engine)
             }
 
-            // 家长乘法口诀验证门
+            // 20-20-20 森林绿洲护眼休息弹窗（覆盖在普通奖励/备份弹窗之上）
+            if engine.eyeRestActive {
+                EyeRestOverlayView(engine: engine)
+            }
+
+            // 每日时长上限 / 睡前打烊锁屏弹窗（覆盖在普通奖励/备份弹窗之上）
+            if let lockReason = engine.playLock {
+                PlayLockOverlayView(engine: engine, reason: lockReason)
+            }
+
+            // 家长护眼设置中心面板（家长解锁后可调整限制/重置）
+            if engine.showParentSettings {
+                ParentEyeCareSettingsSheet(engine: engine)
+            }
+
+            // 家长乘法口诀验证门（保持在护眼/锁屏层之上以执行解锁）
             if let gatePurpose = engine.parentGate {
                 ParentGateOverlayView(engine: engine, purpose: gatePurpose)
+            }
+
+            // 顶部非阻塞里程碑祝贺飘浮横幅
+            if let toast = engine.milestoneToast {
+                VStack {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            engine.milestoneToast = nil
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(toast)
+                                .font(.system(size: 13.5, weight: .heavy))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.leading)
+                            Text("✕")
+                                .font(.system(size: 12, weight: .black))
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule().fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#FF7043"), Color(hex: "#E52E71")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        )
+                        .overlay(Capsule().stroke(Color.white.opacity(0.8), lineWidth: 1.5))
+                        .shadow(color: Color.black.opacity(0.22), radius: 10, y: 4)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 18)
+                    .padding(.horizontal, 20)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             // 全局防蓝光暖光护眼滤镜层（不拦截任何点击）
@@ -132,74 +196,34 @@ public struct MainContainerView: View {
     // MARK: - 主页内容
     private var homeContentView: some View {
         VStack(spacing: 10) {
-            // 1. 顶部招牌《满满的奇妙料理城》 + 4 大统计指标
-            HStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    Button {
-                        engine.audio.sfxTap()
-                        withAnimation(.spring(response: 0.28)) {
-                            engine.showSkinDrawer.toggle()
-                        }
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(LinearGradient(colors: [Color(hex: "#FFE8C2"), Color(hex: "#FFC97A")], startPoint: .top, endPoint: .bottom))
-                                .frame(width: 52, height: 52)
-                                .shadow(color: Color(hex: "#D9953B"), radius: 0, x: 0, y: 3)
-                            PotVectorView(skin: engine.currentPotSkin, size: 42)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 7) {
-                            Text("满满的奇妙料理城")
-                                .font(.system(size: 20, weight: .black))
-                                .foregroundColor(Color(hex: "#4A2E14"))
-                            Text("沪教一年级 · 语数英冒险屋")
-                                .font(.system(size: 11, weight: .heavy))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 2.5)
-                                .background(
-                                    Capsule().fill(
-                                        LinearGradient(colors: [themeColor, Color(hex: "#FF8A48")], startPoint: .leading, endPoint: .trailing)
-                                    )
-                                )
-                        }
-                        Text(engine.mascotLine)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color(hex: "#8A7765"))
-                            .lineLimit(1)
-                    }
+            // 1. 顶部招牌《满满的奇妙料理城》 + 自适应货币与奖励入口芯片条
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    homeBrandBadge
+                    Spacer(minLength: 4)
+                    headerCurrencyPills
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white)
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(themeColor.opacity(0.26), lineWidth: 1.8))
-                )
-
-                Spacer(minLength: 4)
-
-                // 5 大统计胶囊（星光币·扭蛋 & 公主华服衣橱快捷入口）
-                HStack(spacing: 8) {
-                    statPill(icon: "⭐", value: "\(engine.progress.totalStars)", label: "三科总星", color: Color(hex: "#F5A623"), tab: .map)
-                    statPill(icon: "🪙", value: "\(engine.progress.coins)", label: "星币·扭蛋", color: Color(hex: "#E63946"), tab: .paradise)
-                    statPill(icon: "👗", value: "\(engine.progress.unlockedFashionCount)/30", label: "公主变装", color: Color(hex: "#E05385"), tab: .garden)
-                    statPill(icon: "📖", value: "\(engine.progress.foodCount + engine.progress.dessertCount + engine.progress.englishCardCount)", label: "料理图鉴", color: Color(hex: "#3EA865"), tab: .recipe)
-                    statPill(icon: "📅", value: "\(engine.progress.streak.n)", label: "连续打卡", color: Color(hex: "#3685D6"), tab: .records)
+                VStack(alignment: .leading, spacing: 8) {
+                    homeBrandBadge
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        headerCurrencyPills
+                    }
                 }
             }
 
             // 2. 语数英三大主题场馆切换横幅 (🍲 拼音料理屋 | 🧁 数学烘焙坊 | 🧃 英语饮品吧)
             subjectVenueSwitcherBar
 
-            // 3. 厨神头衔条 + 今日小厨神目标（双栏并排）
-            HStack(spacing: 12) {
-                chefRankBar
-                dailyQuestsBar
+            // 3. 厨神头衔条 + 今日小厨神目标（窄屏自动堆叠不挤压）
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    chefRankBar
+                    dailyQuestsBar
+                }
+                VStack(spacing: 8) {
+                    chefRankBar
+                    dailyQuestsBar
+                }
             }
 
             // 可展开的魔法锅具换装抽屉
@@ -208,13 +232,12 @@ public struct MainContainerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // 4. 五大主 Tab 切换栏（核心奖励：🎰 精灵扭蛋屋 + 👗 满满公主变装秀）
-            HStack(spacing: 8) {
-                tabButton(tab: .map, title: "🍳 \(engine.currentSubject.shortTitle)闯关地图")
-                tabButton(tab: .paradise, title: "🎰 皇家神兽扭蛋屋")
-                tabButton(tab: .garden, title: "👗 满满公主变装秀")
-                tabButton(tab: .recipe, title: "📖 语数英料理图鉴")
-                tabButton(tab: .records, title: "🏆 错题本与成就")
+            // 4. 五大主 Tab 切换栏（闯关厨房 | 图鉴宝典 | 萌宠乐园 | 公主衣橱 | 成长档案）
+            ViewThatFits(in: .horizontal) {
+                mainFiveTabsRow
+                ScrollView(.horizontal, showsIndicators: false) {
+                    mainFiveTabsRow
+                }
             }
             .padding(5)
             .background(
@@ -242,22 +265,166 @@ public struct MainContainerView: View {
         }
     }
 
+    private var homeBrandBadge: some View {
+        HStack(spacing: 10) {
+            Button {
+                engine.audio.sfxTap()
+                withAnimation(.spring(response: 0.28)) {
+                    engine.showSkinDrawer.toggle()
+                }
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(LinearGradient(colors: [Color(hex: "#FFE8C2"), Color(hex: "#FFC97A")], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 48, height: 48)
+                        .shadow(color: Color(hex: "#D9953B"), radius: 0, x: 0, y: 3)
+                    PotVectorView(skin: engine.currentPotSkin, size: 38, gentleMotion: gentleMotion)
+                }
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 7) {
+                    Text("满满的奇妙料理城")
+                        .font(.system(size: 19, weight: .black))
+                        .foregroundColor(Color(hex: "#4A2E14"))
+                        .lineLimit(1)
+                    Text("沪教一年级 · 语数英")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2.5)
+                        .background(
+                            Capsule().fill(
+                                LinearGradient(colors: [themeColor, Color(hex: "#FF8A48")], startPoint: .leading, endPoint: .trailing)
+                            )
+                        )
+                        .fixedSize()
+                }
+                Text(engine.mascotLine)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "#8A7765"))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(themeColor.opacity(0.26), lineWidth: 1.8))
+        )
+    }
+
+    private var headerCurrencyPills: some View {
+        HStack(spacing: 7) {
+            statPill(icon: "🪙", value: "\(engine.progress.coins)", label: "星光币", color: Color(hex: "#E63946"), tab: .paradise)
+            statPill(icon: "🎟️", value: "\(engine.progress.gachaTickets)", label: "扭蛋券", color: Color(hex: "#D97706"), tab: .paradise)
+            statPill(icon: "🧵", value: "\(engine.progress.starThread)", label: "丝线", color: Color(hex: "#9B6EF3"), tab: .garden)
+            statPill(icon: "🌟", value: "\(engine.progress.petCandy)", label: "糖果", color: Color(hex: "#2FB380"), tab: .paradise)
+
+            // 星星之路 & 段位晋升领奖入口（带可领小红点）
+            Button {
+                engine.audio.sfxTap()
+                showMilestoneDrawer = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text("⭐")
+                        .font(.system(size: 17))
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text("\(engine.progress.totalStars)★")
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .foregroundColor(Color(hex: "#D97706"))
+                            if claimableGiftCount > 0 {
+                                Text("\(claimableGiftCount)礼")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color(hex: "#E52E71")))
+                            }
+                        }
+                        Text("星星之路")
+                            .font(.system(size: 10.5, weight: .bold))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(claimableGiftCount > 0 ? Color(hex: "#FFF4D9") : Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(claimableGiftCount > 0 ? Color(hex: "#F5A623") : Color(hex: "#F5A623").opacity(0.32), lineWidth: claimableGiftCount > 0 ? 2.0 : 1.5)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 每日幸运大转盘快捷入口
+            Button {
+                engine.audio.sfxTap()
+                showDailyWheelModal = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text("🎡")
+                        .font(.system(size: 17))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(engine.canSpinDailyWheel ? "免费转" : "已抽奖")
+                            .font(.system(size: 12.5, weight: .black))
+                            .foregroundColor(engine.canSpinDailyWheel ? Color(hex: "#E52E71") : Color(hex: "#2B7F4A"))
+                        Text("幸运转盘")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(engine.canSpinDailyWheel ? Color(hex: "#FFF0F5") : Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15)
+                                .stroke(engine.canSpinDailyWheel ? Color(hex: "#E05385") : Color.black.opacity(0.1), lineWidth: 1.5)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var mainFiveTabsRow: some View {
+        HStack(spacing: 8) {
+            tabButton(tab: .map, title: "🍳 闯关厨房")
+            tabButton(tab: .recipe, title: "📖 图鉴宝典")
+            tabButton(tab: .paradise, title: "🦄 萌宠乐园")
+            tabButton(tab: .garden, title: "👗 公主衣橱")
+            tabButton(tab: .records, title: "🏆 成长档案")
+        }
+    }
+
     // MARK: - 语数英三大场馆切换卡片条
     private var subjectVenueSwitcherBar: some View {
-        HStack(spacing: 10) {
+        let pinyinCount = LevelRepository.allUniqueCharacters.count
+        let mathCount = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix("hjm_") }.count
+        let englishCount = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix("hje_") }.count
+
+        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 8) {
             venueButton(
                 subject: .pinyin,
-                badge: "9关 · 443字",
+                badge: "\(LevelRepository.levels.count)关 · \(pinyinCount)字",
                 desc: "声母+无调韵母+四声调料瓶"
             )
             venueButton(
                 subject: .math,
-                badge: "10关 · 468题",
+                badge: "\(HujiaoCurriculumRepository.mathStages.count)关 · \(mathCount)题",
                 desc: "沪教一上/一下 · 5大互动教具"
             )
             venueButton(
                 subject: .english,
-                badge: "11关 · 223题",
+                badge: "\(HujiaoCurriculumRepository.englishStages.count)关 · \(englishCount)题",
                 desc: "沪教牛津上海版 · 听说与鲜果拼句"
             )
         }
@@ -348,12 +515,13 @@ public struct MainContainerView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 厨神等级、伴读守护神兽与换锅按钮
+    // MARK: - 厨神等级、伴读守护神兽与换锅/段位大礼按钮
     private var chefRankBar: some View {
         let info = engine.chefRank
         let stars = engine.progress.totalStars
         let pet = engine.equippedPet
         let petStage = engine.equippedPetStage
+        let rankGiftCount = engine.claimableRankMilestones.count
 
         return HStack(spacing: 10) {
             Button {
@@ -361,7 +529,7 @@ public struct MainContainerView: View {
                 engine.activeTab = .garden
                 engine.audio.speakText("满满小公主的魔法衣橱！", slow: false)
             } label: {
-                PrincessAvatarVectorView(progress: engine.progress, size: 44, animated: true)
+                PrincessAvatarVectorView(progress: engine.progress, size: 44, animated: true, gentleMotion: gentleMotion)
             }
             .buttonStyle(.plain)
 
@@ -370,33 +538,52 @@ public struct MainContainerView: View {
                 engine.activeTab = .paradise
                 engine.audio.speakText("\(pet.name)陪你闯关！", slow: false)
             } label: {
-                GuardianPetVectorView(species: pet, stage: petStage, size: 42, animated: true)
+                GuardianPetVectorView(species: pet, stage: petStage, size: 42, animated: true, gentleMotion: gentleMotion)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(info.name)
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundColor(Color(hex: "#4A2E14"))
+                    Button {
+                        engine.audio.sfxTap()
+                        showMilestoneDrawer = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(info.name)
+                                .font(.system(size: 13.5, weight: .heavy))
+                                .foregroundColor(Color(hex: "#4A2E14"))
+                            if rankGiftCount > 0 {
+                                Text("🎁\(rankGiftCount)")
+                                    .font(.system(size: 10.5, weight: .black))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color(hex: "#E52E71")))
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+
                     Text("🦄 \(pet.name)")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A4B12"))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(Color.white.opacity(0.85)))
+                        .lineLimit(1)
                 }
                 if let nextName = info.nextRankName, let nextMin = info.nextMinStars {
-                    Text("再拿 \(max(0, nextMin - stars)) 颗星升级 → \(nextName)")
+                    Text("再拿 \(max(0, nextMin - stars))★ 升级 → \(nextName)")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color(hex: "#8A7765"))
+                        .lineLimit(1)
                 } else {
                     Text("已达最高料理城主厨等级 ✨")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color(hex: "#F07D2E"))
                 }
             }
-            Spacer()
+            Spacer(minLength: 4)
             Button {
                 engine.audio.sfxTap()
                 withAnimation(.spring(response: 0.28)) {
@@ -406,16 +593,17 @@ public struct MainContainerView: View {
                 Text("🍲 换锅具")
                     .font(.system(size: 12.5, weight: .heavy))
                     .foregroundColor(Color(hex: "#8A4B12"))
-                    .padding(.horizontal, 11)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 7)
                     .background(RoundedRectangle(cornerRadius: 11).fill(Color.white))
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color(hex: "#F07D2E").opacity(0.35), lineWidth: 1.5))
             }
             .buttonStyle(.plain)
+            .fixedSize()
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .frame(maxWidth: 440)
+        .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(LinearGradient(colors: [Color(hex: "#FFF6E5"), Color(hex: "#FFE8C5")], startPoint: .leading, endPoint: .trailing))
@@ -423,46 +611,59 @@ public struct MainContainerView: View {
         )
     }
 
-    // MARK: - 今日小厨神目标栏
+    // MARK: - 今日小厨神目标栏（含 3/3 全清大礼状态 & 转盘快捷入口）
     private var dailyQuestsBar: some View {
-        HStack(spacing: 8) {
-            Text("📅 今日目标")
-                .font(.system(size: 12.5, weight: .heavy))
-                .foregroundColor(Color(hex: "#5A3818"))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Text("📅 今日目标")
+                    .font(.system(size: 12.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#5A3818"))
 
-            ForEach(engine.dailyQuests) { q in
-                Button {
-                    guard q.isCompleted && !q.claimed else { return }
-                    engine.claimDailyQuest(q.id)
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(q.title)
-                            .font(.system(size: 11.5, weight: .bold))
-                            .foregroundColor(Color(hex: "#3B2E22"))
-                            .lineLimit(1)
-                        Text(q.claimed ? "✓已领华服" : (q.isCompleted ? "🎁点我领礼服" : "\(q.current)/\(q.goal)"))
-                            .font(.system(size: 11, weight: .heavy))
-                            .foregroundColor(q.claimed ? Color(hex: "#2B7F4A") : (q.isCompleted ? .white : Color(hex: "#8A7765")))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule().fill(
-                                    q.claimed ? Color(hex: "#E6F7ED") : (q.isCompleted ? Color(hex: "#F07D2E") : Color(hex: "#F5EFE6"))
+                ForEach(engine.dailyQuests) { q in
+                    Button {
+                        guard q.isCompleted && !q.claimed else { return }
+                        engine.claimDailyQuest(q.id)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(q.title)
+                                .font(.system(size: 11.5, weight: .bold))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                                .lineLimit(1)
+                            Text(q.claimed ? "✓已领" : (q.isCompleted ? "🎁领礼服" : "\(q.current)/\(q.goal)"))
+                                .font(.system(size: 11, weight: .heavy))
+                                .foregroundColor(q.claimed ? Color(hex: "#2B7F4A") : (q.isCompleted ? .white : Color(hex: "#8A7765")))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule().fill(
+                                        q.claimed ? Color(hex: "#E6F7ED") : (q.isCompleted ? Color(hex: "#F07D2E") : Color(hex: "#F5EFE6"))
+                                    )
                                 )
-                            )
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 11)
+                                .fill(Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 11)
+                                        .stroke(q.isCompleted && !q.claimed ? Color(hex: "#F07D2E") : Color.black.opacity(0.08), lineWidth: 1.5)
+                                )
+                        )
                     }
+                    .buttonStyle(.plain)
+                }
+
+                // 3/3 每日全清大礼盒进度提示
+                Text(engine.isDailyFullClearClaimed ? "🎊 3/3全清大礼已发放" : "🎁 3/3全清额外送大礼")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundColor(engine.isDailyFullClearClaimed ? Color(hex: "#2B7F4A") : Color(hex: "#9A3412"))
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 11)
-                            .fill(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 11)
-                                    .stroke(q.isCompleted && !q.claimed ? Color(hex: "#F07D2E") : Color.black.opacity(0.08), lineWidth: 1.5)
-                            )
+                            .fill(engine.isDailyFullClearClaimed ? Color(hex: "#E6F7ED") : Color(hex: "#FFF4D9"))
                     )
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 12)
@@ -480,43 +681,45 @@ public struct MainContainerView: View {
         let stars = engine.progress.totalStars
         let curId = engine.currentPotSkin.id
 
-        return HStack(spacing: 12) {
-            ForEach(PotSkin.all) { skin in
-                let unlocked = stars >= skin.needStars
-                let isCurrent = (curId == skin.id)
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(PotSkin.all) { skin in
+                    let unlocked = stars >= skin.needStars
+                    let isCurrent = (curId == skin.id)
 
-                Button {
-                    guard unlocked else { return }
-                    engine.progress.potSkin = skin.id
-                    engine.saveProgress()
-                    engine.audio.sfxWin()
-                } label: {
-                    VStack(spacing: 4) {
-                        PotVectorView(skin: skin, size: 54)
-                        Text(skin.name)
-                            .font(.system(size: 12.5, weight: .heavy))
-                            .foregroundColor(Color(hex: "#3B2E22"))
-                        Text(unlocked ? (isCurrent ? "✓ 使用中" : "点我换上") : "需 \(skin.needStars) ★")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(unlocked ? (isCurrent ? Color(hex: "#2B7F4A") : Color(hex: "#F07D2E")) : .gray)
+                    Button {
+                        guard unlocked else { return }
+                        engine.progress.potSkin = skin.id
+                        engine.saveProgress()
+                        engine.audio.sfxWin()
+                    } label: {
+                        VStack(spacing: 4) {
+                            PotVectorView(skin: skin, size: 54, gentleMotion: gentleMotion)
+                            Text(skin.name)
+                                .font(.system(size: 12.5, weight: .heavy))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                            Text(unlocked ? (isCurrent ? "✓ 使用中" : "点我换上") : "需 \(skin.needStars) ★")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(unlocked ? (isCurrent ? Color(hex: "#2B7F4A") : Color(hex: "#F07D2E")) : .gray)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(minWidth: 115)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(isCurrent ? Color(hex: "#FFF3DC") : Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(isCurrent ? Color(hex: "#F07D2E") : Color.black.opacity(0.1), lineWidth: isCurrent ? 2.2 : 1.2)
+                                )
+                        )
+                        .opacity(unlocked ? 1.0 : 0.5)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(isCurrent ? Color(hex: "#FFF3DC") : Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(isCurrent ? Color(hex: "#F07D2E") : Color.black.opacity(0.1), lineWidth: isCurrent ? 2.2 : 1.2)
-                            )
-                    )
-                    .opacity(unlocked ? 1.0 : 0.5)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(10)
         }
-        .padding(10)
         .background(RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.95)))
     }
 
@@ -527,10 +730,12 @@ public struct MainContainerView: View {
             engine.activeTab = tab
         } label: {
             Text(title)
-                .font(.system(size: 14, weight: .heavy))
+                .font(.system(size: 13.5, weight: .heavy))
                 .foregroundColor(on ? .white : Color(hex: "#5A4634"))
-                .frame(maxWidth: .infinity)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(on ? themeColor : Color.clear)
@@ -567,118 +772,377 @@ public struct MainContainerView: View {
                     engine.firePickerLevel = nil
                 }
 
-            VStack(spacing: 14) {
-                Text(stageInfo.title)
-                    .font(.system(size: 20, weight: .black))
-                    .foregroundColor(Color(hex: "#4A2E14"))
-                    .multilineTextAlignment(.center)
-                Text(stageInfo.sub)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 14) {
+                    Text(stageInfo.title)
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundColor(Color(hex: "#4A2E14"))
+                        .multilineTextAlignment(.center)
+                    Text(stageInfo.sub)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                        .multilineTextAlignment(.center)
+
+                    Text(stageInfo.wrongCount > 0 ? "🎯 这一关还有 \(stageInfo.wrongCount) 道以前错过的题，这次把它们全部拿下！" : "✨ 这一关熟门熟路啦，可以挑战「大火」拿双倍公主华服礼盒！")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#B25614"))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color(hex: "#FFF3DC")))
+
+                    // 拼音专属快捷开关
+                    if engine.currentSubject == .pinyin {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 10)], spacing: 10) {
+                            Button {
+                                engine.audio.sfxTap()
+                                engine.progress.seasoningMode.toggle()
+                                engine.saveProgress()
+                            } label: {
+                                HStack {
+                                    Text("🧂 四声调料瓶减负")
+                                        .font(.system(size: 12.5, weight: .bold))
+                                    Spacer()
+                                    Text(engine.progress.seasoningMode ? "已开启" : "关")
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(engine.progress.seasoningMode ? Color(hex: "#2B7F4A") : .gray)
+                                }
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FAF6F0")))
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                engine.audio.sfxTap()
+                                engine.progress.blind.toggle()
+                                engine.saveProgress()
+                            } label: {
+                                HStack {
+                                    Text("🛎️ 神秘锅盖盲听")
+                                        .font(.system(size: 12.5, weight: .bold))
+                                    Spacer()
+                                    Text(engine.progress.blind ? "已开启" : "关")
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(engine.progress.blind ? Color(hex: "#7A6EE6") : .gray)
+                                }
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FAF6F0")))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    // 小火 / 中火 / 大火选项
+                    VStack(spacing: 9) {
+                        ForEach(FireDifficulty.allCases, id: \.self) { fire in
+                            Button {
+                                engine.audio.sfxTap()
+                                engine.startSubjectStage(stageId: levelNumber, fire: fire)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text(fire == .high ? "🔥🔥" : "🔥")
+                                        .font(.system(size: 22))
+                                        .frame(width: 36)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("\(fire.name) · \(fire.desc)")
+                                            .font(.system(size: 15, weight: .heavy))
+                                            .foregroundColor(Color(hex: "#3B2E22"))
+                                        Text(fire.tip)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(fire == .high ? Color(hex: "#E25247") : Color(hex: "#8A7765"))
+                                    }
+                                    Spacer()
+                                    Text("开始 →")
+                                        .font(.system(size: 13.5, weight: .black))
+                                        .foregroundColor(themeColor)
+                                }
+                                .padding(13)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(fire == .high ? Color(hex: "#FFF4F2") : Color.white)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(fire == .high ? Color(hex: "#E25247").opacity(0.45) : Color.black.opacity(0.12), lineWidth: 1.8)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Button("先不玩") {
+                        engine.audio.sfxTap()
+                        engine.firePickerLevel = nil
+                    }
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Color(hex: "#8A7765"))
-                    .multilineTextAlignment(.center)
-
-                Text(stageInfo.wrongCount > 0 ? "🎯 这一关还有 \(stageInfo.wrongCount) 道以前错过的题，这次把它们全部拿下！" : "✨ 这一关熟门熟路啦，可以挑战「大火」拿双倍公主华服礼盒！")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundColor(Color(hex: "#B25614"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color(hex: "#FFF3DC")))
-
-                // 拼音专属快捷开关
-                if engine.currentSubject == .pinyin {
-                    HStack(spacing: 10) {
-                        Button {
-                            engine.audio.sfxTap()
-                            engine.progress.seasoningMode.toggle()
-                            engine.saveProgress()
-                        } label: {
-                            HStack {
-                                Text("🧂 四声调料瓶减负")
-                                    .font(.system(size: 12.5, weight: .bold))
-                                Spacer()
-                                Text(engine.progress.seasoningMode ? "已开启" : "关")
-                                    .font(.system(size: 12, weight: .heavy))
-                                    .foregroundColor(engine.progress.seasoningMode ? Color(hex: "#2B7F4A") : .gray)
-                            }
-                            .padding(10)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FAF6F0")))
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            engine.audio.sfxTap()
-                            engine.progress.blind.toggle()
-                            engine.saveProgress()
-                        } label: {
-                            HStack {
-                                Text("🛎️ 神秘锅盖盲听")
-                                    .font(.system(size: 12.5, weight: .bold))
-                                Spacer()
-                                Text(engine.progress.blind ? "已开启" : "关")
-                                    .font(.system(size: 12, weight: .heavy))
-                                    .foregroundColor(engine.progress.blind ? Color(hex: "#7A6EE6") : .gray)
-                            }
-                            .padding(10)
-                            .frame(width: 170)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#FAF6F0")))
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .padding(.top, 4)
                 }
-
-                // 小火 / 中火 / 大火选项
-                VStack(spacing: 9) {
-                    ForEach(FireDifficulty.allCases, id: \.self) { fire in
-                        Button {
-                            engine.audio.sfxTap()
-                            engine.startSubjectStage(stageId: levelNumber, fire: fire)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Text(fire == .high ? "🔥🔥" : "🔥")
-                                    .font(.system(size: 22))
-                                    .frame(width: 36)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(fire.name) · \(fire.desc)")
-                                        .font(.system(size: 15, weight: .heavy))
-                                        .foregroundColor(Color(hex: "#3B2E22"))
-                                    Text(fire.tip)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(fire == .high ? Color(hex: "#E25247") : Color(hex: "#8A7765"))
-                                }
-                                Spacer()
-                                Text("开始 →")
-                                    .font(.system(size: 13.5, weight: .black))
-                                    .foregroundColor(themeColor)
-                            }
-                            .padding(13)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(fire == .high ? Color(hex: "#FFF4F2") : Color.white)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(fire == .high ? Color(hex: "#E25247").opacity(0.45) : Color.black.opacity(0.12), lineWidth: 1.8)
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Button("先不玩") {
-                    engine.audio.sfxTap()
-                    engine.firePickerLevel = nil
-                }
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(Color(hex: "#8A7765"))
-                .padding(.top, 4)
+                .padding(24)
             }
-            .padding(24)
             .frame(maxWidth: 490)
+            .fixedSize(horizontal: false, vertical: true)
             .background(
                 RoundedRectangle(cornerRadius: 26)
                     .fill(Color.white)
                     .shadow(color: Color.black.opacity(0.22), radius: 20, y: 10)
             )
+            .padding(20)
         }
+    }
+
+    private func dailyWheelResultFallbackOverlay(_ slice: DailyWheelSlice) -> some View {
+        ZStack {
+            Color.black.opacity(0.38)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    engine.dailyWheelResult = nil
+                }
+
+            VStack(spacing: 12) {
+                Text(slice.emoji)
+                    .font(.system(size: 48))
+                Text("🎡 幸运大转盘中奖啦！")
+                    .font(.system(size: 20, weight: .black))
+                    .foregroundColor(Color(hex: "#4A2E14"))
+                Text(slice.title)
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundColor(Color(hex: "#E52E71"))
+                Button("开心收下 ✓") {
+                    engine.audio.sfxTap()
+                    engine.dailyWheelResult = nil
+                }
+                .font(.system(size: 14, weight: .black))
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(Color(hex: "#2FB380")))
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+            .frame(maxWidth: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color(hex: "#FFFDF9"))
+                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color(hex: "#F5A623"), lineWidth: 2))
+                    .shadow(color: Color.black.opacity(0.25), radius: 18, y: 8)
+            )
+            .padding(20)
+        }
+    }
+}
+
+// MARK: - 🌟 星星之路（10~90★）& 👑 厨神段位晋升大礼中心弹窗
+public struct StarPathAndRankGiftOverlay: View {
+    @ObservedObject public var engine: GameEngine
+    @Binding public var isPresented: Bool
+    @State private var sectionTab: Int = 0 // 0 星星之路, 1 段位大礼
+
+    public init(engine: GameEngine, isPresented: Binding<Bool>) {
+        self.engine = engine
+        self._isPresented = isPresented
+    }
+
+    public var body: some View {
+        let totalStars = engine.progress.totalStars
+
+        return ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    isPresented = false
+                }
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("🌟 星星之路 & 厨神段位晋升大礼")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundColor(Color(hex: "#4A2E14"))
+                        Text("当前三科累计 \(totalStars) ★ · 段位：\(engine.chefRank.name)")
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundColor(Color(hex: "#D97706"))
+                    }
+                    Spacer()
+                    Button {
+                        engine.audio.sfxTap()
+                        isPresented = false
+                    } label: {
+                        Text("完成 ✕")
+                            .font(.system(size: 13.5, weight: .heavy))
+                            .foregroundColor(Color(hex: "#5A4634"))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(Color(hex: "#F5EFE6")))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // 切换标签
+                HStack(spacing: 8) {
+                    milestoneTabButton(
+                        index: 0,
+                        title: "⭐ 星星之路 (10~90★)",
+                        badge: engine.claimableStarMilestones.count
+                    )
+                    milestoneTabButton(
+                        index: 1,
+                        title: "👑 厨神段位晋升礼",
+                        badge: engine.claimableRankMilestones.count
+                    )
+                }
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        if sectionTab == 0 {
+                            ForEach(StarMilestone.all) { item in
+                                let claimed = engine.isStarMilestoneClaimed(item.needStars)
+                                let unlocked = totalStars >= item.needStars
+                                milestoneRow(
+                                    badgeText: "\(item.needStars) ★",
+                                    title: item.title,
+                                    rewardDesc: item.rewardDesc,
+                                    claimed: claimed,
+                                    unlocked: unlocked,
+                                    remainText: "还差 \(max(0, item.needStars - totalStars)) ★",
+                                    accent: Color(hex: "#F5A623")
+                                ) {
+                                    engine.claimStarMilestone(item.needStars)
+                                }
+                            }
+                        } else {
+                            ForEach(ChefRankMilestone.all.filter { $0.level > 0 }) { rank in
+                                let claimed = engine.progress.claimedRankMilestones.contains(rank.level)
+                                let unlocked = totalStars >= rank.minStars
+                                milestoneRow(
+                                    badgeText: "Lv.\(rank.level) · \(rank.minStars)★",
+                                    title: rank.name,
+                                    rewardDesc: rank.rewardDesc,
+                                    claimed: claimed,
+                                    unlocked: unlocked,
+                                    remainText: "还差 \(max(0, rank.minStars - totalStars)) ★",
+                                    accent: Color(hex: "#E05385")
+                                ) {
+                                    engine.claimRankPromotionGift(rank.level)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 600)
+            .background(
+                RoundedRectangle(cornerRadius: 26)
+                    .fill(Color(hex: "#FFFDF9"))
+                    .overlay(RoundedRectangle(cornerRadius: 26).stroke(Color(hex: "#F5A623").opacity(0.45), lineWidth: 2))
+                    .shadow(color: Color.black.opacity(0.28), radius: 22, y: 10)
+            )
+            .padding(20)
+        }
+        .onAppear {
+            if engine.claimableStarMilestones.isEmpty && !engine.claimableRankMilestones.isEmpty {
+                sectionTab = 1
+            }
+        }
+    }
+
+    private func milestoneTabButton(index: Int, title: String, badge: Int) -> some View {
+        let on = (sectionTab == index)
+        return Button {
+            engine.audio.sfxTap()
+            sectionTab = index
+        } label: {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 13.5, weight: .heavy))
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color(hex: "#E52E71")))
+                }
+            }
+            .foregroundColor(on ? .white : Color(hex: "#5A4634"))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(on ? Color(hex: "#F07D2E") : Color(hex: "#F5EFE6"))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func milestoneRow(
+        badgeText: String,
+        title: String,
+        rewardDesc: String,
+        claimed: Bool,
+        unlocked: Bool,
+        remainText: String,
+        accent: Color,
+        onClaim: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(badgeText)
+                .font(.system(size: 12.5, weight: .black, design: .rounded))
+                .foregroundColor(unlocked ? .white : Color(hex: "#8A7765"))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(unlocked ? accent : Color(hex: "#EFE7D8")))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#3B2E22"))
+                Text("大礼内容：\(rewardDesc)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Color(hex: "#8A4B12"))
+            }
+
+            Spacer(minLength: 6)
+
+            if claimed {
+                Text("✓ 已领取")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundColor(Color(hex: "#2B7F4A"))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color(hex: "#E6F7ED")))
+            } else if unlocked {
+                Button(action: onClaim) {
+                    Text("🎁 立即领奖")
+                        .font(.system(size: 12.5, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule().fill(
+                                LinearGradient(colors: [accent, Color(hex: "#E52E71")], startPoint: .leading, endPoint: .trailing)
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(remainText)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Color(hex: "#8A7765"))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color(hex: "#F5EFE6")))
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(claimed ? Color(hex: "#F7FBF8") : (unlocked ? Color(hex: "#FFF8EB") : Color.white))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(unlocked && !claimed ? accent : Color.black.opacity(0.08), lineWidth: unlocked && !claimed ? 2.0 : 1.2)
+                )
+        )
     }
 }

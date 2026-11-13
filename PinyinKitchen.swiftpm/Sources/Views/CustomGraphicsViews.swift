@@ -9,8 +9,10 @@ public struct PotVectorView: View {
     public let steamOn: Bool
     public let fire: FireDifficulty
     public var size: CGFloat = 170
+    public let gentleMotion: Bool
 
     @State private var flamePhase: Bool = false
+    @State private var steamLiftPhase: Bool = false
 
     public init(
         skin: PotSkin,
@@ -19,7 +21,8 @@ public struct PotVectorView: View {
         isHot: Bool = false,
         steamOn: Bool = false,
         fire: FireDifficulty = .mid,
-        size: CGFloat = 170
+        size: CGFloat = 170,
+        gentleMotion: Bool = false
     ) {
         self.skin = skin
         self.isShaking = isShaking
@@ -28,26 +31,60 @@ public struct PotVectorView: View {
         self.steamOn = steamOn
         self.fire = fire
         self.size = size
+        self.gentleMotion = gentleMotion
     }
 
     public var body: some View {
         ZStack(alignment: .bottom) {
+            if isHot {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(hex: "#FFB347").opacity(gentleMotion ? 0.25 : 0.42),
+                                Color(hex: "#FF6B6B").opacity(0.14),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: size * 0.65
+                        )
+                    )
+                    .frame(width: size * 1.25, height: size * 1.05)
+                    .offset(y: -size * 0.08)
+            }
+
             // 顶部蒸汽与糊锅小黑烟
             if steamOn {
                 HStack(spacing: 14) {
                     ForEach(0..<4, id: \.self) { i in
                         Capsule()
-                            .fill(Color.white.opacity(0.85))
-                            .frame(width: 8, height: 28)
-                            .shadow(color: Color(hex: "#F07D2E").opacity(0.4), radius: 4)
-                            .offset(y: isShaking ? -36 : -22)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.92), Color(hex: "#FFF4E3").opacity(0.45)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(width: 9, height: i.isMultiple(of: 2) ? 30 : 24)
+                            .shadow(color: Color(hex: "#F07D2E").opacity(0.32), radius: 4)
+                            .offset(y: gentleMotion ? (isShaking ? -28 : -22) : (steamLiftPhase ? -38 : -20))
+                            .opacity(gentleMotion ? 0.85 : (steamLiftPhase ? 0.95 : 0.55))
                             .animation(
-                                .easeInOut(duration: 0.7).repeatForever(autoreverses: true).delay(Double(i) * 0.15),
-                                value: steamOn
+                                gentleMotion
+                                    ? .easeInOut(duration: 0.35)
+                                    : .easeInOut(duration: 0.85).repeatForever(autoreverses: true).delay(Double(i) * 0.14),
+                                value: gentleMotion ? isShaking : steamLiftPhase
                             )
                     }
                 }
                 .offset(y: -size * 0.62)
+                .onAppear {
+                    if !gentleMotion { steamLiftPhase = true }
+                }
+                .onCompatChange(of: gentleMotion) { isGentle in
+                    steamLiftPhase = !isGentle
+                }
             }
 
             if isNope {
@@ -108,10 +145,14 @@ public struct PotVectorView: View {
                 )
                 context.stroke(highlight, with: .color(.white.opacity(0.32)), style: StrokeStyle(lineWidth: 4.2 * sx, lineCap: .round))
 
-                // 锅沿
+                // 锅沿光泽（立体感双层描边）
                 let rimRect = RoundedRectangle(cornerRadius: 5.5 * sx)
                     .path(in: CGRect(x: 14 * sx, y: 29 * sy, width: 122 * sx, height: 11 * sy))
                 context.fill(rimRect, with: .color(rimColor))
+                var rimGloss = Path()
+                rimGloss.move(to: CGPoint(x: 20 * sx, y: 31.5 * sy))
+                rimGloss.addLine(to: CGPoint(x: 130 * sx, y: 31.5 * sy))
+                context.stroke(rimGloss, with: .color(.white.opacity(0.36)), style: StrokeStyle(lineWidth: 2.0 * sx, lineCap: .round))
 
                 // 锅盖（摇晃时向上弹起）
                 let lidLift: CGFloat = isShaking ? -8.0 * sy : 0.0
@@ -124,8 +165,18 @@ public struct PotVectorView: View {
                 lidPath.closeSubpath()
                 context.fill(lidPath, with: .color(lidColor))
 
+                var lidHighlight = Path()
+                lidHighlight.move(to: CGPoint(x: 38 * sx, y: 22 * sy + lidLift))
+                lidHighlight.addQuadCurve(
+                    to: CGPoint(x: 68 * sx, y: 15 * sy + lidLift),
+                    control: CGPoint(x: 50 * sx, y: 15.5 * sy + lidLift)
+                )
+                context.stroke(lidHighlight, with: .color(.white.opacity(0.42)), style: StrokeStyle(lineWidth: 2.8 * sx, lineCap: .round))
+
                 let knobCircle = Circle().path(in: CGRect(x: 67.5 * sx, y: 4 * sy + lidLift, width: 15 * sx, height: 15 * sy))
                 context.fill(knobCircle, with: .color(knobColor))
+                let knobSpec = Circle().path(in: CGRect(x: 70.5 * sx, y: 6.2 * sy + lidLift, width: 4.5 * sx, height: 4.5 * sy))
+                context.fill(knobSpec, with: .color(.white.opacity(0.55)))
 
                 var lidLine = Path()
                 lidLine.move(to: CGPoint(x: 18 * sx, y: 26 * sy + lidLift))
@@ -162,200 +213,50 @@ public struct PotVectorView: View {
                 context.stroke(mouth, with: .color(ink), style: StrokeStyle(lineWidth: 3.2 * sx, lineCap: .round))
             }
             .frame(width: size, height: size * 0.75)
-            .rotationEffect(.degrees(isShaking ? -4 : (isNope ? 4 : 0)))
-            .scaleEffect(isHot ? 1.06 : 1.0)
+            .rotationEffect(.degrees(gentleMotion ? 0 : (isShaking ? -4 : (isNope ? 4 : 0))))
+            .scaleEffect(isHot ? (gentleMotion ? 1.03 : 1.06) : 1.0)
             .shadow(color: isHot ? Color(hex: "#FFA028").opacity(0.55) : Color.black.opacity(0.12), radius: isHot ? 14 : 6, y: 4)
-            .animation(.spring(response: 0.28, dampingFraction: 0.45), value: isShaking)
-            .animation(.spring(response: 0.22, dampingFraction: 0.40), value: isNope)
+            .animation(gentleMotion ? .easeOut(duration: 0.25) : .spring(response: 0.28, dampingFraction: 0.45), value: isShaking)
+            .animation(gentleMotion ? .easeOut(duration: 0.25) : .spring(response: 0.22, dampingFraction: 0.40), value: isNope)
 
-            // 底部灶火苗动画
-            HStack(spacing: 6) {
-                ForEach(0..<5, id: \.self) { i in
-                    let hScale: CGFloat = (i == 2) ? 1.25 : ((i == 1 || i == 3) ? 1.1 : 0.9)
-                    let fireScale: CGFloat = fire == .high ? 1.22 : (fire == .low ? 0.80 : 1.0)
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color(hex: "#FFF176"), Color(hex: "#FF9800"), Color(hex: "#F44336")],
-                                startPoint: .bottom,
-                                endPoint: .top
+            // 底部灶火苗动画（支持柔和护眼动效模式）
+            ZStack {
+                Ellipse()
+                    .fill(Color(hex: "#FF9800").opacity(gentleMotion ? 0.16 : 0.26))
+                    .frame(width: size * 0.56, height: 10)
+                    .offset(y: 7)
+
+                HStack(spacing: 6) {
+                    ForEach(0..<5, id: \.self) { i in
+                        let hScale: CGFloat = (i == 2) ? 1.25 : ((i == 1 || i == 3) ? 1.1 : 0.9)
+                        let fireScale: CGFloat = fire == .high ? 1.22 : (fire == .low ? 0.80 : 1.0)
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: "#FFF59D"), Color(hex: "#FF9800"), Color(hex: "#E64A19")],
+                                    startPoint: .bottom,
+                                    endPoint: .top
+                                )
                             )
-                        )
-                        .frame(width: 13 * fireScale, height: 18 * hScale * fireScale)
-                        .scaleEffect(y: flamePhase ? 1.14 : 0.88, anchor: .bottom)
-                        .rotationEffect(.degrees(flamePhase ? Double(i % 2 == 0 ? 5 : -5) : Double(i % 2 == 0 ? -4 : 4)))
-                        .animation(
-                            .easeInOut(duration: 0.42).repeatForever(autoreverses: true).delay(Double(i) * 0.07),
-                            value: flamePhase
-                        )
+                            .frame(width: 13 * fireScale, height: 18 * hScale * fireScale)
+                            .scaleEffect(y: gentleMotion ? 1.0 : (flamePhase ? 1.14 : 0.88), anchor: .bottom)
+                            .rotationEffect(.degrees(gentleMotion ? 0 : (flamePhase ? Double(i % 2 == 0 ? 5 : -5) : Double(i % 2 == 0 ? -4 : 4))))
+                            .animation(
+                                gentleMotion
+                                    ? .easeOut(duration: 0.2)
+                                    : .easeInOut(duration: 0.48).repeatForever(autoreverses: true).delay(Double(i) * 0.07),
+                                value: flamePhase
+                            )
+                    }
                 }
             }
             .offset(y: 6)
         }
         .onAppear {
-            flamePhase = true
+            if !gentleMotion { flamePhase = true }
         }
-    }
-}
-
-// MARK: - 蝴蝶矢量视图（支持 20 种配色 + 3 阶进化光环与金边）
-public struct ButterflyVectorView: View {
-    public let species: ButterflySpecies
-    public let stage: Int // 1 初见, 2 闪耀, 3 华丽
-    public var size: CGFloat = 56
-    public var animated: Bool = true
-
-    @State private var flapping: Bool = false
-
-    public init(species: ButterflySpecies, stage: Int = 1, size: CGFloat = 56, animated: Bool = true) {
-        self.species = species
-        self.stage = max(1, stage)
-        self.size = size
-        self.animated = animated
-    }
-
-    public var body: some View {
-        ZStack {
-            // 2阶/3阶进化背后的柔光光环
-            if stage >= 2 {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(hex: species.secondaryHex).opacity(stage >= 3 ? 0.72 : 0.48),
-                                Color(hex: species.primaryHex).opacity(stage >= 3 ? 0.35 : 0.15),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 2,
-                            endRadius: size * 0.55
-                        )
-                    )
-                    .frame(width: size * 1.1, height: size * 1.1)
-            }
-
-            // 稀有蝶虚线光圈
-            if species.rarity == 3 {
-                Circle()
-                    .stroke(
-                        Color(hex: species.id == "h" ? "#7F77DD" : "#FAC775").opacity(0.75),
-                        style: StrokeStyle(lineWidth: 1.6, dash: [6, 5])
-                    )
-                    .frame(width: size * 0.92, height: size * 0.92)
-            }
-
-            // 蝴蝶双翅与身体
-            Canvas { context, canvasSize in
-                let w = canvasSize.width
-                let h = canvasSize.height
-                let sx = w / 100.0
-                let sy = h / 92.0
-
-                let c1 = Color(hex: species.primaryHex)
-                let c2 = Color(hex: species.secondaryHex)
-                let grad = Gradient(colors: [c1, c2])
-
-                func drawHalfWing(mirror: Bool) {
-                    var ctx = context
-                    if mirror {
-                        ctx.transform = CGAffineTransform(translationX: w, y: 0).scaledBy(x: -1, y: 1)
-                    }
-
-                    // 上翅
-                    var upper = Path()
-                    upper.move(to: CGPoint(x: 50 * sx, y: 45 * sy))
-                    upper.addCurve(
-                        to: CGPoint(x: 15 * sx, y: 9 * sy),
-                        control1: CGPoint(x: 45 * sx, y: 20 * sy),
-                        control2: CGPoint(x: 31 * sx, y: 5 * sy)
-                    )
-                    upper.addCurve(
-                        to: CGPoint(x: 17 * sx, y: 37 * sy),
-                        control1: CGPoint(x: 5 * sx, y: 12 * sy),
-                        control2: CGPoint(x: 5 * sx, y: 26 * sy)
-                    )
-                    upper.addCurve(
-                        to: CGPoint(x: 50 * sx, y: 45 * sy),
-                        control1: CGPoint(x: 26 * sx, y: 45 * sy),
-                        control2: CGPoint(x: 40 * sx, y: 48 * sy)
-                    )
-                    upper.closeSubpath()
-
-                    // 下翅
-                    var lower = Path()
-                    lower.move(to: CGPoint(x: 50 * sx, y: 51 * sy))
-                    lower.addCurve(
-                        to: CGPoint(x: 29 * sx, y: 76 * sy),
-                        control1: CGPoint(x: 41 * sx, y: 58 * sy),
-                        control2: CGPoint(x: 29 * sx, y: 64 * sy)
-                    )
-                    lower.addCurve(
-                        to: CGPoint(x: 47 * sx, y: 78 * sy),
-                        control1: CGPoint(x: 29 * sx, y: 86 * sy),
-                        control2: CGPoint(x: 40 * sx, y: 88 * sy)
-                    )
-                    lower.addCurve(
-                        to: CGPoint(x: 50 * sx, y: 51 * sy),
-                        control1: CGPoint(x: 51 * sx, y: 72 * sy),
-                        control2: CGPoint(x: 51 * sx, y: 60 * sy)
-                    )
-                    lower.closeSubpath()
-
-                    ctx.fill(upper, with: .linearGradient(grad, startPoint: CGPoint(x: 10 * sx, y: 10 * sy), endPoint: CGPoint(x: 50 * sx, y: 50 * sy)))
-                    ctx.fill(lower, with: .linearGradient(grad, startPoint: CGPoint(x: 25 * sx, y: 50 * sy), endPoint: CGPoint(x: 50 * sx, y: 85 * sy)))
-
-                    if stage >= 2 {
-                        let goldColor = Color(hex: stage >= 3 ? "#F5C542" : "#F0C95C")
-                        let strokeW = (stage >= 3 ? 2.4 : 1.3) * sx
-                        ctx.stroke(upper, with: .color(goldColor), lineWidth: strokeW)
-                        ctx.stroke(lower, with: .color(goldColor), lineWidth: strokeW)
-                    }
-
-                    // 翅斑点缀
-                    let spot1 = Circle().path(in: CGRect(x: 16 * sx, y: 20 * sy, width: 12 * sx, height: 12 * sy))
-                    ctx.fill(spot1, with: .color(c1.opacity(0.85)))
-                    let spot1Inner = Circle().path(in: CGRect(x: 18.6 * sx, y: 22.6 * sy, width: 6.8 * sx, height: 6.8 * sy))
-                    ctx.fill(spot1Inner, with: .color(.white.opacity(0.82)))
-
-                    let spot2 = Circle().path(in: CGRect(x: 33.4 * sx, y: 70.4 * sy, width: 7.2 * sx, height: 7.2 * sy))
-                    ctx.fill(spot2, with: .color(.white.opacity(0.75)))
-                }
-
-                drawHalfWing(mirror: false)
-                drawHalfWing(mirror: true)
-
-                // 身体与触角
-                let bodyColor = Color(hex: "#4A3F33")
-                let bodyOval = Ellipse().path(in: CGRect(x: 46.2 * sx, y: 39 * sy, width: 7.6 * sx, height: 34 * sy))
-                context.fill(bodyOval, with: .color(bodyColor))
-                let headCircle = Circle().path(in: CGRect(x: 45.6 * sx, y: 33.6 * sy, width: 8.8 * sx, height: 8.8 * sy))
-                context.fill(headCircle, with: .color(bodyColor))
-
-                var antL = Path()
-                antL.move(to: CGPoint(x: 48 * sx, y: 35 * sy))
-                antL.addQuadCurve(to: CGPoint(x: 32 * sx, y: 21 * sy), control: CGPoint(x: 41 * sx, y: 25 * sy))
-                var antR = Path()
-                antR.move(to: CGPoint(x: 52 * sx, y: 35 * sy))
-                antR.addQuadCurve(to: CGPoint(x: 68 * sx, y: 21 * sy), control: CGPoint(x: 59 * sx, y: 25 * sy))
-                context.stroke(antL, with: .color(bodyColor), style: StrokeStyle(lineWidth: 1.8 * sx, lineCap: .round))
-                context.stroke(antR, with: .color(bodyColor), style: StrokeStyle(lineWidth: 1.8 * sx, lineCap: .round))
-            }
-            .frame(width: size, height: size * 0.92)
-            .scaleEffect(x: (animated && flapping) ? 0.86 : 1.0, y: 1.0)
-            .animation(
-                animated ? .easeInOut(duration: 0.55).repeatForever(autoreverses: true) : .default,
-                value: flapping
-            )
-
-            // 3阶完全进化星光点缀
-            if stage >= 3 {
-                Text("✨")
-                    .font(.system(size: size * 0.26))
-                    .offset(x: size * 0.34, y: -size * 0.32)
-            }
-        }
-        .onAppear {
-            if animated { flapping = true }
+        .onCompatChange(of: gentleMotion) { isGentle in
+            flamePhase = !isGentle
         }
     }
 }
@@ -367,7 +268,26 @@ public struct PinyinIngredientCardView: View {
     public let isSelected: Bool
     public let isCorrectHint: Bool
     public let isDimmed: Bool
+    public let gentleMotion: Bool
     public let action: () -> Void
+
+    public init(
+        kind: String,
+        text: String,
+        isSelected: Bool,
+        isCorrectHint: Bool,
+        isDimmed: Bool,
+        gentleMotion: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.kind = kind
+        self.text = text
+        self.isSelected = isSelected
+        self.isCorrectHint = isCorrectHint
+        self.isDimmed = isDimmed
+        self.gentleMotion = gentleMotion
+        self.action = action
+    }
 
     public var body: some View {
         let theme = cardTheme
@@ -379,8 +299,21 @@ public struct PinyinIngredientCardView: View {
                 .padding(.vertical, 10)
                 .frame(minWidth: 62, minHeight: 50)
                 .background(
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(isCorrectHint ? Color(hex: "#E6F7ED") : theme.bg)
+                    ZStack(alignment: .top) {
+                        RoundedRectangle(cornerRadius: 15)
+                            .fill(isCorrectHint ? Color(hex: "#E6F7ED") : theme.bg)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.65), Color.white.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(height: 16)
+                            .padding(.horizontal, 3)
+                            .padding(.top, 2)
+                    }
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 15)
@@ -390,8 +323,9 @@ public struct PinyinIngredientCardView: View {
                         )
                 )
                 .shadow(color: theme.lip.opacity(0.28), radius: 0, x: 0, y: isSelected ? 1.5 : 3.5)
-                .scaleEffect(isSelected ? 1.05 : 1.0)
+                .scaleEffect(isSelected ? (gentleMotion ? 1.02 : 1.06) : 1.0)
                 .opacity(isDimmed ? 0.28 : 1.0)
+                .animation(gentleMotion ? .easeOut(duration: 0.16) : .spring(response: 0.24, dampingFraction: 0.65), value: isSelected)
         }
         .buttonStyle(.plain)
         .onDrag {
@@ -438,7 +372,30 @@ public struct ToneBottleCardView: View {
     public let mode: LevelMode
     public let isSelected: Bool
     public let isCorrectHint: Bool
+    public let gentleMotion: Bool
     public let action: () -> Void
+
+    public init(
+        bottle: ToneSeasoningBottle,
+        baseFinal: String?,
+        initial: String?,
+        medial: String?,
+        mode: LevelMode,
+        isSelected: Bool,
+        isCorrectHint: Bool,
+        gentleMotion: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.bottle = bottle
+        self.baseFinal = baseFinal
+        self.initial = initial
+        self.medial = medial
+        self.mode = mode
+        self.isSelected = isSelected
+        self.isCorrectHint = isCorrectHint
+        self.gentleMotion = gentleMotion
+        self.action = action
+    }
 
     public var previewSyllable: String {
         guard let base = baseFinal else {
@@ -503,12 +460,25 @@ public struct ToneBottleCardView: View {
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        isCorrectHint
-                        ? Color(hex: "#E6F7ED")
-                        : (isSelected ? accent.opacity(0.16) : (active ? Color.white : Color(hex: "#FAF6F0")))
-                    )
+                ZStack(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            isCorrectHint
+                            ? Color(hex: "#E6F7ED")
+                            : (isSelected ? accent.opacity(0.16) : (active ? Color.white : Color(hex: "#FAF6F0")))
+                        )
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.75), Color.white.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(height: 15)
+                        .padding(.horizontal, 4)
+                        .padding(.top, 2)
+                }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -520,11 +490,140 @@ public struct ToneBottleCardView: View {
                     )
             )
             .shadow(color: active ? accent.opacity(0.18) : .clear, radius: 4, x: 0, y: 3)
-            .scaleEffect(isSelected ? 1.04 : 1.0)
+            .scaleEffect(isSelected ? (gentleMotion ? 1.02 : 1.04) : 1.0)
+            .animation(gentleMotion ? .easeOut(duration: 0.16) : .spring(response: 0.24, dampingFraction: 0.65), value: isSelected)
         }
         .buttonStyle(.plain)
         .onDrag {
             NSItemProvider(object: "t:\(bottle.id)" as NSString)
+        }
+    }
+}
+
+// MARK: - 🪙 悬浮星币爆发飘字组件（护眼温和动效兼容）
+public struct CoinBurstPillView: View {
+    public let text: String
+    public let isFever: Bool
+    public let gentleMotion: Bool
+
+    @State private var appeared: Bool = false
+
+    public init(text: String, isFever: Bool = false, gentleMotion: Bool = false) {
+        self.text = text
+        self.isFever = isFever
+        self.gentleMotion = gentleMotion
+    }
+
+    public var body: some View {
+        HStack(spacing: 5) {
+            Text(isFever ? "🔥" : "🪙")
+                .font(.system(size: 16))
+            Text(text)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(
+            Capsule().fill(
+                LinearGradient(
+                    colors: isFever
+                        ? [Color(hex: "#FF7043"), Color(hex: "#D84315")]
+                        : [Color(hex: "#F5B82E"), Color(hex: "#E68A00")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+        )
+        .overlay(
+            Capsule().stroke(Color.white.opacity(0.85), lineWidth: 1.8)
+        )
+        .shadow(color: Color(hex: isFever ? "#FF7043" : "#F5B82E").opacity(0.42), radius: 8, y: 3)
+        .offset(y: appeared ? (gentleMotion ? -6 : -18) : 6)
+        .scaleEffect(appeared ? 1.0 : (gentleMotion ? 0.96 : 0.78))
+        .opacity(appeared ? 1.0 : 0.0)
+        .onAppear {
+            withAnimation(gentleMotion ? .easeOut(duration: 0.28) : .spring(response: 0.34, dampingFraction: 0.58)) {
+                appeared = true
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - ✨ 护眼温和礼花撒花脉冲组件（不与烟花重名）
+public struct CustomConfettiBurstView: View {
+    public let burstID: Int
+    public let isFever: Bool
+    public let gentleMotion: Bool
+
+    @State private var progress: CGFloat = 0
+
+    public init(burstID: Int, isFever: Bool = false, gentleMotion: Bool = false) {
+        self.burstID = burstID
+        self.isFever = isFever
+        self.gentleMotion = gentleMotion
+    }
+
+    private static let particleColors: [String] = [
+        "#FFD54F", "#FF8A65", "#F06292", "#81C784", "#4FC3F7", "#BA68C8"
+    ]
+
+    public var body: some View {
+        ZStack {
+            ForEach(0..<12, id: \.self) { idx in
+                let angle = Double(idx) * (.pi * 2.0 / 12.0) + (idx.isMultiple(of: 2) ? 0.12 : -0.12)
+                let maxRadius: CGFloat = gentleMotion ? (isFever ? 46 : 36) : (isFever ? 78 : 62)
+                let dist = maxRadius * progress
+                let x = cos(angle) * dist
+                let y = sin(angle) * dist
+                let colorHex = Self.particleColors[idx % Self.particleColors.count]
+
+                Group {
+                    if idx % 3 == 0 {
+                        Image(systemName: "sparkle")
+                            .font(.system(size: isFever ? 13 : 11, weight: .bold))
+                            .foregroundColor(Color(hex: colorHex))
+                    } else if idx % 3 == 1 {
+                        Circle()
+                            .fill(Color(hex: colorHex))
+                            .frame(width: 7, height: 7)
+                    } else {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color(hex: colorHex))
+                            .frame(width: 8, height: 5)
+                            .rotationEffect(.degrees(Double(idx) * 35 + Double(progress) * (gentleMotion ? 20 : 110)))
+                    }
+                }
+                .offset(x: x, y: y)
+                .scaleEffect(max(0.25, 1.08 - progress * 0.45))
+                .opacity(progress <= 0.02 ? 0 : Double(max(0, 1.0 - max(0, progress - 0.35) / 0.65)))
+            }
+        }
+        .onAppear { triggerBurst() }
+        .onCompatChange(of: burstID) { _ in triggerBurst() }
+        .allowsHitTesting(false)
+    }
+
+    private func triggerBurst() {
+        guard burstID > 0 else { return }
+        progress = 0.01
+        withAnimation(gentleMotion ? .easeOut(duration: 0.65) : .easeOut(duration: 0.85)) {
+            progress = 1.0
+        }
+    }
+}
+
+public extension View {
+    /// 跨 iOS 16/17+ 与 macOS 13/14+ 的零警告值变更监听
+    @ViewBuilder
+    func onCompatChange<V: Equatable>(of value: V, perform action: @escaping (V) -> Void) -> some View {
+        if #available(iOS 17.0, macOS 14.0, *) {
+            self.onChange(of: value) { _, newValue in
+                action(newValue)
+            }
+        } else {
+            self.onChange(of: value, perform: action)
         }
     }
 }

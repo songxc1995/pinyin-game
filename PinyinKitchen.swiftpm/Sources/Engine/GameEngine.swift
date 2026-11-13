@@ -25,15 +25,6 @@ public enum SpecialModeType: String, Sendable {
     case allstar = "allstar"
 }
 
-public struct ButterflyUpgradeEvent: Identifiable, Sendable {
-    public let id = UUID()
-    public let species: ButterflySpecies
-    public let fromStage: Int
-    public let toStage: Int
-    public let count: Int
-    public let customTitle: String?
-}
-
 public struct DailyQuestItem: Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -94,13 +85,22 @@ public final class GameEngine: ObservableObject {
     @Published public var rainbowCharge: Int = 0
     @Published public var roundCoinsEarned: Int = 0
     @Published public var floatingCoinGainText: String? = nil
+    @Published public var floatingCoinBurst: Int = 0
+    @Published public var isFeverMode: Bool = false
     @Published public var rainbowChestBurstMessage: String? = nil
     @Published public var mysteryChests: [MysteryChestItem] = []
     @Published public var openedChestIndex: Int? = nil
     @Published public var isSpinningGacha: Bool = false
     @Published public var activeGachaHatch: GachaHatchEvent? = nil
+    @Published public var activeGachaBatch: [GachaHatchEvent] = []
     @Published public var petFeedToast: String? = nil
     @Published public var petHeartBurst: Bool = false
+    @Published public var petTalentActive: Bool = false
+    @Published public var phoenixShieldsRemaining: Int = 0
+    @Published public var dailyWheelResult: DailyWheelSlice? = nil
+    @Published public var canSpinDailyWheel: Bool = false
+    @Published public var milestoneToast: String? = nil
+    @Published public var preparedBackupFileURL: URL? = nil
 
     // MARK: - 语文拼音题目交互槽位状态
     @Published public var pickedInitial: String? = nil
@@ -134,6 +134,8 @@ public final class GameEngine: ObservableObject {
 
     /// 每开一局 / 返回主页自增，防止上一局遗留的延时任务篡改新一局的进度
     private var roundGeneration: Int = 0
+    /// 每次重置存档时自增，防止重置前开启的扭蛋等异步任务覆盖状态
+    private var stateResetGeneration: Int = 0
 
     @Published public var isLocked: Bool = false
     @Published public var isBlindRevealed: Bool = false
@@ -178,7 +180,13 @@ public final class GameEngine: ObservableObject {
     public init() {
         self.progress = Self.loadProgress(key: "pinyin_kitchen_swiftui_v2")
         self.progress.ensureDaily()
+        refreshDailyDerivedState()
         saveProgress()
+    }
+
+    /// 同步派生状态（如每日转盘可用状态等）
+    public func refreshDailyDerivedState() {
+        canSpinDailyWheel = !progress.isDailyWheelSpunToday
     }
 
     // MARK: - 存档持久化与导入导出（iPad / Mac 多重本地自动保存 + 一键备份导出）
@@ -199,12 +207,17 @@ public final class GameEngine: ObservableObject {
         return dir.appendingPathComponent("PinyinKitchen_progress_v2.json")
     }
 
+    private static func backupTempFileURL() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("满满的奇妙料理城_存档备份.json")
+    }
+
     private static func loadProgress(key: String) -> GameProgress {
         let decoder = JSONDecoder()
         var merged = GameProgress()
         var foundAny = false
 
         // 依次读取 ApplicationSupport、Documents、UserDefaults 并合并，确保 iPad / Mac 任意路径存档都不丢失
+        // merge(from:) 对 wrong 等字典采用 max 策略而非相加，绝不会把多端存档倍增放大
         if let url = saveFileURL(),
            let data = try? Data(contentsOf: url),
            let loaded = try? decoder.decode(GameProgress.self, from: data) {
@@ -256,14 +269,25 @@ public final class GameEngine: ObservableObject {
         return str
     }
 
-    /// 生成可供 iPad「文件(Files)」/ AirDrop / 微信 分享导出的 .json 备份文件 URL
-    public func exportBackupFileURL() -> URL? {
+    /// 显式按需生成 .json 备份文件供 ShareLink / AirDrop 导出（不要在 SwiftUI body 内调用）
+    @discardableResult
+    public func prepareBackupFile() -> URL? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(progress) else { return nil }
-        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("满满的奇妙料理城_存档备份.json")
-        try? data.write(to: fileURL, options: .atomic)
-        return fileURL
+        let fileURL = Self.backupTempFileURL()
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            preparedBackupFileURL = fileURL
+            return fileURL
+        } catch {
+            return nil
+        }
+    }
+
+    /// 兼容旧调用名称：按需生成可供 iPad「文件(Files)」/ AirDrop / 微信 分享导出的 .json 备份文件 URL
+    public func exportBackupFileURL() -> URL? {
+        prepareBackupFile()
     }
 
     /// 一键复制存档 JSON 到 iPad / Mac 剪贴板
@@ -309,6 +333,8 @@ public final class GameEngine: ObservableObject {
         do {
             let incoming = try decoder.decode(GameProgress.self, from: data)
             let count = progress.merge(from: incoming)
+            progress.ensureDaily()
+            refreshDailyDerivedState()
             saveProgress()
             audio.sfxWin()
             return count > 0 ? "✅ 成功合并恢复 \(count) 项学习记录、星币与奖励！" : "ℹ️ 这份存档里的进度已全部包含在当前记录中"
@@ -318,15 +344,172 @@ public final class GameEngine: ObservableObject {
         }
     }
 
+    private func wipeAllSavedFiles() {
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        if let url = Self.saveFileURL() {
+            try? FileManager.default.removeItem(at: url)
+        }
+        if let docURL = Self.documentsSaveFileURL() {
+            try? FileManager.default.removeItem(at: docURL)
+        }
+        try? FileManager.default.removeItem(at: Self.backupTempFileURL())
+    }
+
+    private func resetPublishedTransientState(keepScreenHome: Bool) {
+        if keepScreenHome {
+            screenState = .home
+            questionQueue = []
+            curriculumQueue = []
+            questionIndex = 0
+            rightCount = 0
+            comboCount = 0
+            retryLeft = 2
+            retriedCurrent = false
+            masteredCount = 0
+            showBackupModal = false
+            showMathExplanation = false
+            praisePopup = nil
+            dishPopup = nil
+            jqxRuleBanner = nil
+            potShaking = false
+            potNope = false
+            steamActive = false
+            activeBlendingSlot = nil
+            pickedInitial = nil
+            pickedMedial = nil
+            pickedBaseFinal = nil
+            pickedTone = nil
+            pickedTonedFinal = nil
+            numericInput = ""
+            numericSmartOptions = []
+            sentencePickedIndices = []
+            sentenceDisplayOrder = []
+            displayOptions = []
+            pickedChoiceOption = nil
+            roundCoinsEarned = 0
+            rainbowCharge = 0
+            roundStars = 0
+            newFoodsInRound = []
+            newDessertsInRound = []
+            newFlashcardsInRound = []
+        }
+        rewardedFashionInRound = []
+        floatingCoinGainText = nil
+        floatingCoinBurst = 0
+        isFeverMode = false
+        rainbowChestBurstMessage = nil
+        mysteryChests = []
+        openedChestIndex = nil
+        isSpinningGacha = false
+        activeGachaHatch = nil
+        activeGachaBatch = []
+        pendingFashionUpgrades = []
+        petFeedToast = nil
+        petHeartBurst = false
+        petTalentActive = false
+        phoenixShieldsRemaining = 0
+        dailyWheelResult = nil
+        milestoneToast = nil
+        preparedBackupFileURL = nil
+        isLocked = false
+        refreshDailyDerivedState()
+    }
+
+    /// 彻底重置全部存档（保留护眼设置与今日已用眼时长），清除三端存储与临时导出文件
     public func resetAllProgress() {
+        stateResetGeneration += 1
+        roundGeneration += 1
+        audio.stopAllSpeech()
+
         // 护眼设置与今日游戏时长属于家长管控，清空学习记录时保留
         let keepEye = progress.eyeCare
         let keepPlay = progress.playSeconds
         let keepBonus = progress.bonusMinutes
-        progress = GameProgress()
-        progress.eyeCare = keepEye
-        progress.playSeconds = keepPlay
-        progress.bonusMinutes = keepBonus
+
+        wipeAllSavedFiles()
+
+        var fresh = GameProgress()
+        fresh.eyeCare = keepEye
+        fresh.playSeconds = keepPlay
+        fresh.bonusMinutes = keepBonus
+        fresh.ensureDaily()
+        progress = fresh
+
+        resetPublishedTransientState(keepScreenHome: true)
+        importExportMessage = "✅ 已彻底清空所有学习与奖励存档！"
+        saveProgress()
+        audio.sfxTap()
+    }
+
+    /// 仅重置奖励与经济（保留全部语/数/英星星、关卡解锁、图鉴、错题本、历史记录、连续打卡、护眼与朗读偏好）
+    public func resetRewardsOnlyKeepLearning() {
+        stateResetGeneration += 1
+        audio.stopAllSpeech()
+
+        var clean = GameProgress()
+        // 保留学习记录与偏好
+        clean.unlocked = progress.unlocked
+        clean.stars = progress.stars
+        clean.food = progress.food
+        clean.mathUnlocked = progress.mathUnlocked
+        clean.mathStars = progress.mathStars
+        clean.desserts = progress.desserts
+        clean.englishUnlocked = progress.englishUnlocked
+        clean.englishStars = progress.englishStars
+        clean.englishCards = progress.englishCards
+        clean.freeUnlockAll = progress.freeUnlockAll
+        clean.wrong = progress.wrong
+        clean.wrongMastered = progress.wrongMastered
+        clean.history = progress.history
+        clean.streak = progress.streak
+        clean.bestCombo = progress.bestCombo
+        clean.cleared = progress.cleared
+        clean.tts = progress.tts
+        clean.blind = progress.blind
+        clean.seasoningMode = progress.seasoningMode
+        clean.eyeCare = progress.eyeCare
+        clean.playSeconds = progress.playSeconds
+        clean.bonusMinutes = progress.bonusMinutes
+        clean.daily = DailyProgress(
+            d: GameProgress.todayString(),
+            rounds: progress.daily.rounds,
+            maxCombo: progress.daily.maxCombo,
+            words: progress.daily.words,
+            claimed: [:]
+        )
+
+        // 清零全部经济/衣橱/神兽/游乐园/里程碑奖励
+        clean.coins = 0
+        clean.gachaTickets = 0
+        clean.starThread = 0
+        clean.petCandy = 0
+        clean.potSkin = "classic"
+        clean.wardrobe = GameProgress.defaultWardrobe
+        clean.equippedOutfit = GameProgress.defaultEquippedOutfit
+        clean.pets = GameProgress.defaultPets
+        clean.petFeedExp = [:]
+        clean.equippedPetId = "fire_dragon"
+        clean.castleUnlocked = ["fountain": 1]
+        clean.gachaPityMythic = 0
+        clean.gachaRepeatMissCount = 0
+        clean.princessHairColorId = "caramel"
+        clean.princessExpressionId = "smile"
+        clean.princessPoseId = "curtsy"
+        clean.claimedRankMilestones = []
+        clean.claimedStarMilestones = []
+        clean.claimedCollectionMilestones = [:]
+        clean.dailyBallThemeClaimedDate = ""
+        clean.dailyWheelSpunDate = ""
+        clean.dailyPetPatDate = GameProgress.todayString()
+        clean.dailyPetPatCount = 0
+        clean.dailyDessertFeedDate = ""
+        clean.migratedLegacyButterflies = true
+        clean.ensureDaily()
+
+        try? FileManager.default.removeItem(at: Self.backupTempFileURL())
+        progress = clean
+        resetPublishedTransientState(keepScreenHome: false)
+        importExportMessage = "✅ 已重置星币、华服、神兽与里程碑奖励，完整保留所有学习成果与错题记录！"
         saveProgress()
         audio.sfxTap()
     }
@@ -399,25 +582,56 @@ public final class GameEngine: ObservableObject {
         ]
     }
 
+    public var isDailyFullClearClaimed: Bool {
+        (progress.daily.claimed["q_full_bonus"] ?? 0) > 0
+    }
+
     public func claimDailyQuest(_ questId: String) {
         progress.ensureDaily()
-        guard (progress.daily.claimed[questId] ?? 0) == 0 else { return }
+        guard let quest = dailyQuests.first(where: { $0.id == questId }),
+              quest.isCompleted,
+              !quest.claimed else {
+            return
+        }
         progress.daily.claimed[questId] = 1
         progress.coins += 35
         if questId == "q_words" {
             progress.gachaTickets += 1
         }
+        let allThreeDone = ["q_round", "q_combo", "q_words"].allSatisfy { (progress.daily.claimed[$0] ?? 0) > 0 }
+        var grantedFullClear = false
+        if allThreeDone && (progress.daily.claimed["q_full_bonus"] ?? 0) == 0 {
+            progress.daily.claimed["q_full_bonus"] = 1
+            progress.gachaTickets += 1
+            progress.starThread += 1
+            progress.coins += 50
+            grantedFullClear = true
+        }
+
         let item = rollFashionReward(stars: 3, fire: .high)
         let wasOwned = progress.fashionCount(for: item.id) > 0
         let beforeStage = max(1, progress.fashionStage(for: item.id))
         progress.wardrobe[item.id] = (progress.wardrobe[item.id] ?? 0) + 1
         if !wasOwned {
-            progress.equippedOutfit[item.category.rawValue] = item.id
+            let currentEquipped = progress.equippedItem(for: item.category)
+            if item.tier >= currentEquipped.tier {
+                progress.equippedOutfit[item.category.rawValue] = item.id
+            }
         }
         let afterStage = max(1, progress.fashionStage(for: item.id))
         let newCount = progress.fashionCount(for: item.id)
         saveProgress()
         audio.sfxChestOpen()
+
+        let baseTitle = questId == "q_words"
+            ? "🎁 每日目标达成！+35星币 · +1扭蛋券 · 获赠【\(item.name)】！"
+            : "🎁 每日目标达成！+35星币 · 获赠【\(item.name)】！"
+        let fullTitle = grantedFullClear
+            ? baseTitle + "\n🌟 今日目标全清礼盒：额外 +1🎟️ +1🧵 +50🪙！"
+            : baseTitle
+        if grantedFullClear {
+            milestoneToast = "🎁 今日目标全清大礼盒：+1 🎟️ +1 🧵 +50 🪙！"
+        }
         pendingFashionUpgrades.append(
             FashionUpgradeEvent(
                 item: item,
@@ -425,18 +639,94 @@ public final class GameEngine: ObservableObject {
                 fromStage: beforeStage,
                 toStage: afterStage,
                 totalCount: newCount,
-                customTitle: questId == "q_words"
-                    ? "🎁 每日目标达成！+35星币 · +1扭蛋券 · 获赠【\(item.name)】！"
-                    : "🎁 每日目标达成！+35星币 · 获赠【\(item.name)】！"
+                customTitle: fullTitle
             )
         )
     }
 
-    // MARK: - 🎰 皇家扭蛋机孵化（5阶神兽进化）、👗 满满公主高定变装 & 🏰 游乐园建造
+    // MARK: - 🎰 皇家扭蛋机孵化（单抽 / 五连 / 10抽神话保底 / Lv.5溢出转化）、👗 满满公主高定变装、🏆 里程碑 & 🏰 游乐园建造
 
-    /// 旋转皇家扭蛋机（需 1 张皇家扭蛋券 或 120 料理星币，重复抽中自动转化为 +2 神兽成长值）
+    private func performSingleGachaRoll(guaranteeRareOrNew: Bool) -> GachaHatchEvent {
+        let isMythicPity = progress.gachaPityMythic >= 9
+        let roll = Double.random(in: 0..<1)
+        let targetRarity: Int
+        if isMythicPity {
+            targetRarity = 3
+        } else if guaranteeRareOrNew {
+            targetRarity = roll < 0.28 ? 3 : 2
+        } else {
+            targetRarity = roll < 0.16 ? 3 : (roll < 0.52 ? 2 : 1)
+        }
+
+        let rarityPool = GuardianPetSpecies.all.filter { $0.rarity == targetRarity }
+        let unownedInTier = rarityPool.filter { (progress.pets[$0.id] ?? 0) == 0 }
+        let allUnowned = GuardianPetSpecies.all.filter { (progress.pets[$0.id] ?? 0) == 0 }
+
+        let pickedPet: GuardianPetSpecies
+        if progress.gachaRepeatMissCount >= 3 && !allUnowned.isEmpty && Double.random(in: 0..<1) < 0.75 {
+            pickedPet = (unownedInTier.isEmpty ? allUnowned : unownedInTier).randomElement() ?? rarityPool[0]
+        } else if guaranteeRareOrNew && !unownedInTier.isEmpty {
+            pickedPet = unownedInTier.randomElement() ?? rarityPool[0]
+        } else if !unownedInTier.isEmpty && Double.random(in: 0..<1) < 0.45 {
+            pickedPet = unownedInTier.randomElement() ?? rarityPool[0]
+        } else {
+            let notMaxed = rarityPool.filter { progress.petStage(for: $0.id) < GuardianPetSpecies.maxStage }
+            if !notMaxed.isEmpty && Double.random(in: 0..<1) < 0.70 {
+                pickedPet = notMaxed.randomElement() ?? rarityPool[0]
+            } else {
+                pickedPet = rarityPool.randomElement() ?? GuardianPetSpecies.all[0]
+            }
+        }
+
+        if pickedPet.rarity == 3 {
+            progress.gachaPityMythic = 0
+        } else {
+            progress.gachaPityMythic = min(9, progress.gachaPityMythic + 1)
+        }
+
+        let wasOwned = (progress.pets[pickedPet.id] ?? 0) > 0
+        if !wasOwned {
+            progress.gachaRepeatMissCount = 0
+        } else {
+            progress.gachaRepeatMissCount += 1
+        }
+
+        let beforeStage = max(1, progress.petStage(for: pickedPet.id))
+        if wasOwned && beforeStage >= GuardianPetSpecies.maxStage {
+            // 满级 5 阶神兽溢出转化为：+1 🌟 神兽糖果 + 60 🪙 星币补偿
+            progress.petCandy += 1
+            progress.coins += 60
+            return GachaHatchEvent(
+                pet: pickedPet,
+                isNew: false,
+                fromStage: beforeStage,
+                toStage: beforeStage,
+                totalExp: progress.petTotalExp(for: pickedPet.id),
+                isMaxOverflow: true,
+                overflowCandy: 1,
+                overflowCoins: 60
+            )
+        }
+
+        // 若抽到已拥有的未满级守护萌宠，直接获得 +2 点高额神兽成长值，加速冲击 5 阶至尊幻兽！
+        progress.pets[pickedPet.id] = (progress.pets[pickedPet.id] ?? 0) + (wasOwned ? 2 : 1)
+        if progress.equippedPetId.isEmpty {
+            progress.equippedPetId = pickedPet.id
+        }
+        let afterStage = max(1, progress.petStage(for: pickedPet.id))
+        let totalExp = progress.petTotalExp(for: pickedPet.id)
+        return GachaHatchEvent(
+            pet: pickedPet,
+            isNew: !wasOwned,
+            fromStage: beforeStage,
+            toStage: afterStage,
+            totalExp: totalExp
+        )
+    }
+
+    /// 旋转皇家扭蛋机单抽（需 1 张皇家扭蛋券 或 120 料理星币；10 抽必出神话神兽，3 次未出新宠触发 75% 新宠保底）
     public func spinGacha(useTicket: Bool) {
-        guard !isSpinningGacha && activeGachaHatch == nil else { return }
+        guard !isSpinningGacha && activeGachaHatch == nil && activeGachaBatch.isEmpty else { return }
         if useTicket {
             guard progress.gachaTickets >= 1 else {
                 audio.sfxBad()
@@ -457,46 +747,93 @@ public final class GameEngine: ObservableObject {
         petFeedToast = nil
         audio.sfxGachaCrank()
 
-        // 真实 RPG 稀有度权重：16% 神话(3星)、36% 传说(2星)、48% 史诗(1星)
-        let roll = Double.random(in: 0..<1)
-        let targetRarity = roll < 0.16 ? 3 : (roll < 0.52 ? 2 : 1)
-        let rarityPool = GuardianPetSpecies.all.filter { $0.rarity == targetRarity }
-        let unownedInTier = rarityPool.filter { (progress.pets[$0.id] ?? 0) == 0 }
-
-        let pickedPet: GuardianPetSpecies
-        if !unownedInTier.isEmpty && Double.random(in: 0..<1) < 0.45 {
-            pickedPet = unownedInTier.randomElement() ?? rarityPool[0]
-        } else {
-            pickedPet = rarityPool.randomElement() ?? GuardianPetSpecies.all[0]
-        }
-
-        let wasOwned = (progress.pets[pickedPet.id] ?? 0) > 0
-        let beforeStage = max(1, progress.petStage(for: pickedPet.id))
-        // 若抽到已拥有的守护萌宠，直接获得 +2 点高额神兽成长值，加速冲击 5 阶至尊幻兽！
-        progress.pets[pickedPet.id] = (progress.pets[pickedPet.id] ?? 0) + (wasOwned ? 2 : 1)
-        if progress.equippedPetId.isEmpty {
-            progress.equippedPetId = pickedPet.id
-        }
-        let afterStage = max(1, progress.petStage(for: pickedPet.id))
-        let totalExp = progress.petTotalExp(for: pickedPet.id)
+        let ev = performSingleGachaRoll(guaranteeRareOrNew: false)
+        let resetGen = stateResetGeneration
         saveProgress()
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 680_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
             self.isSpinningGacha = false
+            guard !self.eyeRestActive && self.playLock == nil else {
+                self.activeGachaBatch = [ev]
+                self.activeGachaHatch = ev
+                return
+            }
             self.audio.sfxChestOpen()
-            self.activeGachaHatch = GachaHatchEvent(
-                pet: pickedPet,
-                isNew: !wasOwned,
-                fromStage: beforeStage,
-                toStage: afterStage,
-                totalExp: totalExp
-            )
-            self.audio.speakText("\(pickedPet.name)！\(pickedPet.cheerLine)", slow: false)
+            self.activeGachaBatch = [ev]
+            self.activeGachaHatch = ev
+            if ev.isMaxOverflow {
+                self.petFeedToast = "✨ 「\(ev.pet.name)」已满 5 阶！自动转化为 +\(ev.overflowCandy) 🌟 神兽糖果 & +\(ev.overflowCoins) 🪙！"
+            }
+            self.audio.speakText("\(ev.pet.name)！\(ev.pet.cheerLine)", slow: false)
         }
     }
 
-    /// 投喂守护萌宠美食（投喂星币随阶位 1~5 阶递增：35 -> 50 -> 70 -> 95 星币，越往后越难、进化越炫酷）
+    /// 皇家扭蛋五连抽（5 张扭蛋券 或 8.5 折 510 星币，保底至少 1 只传说/神话或未解锁神兽！）
+    public func spinGachaFive(useTicket: Bool) {
+        guard !isSpinningGacha && activeGachaHatch == nil && activeGachaBatch.isEmpty else { return }
+        if useTicket {
+            guard progress.gachaTickets >= 5 else {
+                audio.sfxBad()
+                petFeedToast = "🎟️ 五连抽需要 5 张扭蛋券（当前 \(progress.gachaTickets) 张）！"
+                return
+            }
+            progress.gachaTickets -= 5
+        } else {
+            guard progress.coins >= 510 else {
+                audio.sfxBad()
+                petFeedToast = "🪙 五连特惠需要 510 星币（8.5 折，当前 \(progress.coins) 星币）！"
+                return
+            }
+            progress.coins -= 510
+        }
+
+        isSpinningGacha = true
+        petFeedToast = nil
+        audio.sfxGachaCrank()
+
+        var events: [GachaHatchEvent] = []
+        for idx in 0..<5 {
+            let needGuarantee = (idx == 4) && !events.contains(where: { $0.pet.rarity >= 2 || $0.isNew })
+            events.append(performSingleGachaRoll(guaranteeRareOrNew: needGuarantee))
+        }
+        let resetGen = stateResetGeneration
+        saveProgress()
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 780_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
+            self.isSpinningGacha = false
+            self.activeGachaBatch = events
+            let highlight = events.first(where: { $0.pet.rarity == 3 })
+                ?? events.first(where: { $0.isNew })
+                ?? events.last
+            self.activeGachaHatch = highlight
+            let overflowCandySum = events.reduce(0) { $0 + $1.overflowCandy }
+            let overflowCoinsSum = events.reduce(0) { $0 + $1.overflowCoins }
+            if overflowCandySum > 0 {
+                self.petFeedToast = "🎰 五连孵化完成！满阶溢出转化 +\(overflowCandySum) 🌟 神兽糖果 & +\(overflowCoinsSum) 🪙！"
+            } else {
+                let newCount = events.filter(\.isNew).count
+                self.petFeedToast = newCount > 0
+                    ? "🎰 五连孵化大吉！喜提 \(newCount) 只全新守护神兽！"
+                    : "🎰 五连孵化完成！神兽们成长值大涨！"
+            }
+            guard !self.eyeRestActive && self.playLock == nil else { return }
+            self.audio.sfxChestOpen()
+            if let top = highlight {
+                self.audio.speakText("五连皇家扭蛋开启啦！恭喜获得\(top.pet.name)！", slow: false)
+            }
+        }
+    }
+
+    public func dismissGachaHatch() {
+        activeGachaHatch = nil
+        activeGachaBatch = []
+    }
+
+    /// 投喂守护萌宠美食（投喂星币随阶位 1~4 阶递增：35 -> 50 -> 70 -> 95 星币；满 5 阶禁止继续消费扣币）
     public func feedPet(_ petId: String) {
         let pet = GuardianPetSpecies.byId(petId)
         guard (progress.pets[petId] ?? 0) > 0 else {
@@ -505,6 +842,11 @@ public final class GameEngine: ObservableObject {
             return
         }
         let beforeStage = progress.petStage(for: petId)
+        guard beforeStage < GuardianPetSpecies.maxStage else {
+            audio.sfxSpark()
+            petFeedToast = "🌈 「\(pet.name)」已经达到最高 5 阶「至尊幻兽」，无需再花星币投喂啦！"
+            return
+        }
         let cost = GuardianPetSpecies.feedCost(for: beforeStage)
         guard progress.coins >= cost else {
             audio.sfxBad()
@@ -516,6 +858,7 @@ public final class GameEngine: ObservableObject {
         progress.petFeedExp[petId] = (progress.petFeedExp[petId] ?? 0) + 1
         let afterStage = progress.petStage(for: petId)
         let totalExp = progress.petTotalExp(for: petId)
+        let resetGen = stateResetGeneration
         saveProgress()
 
         petHeartBurst = true
@@ -523,13 +866,15 @@ public final class GameEngine: ObservableObject {
 
         if afterStage > beforeStage {
             petFeedToast = "👑 华丽蜕变！「\(pet.name)」突破至 \(afterStage) 阶【\(GuardianPetSpecies.stageName(for: afterStage))】！解锁：\(GuardianPetSpecies.stageVisualPerk(for: afterStage))！"
-            activeGachaHatch = GachaHatchEvent(
+            let ev = GachaHatchEvent(
                 pet: pet,
                 isNew: false,
                 fromStage: beforeStage,
                 toStage: afterStage,
                 totalExp: totalExp
             )
+            activeGachaBatch = [ev]
+            activeGachaHatch = ev
             audio.speakText("太酷啦！\(pet.name)进化成\(GuardianPetSpecies.stageName(for: afterStage))啦！", slow: false)
         } else {
             let nextNeed = progress.nextPetStageNeed(for: petId) ?? totalExp
@@ -539,6 +884,187 @@ public final class GameEngine: ObservableObject {
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 900_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
+            self.petHeartBurst = false
+        }
+    }
+
+    /// 使用 🌟 神兽糖果投喂萌宠（+3 成长值）
+    public func feedPetWithCandy(_ petId: String) {
+        let pet = GuardianPetSpecies.byId(petId)
+        guard (progress.pets[petId] ?? 0) > 0 else {
+            audio.sfxBad()
+            petFeedToast = "🥚 这只小精灵还没孵化呢！"
+            return
+        }
+        let beforeStage = progress.petStage(for: petId)
+        guard beforeStage < GuardianPetSpecies.maxStage else {
+            audio.sfxSpark()
+            petFeedToast = "🌈 「\(pet.name)」已是最高 5 阶至尊幻兽，把 🌟 神兽糖果留给其他伙伴吧！"
+            return
+        }
+        guard progress.petCandy >= 1 else {
+            audio.sfxBad()
+            petFeedToast = "🌟 神兽糖果不足！达成里程碑、每日转盘或满阶扭蛋溢出均可获得糖果！"
+            return
+        }
+
+        progress.petCandy -= 1
+        progress.petFeedExp[petId] = (progress.petFeedExp[petId] ?? 0) + 3
+        let afterStage = progress.petStage(for: petId)
+        let totalExp = progress.petTotalExp(for: petId)
+        let resetGen = stateResetGeneration
+        saveProgress()
+
+        petHeartBurst = true
+        audio.sfxPetHappy()
+
+        if afterStage > beforeStage {
+            petFeedToast = "🌟 糖果突破！「\(pet.name)」直接跃升至 \(afterStage) 阶【\(GuardianPetSpecies.stageName(for: afterStage))】！"
+            let ev = GachaHatchEvent(
+                pet: pet,
+                isNew: false,
+                fromStage: beforeStage,
+                toStage: afterStage,
+                totalExp: totalExp
+            )
+            activeGachaBatch = [ev]
+            activeGachaHatch = ev
+            audio.speakText("太棒啦！吃下神兽糖果，\(pet.name)进化啦！", slow: false)
+        } else {
+            let nextNeed = progress.nextPetStageNeed(for: petId) ?? totalExp
+            petFeedToast = "🌟 喂食神兽糖果成功！「\(pet.name)」+3 成长值（\(totalExp)/\(nextNeed)）！"
+            audio.speakText(pet.cheerLine, slow: false)
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
+            self.petHeartBurst = false
+        }
+    }
+
+    /// 每日免费「摸摸抱抱」互动（每日至多 3 次，建造旋转木马后增至 4 次；每次 +10 🪙，第 3 次额外 +1 成长值）
+    public func patPet() {
+        progress.ensureDaily()
+        let maxPats = progress.maxDailyPetPats
+        let currentPats = progress.effectiveDailyPetPatCount
+        guard currentPats < maxPats else {
+            performPetTalent()
+            petFeedToast = "💖 今天已经和「\(equippedPet.name)」亲密摸摸 \(maxPats)/\(maxPats) 次啦，明天再来找它玩！"
+            return
+        }
+
+        progress.dailyPetPatDate = GameProgress.todayString()
+        progress.dailyPetPatCount = currentPats + 1
+        progress.coins += 10
+        var bonusMsg = "+10 🪙"
+
+        let targetId = equippedPet.id
+        let beforeStage = progress.petStage(for: targetId)
+        if progress.dailyPetPatCount == 3 {
+            if beforeStage < GuardianPetSpecies.maxStage {
+                progress.petFeedExp[targetId] = (progress.petFeedExp[targetId] ?? 0) + 1
+                bonusMsg += " · 第 3 次贴贴额外 +1 成长值！"
+                let afterStage = progress.petStage(for: targetId)
+                if afterStage > beforeStage {
+                    let ev = GachaHatchEvent(
+                        pet: equippedPet,
+                        isNew: false,
+                        fromStage: beforeStage,
+                        toStage: afterStage,
+                        totalExp: progress.petTotalExp(for: targetId)
+                    )
+                    activeGachaBatch = [ev]
+                    activeGachaHatch = ev
+                }
+            } else {
+                progress.coins += 15
+                bonusMsg += " · 第 3 次贴贴额外 +15 🪙！"
+            }
+        }
+
+        let resetGen = stateResetGeneration
+        saveProgress()
+        petHeartBurst = true
+        petTalentActive = true
+        audio.sfxPetHappy()
+        petFeedToast = "🤗 摸摸「\(equippedPet.name)」软乎乎的脑袋（今日 \(progress.dailyPetPatCount)/\(maxPats)）：\(bonusMsg)"
+        audio.speakText("\(equippedPet.name)好开心呀！\(equippedPet.cheerLine)", slow: false)
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
+            self.petHeartBurst = false
+            self.petTalentActive = false
+        }
+    }
+
+    /// 触发出战守护神兽的展示才艺动作与语音应援
+    public func performPetTalent() {
+        let resetGen = stateResetGeneration
+        petHeartBurst = true
+        petTalentActive = true
+        audio.sfxPetHappy()
+        petFeedToast = "✨ 「\(equippedPet.name)」正在舞台闪亮展示！技能：\(equippedPet.effectiveSkillSummary(forStage: equippedPetStage))"
+        audio.speakText("\(equippedPet.name)来给你加油啦！\(equippedPet.cheerLine)", slow: false)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
+            self.petHeartBurst = false
+            self.petTalentActive = false
+        }
+    }
+
+    /// 每日免费 1 次：用数学烘焙屋已解锁的甜品投喂出战萌宠（+2 成长值 & +15 🪙；满阶返 +40 🪙）
+    public func feedPetWithUnlockedDessert(_ dessertId: String) {
+        progress.ensureDaily()
+        guard (progress.desserts[dessertId] ?? 0) > 0 else {
+            audio.sfxBad()
+            petFeedToast = "🧁 这道甜品还没在数学烘焙屋制作解锁哦，先去数学关烘焙吧！"
+            return
+        }
+        guard !progress.isDailyDessertFedToday else {
+            audio.sfxBad()
+            petFeedToast = "🍰 今天已经用数学烘焙甜品款待过萌宠啦，明天再来分享新甜品吧！"
+            return
+        }
+
+        let dessertTitle = HujiaoCurriculumRepository.bakeryDesserts.first(where: { $0.id == dessertId })?.name ?? "数学烘焙甜品"
+        progress.dailyDessertFeedDate = GameProgress.todayString()
+
+        let petId = equippedPet.id
+        let beforeStage = progress.petStage(for: petId)
+        if beforeStage < GuardianPetSpecies.maxStage {
+            progress.petFeedExp[petId] = (progress.petFeedExp[petId] ?? 0) + 2
+            progress.coins += 15
+            let afterStage = progress.petStage(for: petId)
+            if afterStage > beforeStage {
+                let ev = GachaHatchEvent(
+                    pet: equippedPet,
+                    isNew: false,
+                    fromStage: beforeStage,
+                    toStage: afterStage,
+                    totalExp: progress.petTotalExp(for: petId)
+                )
+                activeGachaBatch = [ev]
+                activeGachaHatch = ev
+            }
+            petFeedToast = "🍰 免费请「\(equippedPet.name)」品尝【\(dessertTitle)】！+2 成长值 & +15 🪙！"
+        } else {
+            progress.coins += 40
+            petFeedToast = "🍰 请满阶「\(equippedPet.name)」品尝【\(dessertTitle)】！它回赠了 +40 🪙 幸运星币！"
+        }
+
+        let resetGen = stateResetGeneration
+        saveProgress()
+        petHeartBurst = true
+        audio.sfxPetHappy()
+        audio.speakText("\(equippedPet.name)吃到了香甜的\(dessertTitle)，能量满满！", slow: false)
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 950_000_000)
+            guard self.stateResetGeneration == resetGen else { return }
             self.petHeartBurst = false
         }
     }
@@ -549,11 +1075,11 @@ public final class GameEngine: ObservableObject {
         saveProgress()
         audio.sfxPetHappy()
         let pet = GuardianPetSpecies.byId(petId)
-        petFeedToast = "✨ 已将「\(pet.name)」设为伴读守护精灵，它会和满满公主一起闯关答题哦！"
+        petFeedToast = "✨ 已将「\(pet.name)」设为伴读守护精灵，技能：\(pet.effectiveSkillSummary(forStage: progress.petStage(for: petId)))"
         audio.speakText("我是\(pet.name)，陪满满公主一起闯关！", slow: false)
     }
 
-    // MARK: - 👗 满满公主换装穿戴、星币解锁与 5 阶高定织造升阶
+    // MARK: - 👗 满满公主换装穿戴、一键套装、星光锦缎升阶 & 发色/表情/Pose 个性定制
 
     public func equipFashionItem(_ item: PrincessFashionItem) {
         guard progress.fashionCount(for: item.id) > 0 else {
@@ -562,10 +1088,33 @@ public final class GameEngine: ObservableObject {
         }
         progress.equippedOutfit[item.category.rawValue] = item.id
         saveProgress()
-        audio.sfxSpark()
+        audio.sfxTwirl()
         let st = progress.fashionStage(for: item.id)
-        wardrobeToast = "👗 满满已换上 \(st) 阶【\(item.name)】，华丽值高达 \(progress.totalGlamourScore) 分！"
+        let suit = progress.suitBonusInfo()
+        wardrobeToast = "👗 已换上 \(st) 阶【\(item.name)】，当前华丽值 \(progress.totalGlamourScore)（\(suit.suitName) \(suit.matchedCount)/5）！"
         audio.speakText("换上\(item.name)，真漂亮！", slow: false)
+    }
+
+    /// 一键穿戴指定高定套装中已解锁的所有部件（0...5）
+    public func equipFashionSuit(_ styleIndex: Int) {
+        let suitDef = PrincessFashionSuit.byStyleIndex(styleIndex)
+        let ownedItems = suitDef.items.filter { progress.fashionCount(for: $0.id) > 0 }
+        guard !ownedItems.isEmpty else {
+            audio.sfxBad()
+            wardrobeToast = "👗 还没解锁【\(suitDef.name)】的部件，先去闯关或星币裁制一件吧！"
+            return
+        }
+        for item in ownedItems {
+            progress.equippedOutfit[item.category.rawValue] = item.id
+        }
+        saveProgress()
+        audio.sfxTwirl()
+        let info = progress.suitBonusInfo()
+        let resonanceText = info.isFullResonance
+            ? "👑 5/5 满套装共鸣激活：+\(info.glamourBonusPercent)% 华丽度 & 每题 +\(info.coinBonus) 🪙！"
+            : (info.isHalfResonance ? "✨ 3/5 套装共鸣激活：+\(info.glamourBonusPercent)% 华丽度！" : "已穿戴 \(ownedItems.count)/5 件！")
+        wardrobeToast = "👗 一键换装【\(suitDef.name)】！\(resonanceText)"
+        audio.speakText("换上\(suitDef.name)，闪亮登场！", slow: false)
     }
 
     public func unlockOrUpgradeFashionItem(_ item: PrincessFashionItem) {
@@ -644,11 +1193,286 @@ public final class GameEngine: ObservableObject {
         }
     }
 
+    /// 消耗 1 份 🧵 星光锦缎 对已解锁华服进行 +1 升阶经验织造
+    public func upgradeFashionWithThread(_ item: PrincessFashionItem) {
+        let currentCount = progress.fashionCount(for: item.id)
+        guard currentCount > 0 else {
+            audio.sfxBad()
+            wardrobeToast = "🔒 请先裁制解锁【\(item.name)】，再使用 🧵 星光锦缎升阶！"
+            return
+        }
+        let beforeStage = progress.fashionStage(for: item.id)
+        guard beforeStage < PrincessFashionItem.maxStage else {
+            audio.sfxSpark()
+            wardrobeToast = "🌈【\(item.name)】已是最高 5 阶传世神装，把 🧵 星光锦缎留给其他华服吧！"
+            return
+        }
+        guard progress.starThread >= 1 else {
+            audio.sfxBad()
+            wardrobeToast = "🧵 星光锦缎不足！可通过每日任务全清、幸运转盘、舞会挑战与里程碑获得！"
+            return
+        }
+
+        progress.starThread -= 1
+        progress.wardrobe[item.id] = currentCount + 1
+        let currentEq = progress.equippedItem(for: item.category)
+        if item.tier >= currentEq.tier {
+            progress.equippedOutfit[item.category.rawValue] = item.id
+        }
+        let afterStage = progress.fashionStage(for: item.id)
+        let newCount = progress.fashionCount(for: item.id)
+        saveProgress()
+
+        if afterStage > beforeStage {
+            audio.sfxChestOpen()
+            wardrobeToast = "🧵✨ 星光锦缎织造蜕变！【\(item.name)】升至 \(afterStage) 阶「\(PrincessFashionItem.stageName(for: afterStage))」！"
+            pendingFashionUpgrades.append(
+                FashionUpgradeEvent(
+                    item: item,
+                    isNewUnlock: false,
+                    fromStage: beforeStage,
+                    toStage: afterStage,
+                    totalCount: newCount,
+                    customTitle: "🧵 星光锦缎注入，【\(item.name)】升阶啦！"
+                )
+            )
+            audio.speakText("星光锦缎生效！\(item.name)升级到\(PrincessFashionItem.stageName(for: afterStage))！", slow: false)
+        } else {
+            audio.sfxSpark()
+            let need = progress.nextFashionStageNeed(for: item.id) ?? newCount
+            wardrobeToast = "🧵 消耗 1 份星光锦缎！【\(item.name)】华丽度 \(newCount)/\(need) ✨"
+        }
+    }
+
+    public func setHairColor(_ option: HairColorOption) {
+        guard progress.isHairColorUnlocked(option) else {
+            audio.sfxBad()
+            wardrobeToast = "🔒 发色【\(option.name)】需要「\(option.unlockDesc)」才能解锁哦！"
+            return
+        }
+        progress.princessHairColorId = option.id
+        saveProgress()
+        audio.sfxSpark()
+        wardrobeToast = "🎨 已为满满公主染上【\(option.name)】秀发！"
+    }
+
+    public func setExpression(_ expr: PrincessExpression) {
+        guard progress.isExpressionUnlocked(expr) else {
+            audio.sfxBad()
+            wardrobeToast = "🔒 表情【\(expr.name)】需要「\(expr.unlockDesc)」才能解锁哦！"
+            return
+        }
+        progress.princessExpressionId = expr.id
+        saveProgress()
+        audio.sfxSpark()
+        wardrobeToast = "😊 满满公主换上了【\(expr.name)】甜美表情！"
+    }
+
+    public func setPose(_ pose: PrincessPose) {
+        guard progress.isPoseUnlocked(pose) else {
+            audio.sfxBad()
+            wardrobeToast = "🔒 舞台 Pose【\(pose.name)】需要「\(pose.unlockDesc)」才能解锁哦！"
+            return
+        }
+        progress.princessPoseId = pose.id
+        saveProgress()
+        audio.sfxTwirl()
+        wardrobeToast = "💃 满满公主摆出【\(pose.name)】优雅造型！"
+    }
+
+    // MARK: - 💃 每日舞会主题挑战、👑 爵位/摘星/图鉴里程碑 & 🎡 每日幸运小转盘
+
+    public func dailyBallMatchCount(for theme: DailyBallTheme = DailyBallTheme.today()) -> Int {
+        PrincessFashionCategory.allCases.filter {
+            progress.equippedItem(for: $0).styleIndex == theme.targetStyleIndex
+        }.count
+    }
+
+    public var canClaimDailyBallReward: Bool {
+        let theme = DailyBallTheme.today()
+        return !progress.isDailyBallClaimedToday
+            && dailyBallMatchCount(for: theme) >= theme.minMatchingPieces
+            && progress.totalGlamourScore >= theme.minGlamour
+    }
+
+    public func claimDailyBallReward() {
+        let theme = DailyBallTheme.today()
+        guard !progress.isDailyBallClaimedToday else {
+            audio.sfxSpark()
+            wardrobeToast = "💃 今日舞会主题【\(theme.title)】已赴宴领奖啦，明天会有新舞会哦！"
+            return
+        }
+        let matched = dailyBallMatchCount(for: theme)
+        guard matched >= theme.minMatchingPieces && progress.totalGlamourScore >= theme.minGlamour else {
+            audio.sfxBad()
+            wardrobeToast = "👗 赴宴还差一点点：需同主题部件 \(matched)/\(theme.minMatchingPieces) 件、华丽度 \(progress.totalGlamourScore)/\(theme.minGlamour)！"
+            return
+        }
+
+        progress.dailyBallThemeClaimedDate = GameProgress.todayString()
+        progress.coins += theme.rewardCoins
+        progress.starThread += theme.rewardStarThread
+        saveProgress()
+        audio.sfxWin()
+        let msg = "💃 今日舞会主题「\(theme.title)」华丽赴宴成功！+\(theme.rewardCoins) 🪙 +\(theme.rewardStarThread) 🧵！"
+        wardrobeToast = msg
+        milestoneToast = msg
+        audio.speakText("太美艳动人啦！每日公主舞会赴宴成功！", slow: false)
+    }
+
+    public var claimableRankMilestones: [ChefRankMilestone] {
+        ChefRankMilestone.all.filter {
+            $0.level > 0
+                && progress.totalStars >= $0.minStars
+                && !progress.claimedRankMilestones.contains($0.level)
+        }
+    }
+
+    public func claimRankPromotionGift(_ level: Int) {
+        guard let milestone = ChefRankMilestone.all.first(where: { $0.level == level && $0.level > 0 }),
+              progress.totalStars >= milestone.minStars,
+              !progress.claimedRankMilestones.contains(level) else {
+            return
+        }
+        progress.claimedRankMilestones.append(level)
+        progress.coins += milestone.rewardCoins
+        progress.gachaTickets += milestone.rewardTickets
+        progress.starThread += milestone.rewardStarThread
+        progress.petCandy += milestone.rewardPetCandy
+        saveProgress()
+        audio.sfxWin()
+        milestoneToast = "👑 晋升头衔【\(milestone.name)】！领到贺礼：\(milestone.rewardDesc)"
+        audio.speakText("恭喜晋升\(milestone.name)！", slow: false)
+    }
+
+    public func isStarMilestoneClaimed(_ needStars: Int) -> Bool {
+        progress.claimedStarMilestones.contains(needStars)
+    }
+
+    public var claimableStarMilestones: [StarMilestone] {
+        StarMilestone.all.filter {
+            progress.totalStars >= $0.needStars && !progress.claimedStarMilestones.contains($0.needStars)
+        }
+    }
+
+    public func claimStarMilestone(_ needStars: Int) {
+        guard let milestone = StarMilestone.all.first(where: { $0.needStars == needStars }),
+              progress.totalStars >= milestone.needStars,
+              !progress.claimedStarMilestones.contains(needStars) else {
+            return
+        }
+        progress.claimedStarMilestones.append(needStars)
+        progress.coins += milestone.rewardCoins
+        progress.gachaTickets += milestone.rewardTickets
+        progress.starThread += milestone.rewardStarThread
+        progress.petCandy += milestone.rewardPetCandy
+        saveProgress()
+        audio.sfxWin()
+        milestoneToast = "⭐ 摘星之路 \(needStars)★【\(milestone.title)】达成！获赠：\(milestone.rewardDesc)"
+        audio.speakText("恭喜完成\(needStars)颗星里程碑！", slow: false)
+    }
+
+    public func collectionMilestoneStatus(for subject: SubjectKind) -> CollectionMilestoneStatus {
+        let currentCount: Int
+        let step: Int
+        let maxCount: Int
+        let rewardCoins: Int
+        switch subject {
+        case .pinyin:
+            currentCount = progress.foodCount
+            step = 15
+            maxCount = max(15, Set(LevelRepository.levels.flatMap(\.words).map(\.character)).count)
+            rewardCoins = 80
+        case .math:
+            currentCount = progress.dessertCount
+            step = 5
+            maxCount = max(5, HujiaoCurriculumRepository.bakeryDesserts.count)
+            rewardCoins = 70
+        case .english:
+            currentCount = progress.englishCardCount
+            step = 10
+            maxCount = max(10, HujiaoCurriculumRepository.englishFlashcards.count)
+            rewardCoins = 75
+        }
+        let lastClaimed = progress.claimedCollectionMilestones[subject.rawValue] ?? 0
+        let steppedNext = ((lastClaimed / step) + 1) * step
+        let nextTarget: Int?
+        if steppedNext <= maxCount {
+            nextTarget = steppedNext
+        } else if lastClaimed < maxCount {
+            nextTarget = maxCount
+        } else {
+            nextTarget = nil
+        }
+        let canClaim = nextTarget.map { currentCount >= $0 } ?? false
+        return CollectionMilestoneStatus(
+            subject: subject,
+            currentCount: currentCount,
+            step: step,
+            maxCount: maxCount,
+            lastClaimedThreshold: lastClaimed,
+            nextTarget: nextTarget,
+            canClaim: canClaim,
+            rewardCoins: rewardCoins,
+            rewardTickets: 1,
+            rewardStarThread: 1,
+            rewardDesc: "+\(rewardCoins) 🪙 +1 🎟️ +1 🧵"
+        )
+    }
+
+    public func claimCollectionMilestone(subject: SubjectKind) {
+        let status = collectionMilestoneStatus(for: subject)
+        guard status.canClaim, let target = status.nextTarget else { return }
+        progress.claimedCollectionMilestones[subject.rawValue] = target
+        progress.coins += status.rewardCoins
+        progress.gachaTickets += status.rewardTickets
+        progress.starThread += status.rewardStarThread
+        saveProgress()
+        audio.sfxWin()
+        milestoneToast = "📚 【\(subject.title)】图鉴突破 \(target) 件里程碑！获赠：\(status.rewardDesc)"
+        audio.speakText("\(subject.title)图鉴收集突破\(target)件啦！", slow: false)
+    }
+
+    /// 旋转每日幸运小转盘（每日免费 1 次，100% 中奖；解锁魔法天文钟楼额外 +15 🪙）
+    public func spinDailyWheel() {
+        progress.ensureDaily()
+        guard !progress.isDailyWheelSpunToday else {
+            refreshDailyDerivedState()
+            audio.sfxBad()
+            milestoneToast = "🎡 今天已经转过幸运大转盘啦，明天再来转好礼吧！"
+            return
+        }
+
+        let slice = DailyWheelSlice.all.randomElement() ?? DailyWheelSlice.all[0]
+        progress.dailyWheelSpunDate = GameProgress.todayString()
+        switch slice.rewardType {
+        case "coins":  progress.coins += slice.amount
+        case "ticket": progress.gachaTickets += slice.amount
+        case "thread": progress.starThread += slice.amount
+        case "candy":  progress.petCandy += slice.amount
+        default:       progress.coins += 30
+        }
+
+        var bonusText = ""
+        if (progress.castleUnlocked["clock_tower"] ?? 0) > 0 {
+            progress.coins += 15
+            bonusText = " + 🕰️ 天文钟楼 +15 🪙"
+        }
+
+        dailyWheelResult = slice
+        refreshDailyDerivedState()
+        saveProgress()
+        audio.sfxWheelSpin()
+        audio.sfxWin()
+        milestoneToast = "🎡 每日幸运大转盘转中【\(slice.title)】\(bonusText)！"
+        audio.speakText("幸运大转盘转中了\(slice.title)！", slow: false)
+    }
+
     public func unlockCastleAttraction(_ item: CastleAttraction) {
         if (progress.castleUnlocked[item.id] ?? 0) > 0 {
             audio.sfxFirework()
             audio.speakText(item.cheerSpeech, slow: false)
-            petFeedToast = "🎡 \(item.name)：\(item.cheerSpeech)"
+            petFeedToast = "🎡 \(item.name)（\(item.perkShortTag)）：\(item.cheerSpeech)"
             return
         }
         guard progress.coins >= item.costCoins else {
@@ -661,10 +1485,10 @@ public final class GameEngine: ObservableObject {
         saveProgress()
         audio.sfxChestOpen()
         audio.speakText("恭喜点亮\(item.name)！\(item.cheerSpeech)", slow: false)
-        petFeedToast = "🎉 成功建造「\(item.name)」！快看上方游乐园画布，它已经动起来啦！"
+        petFeedToast = "🎉 成功建造「\(item.name)」！已激活永久增益：\(item.perkDesc)！"
     }
 
-    /// 局内每答对 1 题发放星币与彩虹能量槽充能（紧凑递进经济：需集满 8 格能量才爆彩虹宝箱，答错回锅扣减能量）
+    /// 局内每答对 1 题发放星币、彩虹能量槽与 12 大守护萌宠专属技能 + Fever 狂热连击倍率
     public func grantQuestionCorrectReward(wasWrongMastered: Bool) {
         let baseCoin: Int
         switch currentFire {
@@ -672,31 +1496,111 @@ public final class GameEngine: ObservableObject {
         case .mid:  baseCoin = 7
         case .high: baseCoin = 10
         }
-        let petStageBonus = equippedPetStage + (equippedPet.id == "fire_dragon" ? 2 : 0)
+
+        let mult = equippedPetStage >= 4 ? 2 : 1
+        let petBaseCoin = equippedPet.baseCoinPerQuestion * mult + equippedPetStage
         let comboBonus = min(comboCount, 5) * 2
         let masterBonus = wasWrongMastered ? 10 : 0
-        let gain = baseCoin + comboBonus + petStageBonus + masterBonus
+        let suitCoin = progress.suitBonusInfo().coinBonus
+        let glamourCoin = progress.glamourRank.coinBonus
+        let fountainCoin = (progress.castleUnlocked["fountain"] ?? 0) > 0 ? 1 : 0
+        let musicBoxCoin = ((progress.castleUnlocked["music_box"] ?? 0) > 0 && comboCount >= 3) ? 1 : 0
+
+        var petSkillCoin = 0
+        var skillTag: String? = nil
+        var unicornExtraCharge = 0
+        var doubleQuestionGain = false
+
+        switch equippedPet.kind {
+        case .fireDragon:
+            break
+        case .unicorn:
+            if comboCount >= 3 {
+                unicornExtraCharge = 1
+                skillTag = "🦄 +1彩虹"
+            }
+        case .nineTailFox:
+            if Double.random(in: 0..<1) < (0.15 * Double(mult)) {
+                petSkillCoin += 12 * mult
+                skillTag = "🦊 狐仙暴击+\(12 * mult)"
+            }
+        case .azureDragon:
+            petSkillCoin += min(comboCount, 5) * mult
+        case .phoenix:
+            break
+        case .pandaChef:
+            if !retriedCurrent && (currentSubject == .pinyin || currentSubject == .math) {
+                petSkillCoin += 3 * mult
+            }
+        case .whale:
+            break
+        case .luckyCat:
+            if Double.random(in: 0..<1) < (0.18 * Double(mult)) {
+                doubleQuestionGain = true
+                skillTag = "🐱 招财双倍"
+            }
+        case .owlDoctor:
+            if wasWrongMastered {
+                petSkillCoin += 15 * mult
+                skillTag = "🦉 消错+\(15 * mult)"
+            }
+        case .auroraDeer:
+            break
+        case .moonRabbit:
+            if !retriedCurrent && currentSubject == .english {
+                petSkillCoin += 3 * mult
+            }
+        case .corgiPilot:
+            break
+        }
+
+        var gain = baseCoin + comboBonus + petBaseCoin + masterBonus + suitCoin + glamourCoin + fountainCoin + musicBoxCoin + petSkillCoin
+        if doubleQuestionGain {
+            gain *= 2
+        }
+
+        let wasFever = isFeverMode
+        isFeverMode = (comboCount >= 5)
+        if isFeverMode {
+            gain = Int((Double(gain) * 1.5).rounded())
+            if !wasFever {
+                audio.sfxFever()
+            }
+        }
 
         progress.coins += gain
         roundCoinsEarned += gain
-        rainbowCharge += 1
+        rainbowCharge += 1 + unicornExtraCharge
+        floatingCoinBurst += 1
+        audio.sfxCoin()
 
         if rainbowCharge >= 8 {
-            rainbowCharge = 0
-            let chestCoins = 35
+            rainbowCharge -= 8
+            var chestCoins = 35
+            if (progress.castleUnlocked["ferris_wheel"] ?? 0) > 0 {
+                chestCoins += 10
+            }
+            if equippedPet.kind == .whale {
+                chestCoins += 12 * mult
+            }
+            if equippedPet.kind == .unicorn {
+                chestCoins += 10 * mult
+            }
             progress.coins += chestCoins
             roundCoinsEarned += chestCoins
             if currentFire == .high || comboCount >= 6 {
                 progress.gachaTickets += 1
-                floatingCoinGainText = "🌈 彩虹宝箱 +35🪙 +1🎟️"
-                rainbowChestBurstMessage = "🌈 连续集满 8 格彩虹能量！爆出 +35 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+                floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙 +1🎟️"
+                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！爆出 +\(chestCoins) 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
             } else {
-                floatingCoinGainText = "🌈 彩虹宝箱 +35🪙"
-                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！惊喜爆出 +35 🪙 料理星币！（挑战大火或 6 连击还能掉扭蛋券哦）"
+                floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙"
+                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！惊喜爆出 +\(chestCoins) 🪙 料理星币！（挑战大火或 6 连击还能掉扭蛋券哦）"
             }
             audio.sfxChestOpen()
         } else {
-            floatingCoinGainText = "+\(gain) 🪙"
+            let feverTag = isFeverMode ? " 🔥1.5x" : ""
+            let suffix = skillTag.map { " · \($0)" } ?? ""
+            floatingCoinGainText = "+\(gain) 🪙\(feverTag)\(suffix)"
             rainbowChestBurstMessage = nil
         }
     }
@@ -714,13 +1618,24 @@ public final class GameEngine: ObservableObject {
             progress.gachaTickets += chosen.amount
             progress.coins += 15
             roundCoinsEarned += 15
+        case "thread":
+            progress.starThread += chosen.amount
+            progress.coins += 15
+            roundCoinsEarned += 15
+        case "candy":
+            progress.petCandy += chosen.amount
+            progress.coins += 15
+            roundCoinsEarned += 15
         case "fashion":
             let item = chosen.fashionItemId.map { PrincessFashionItem.byId($0) } ?? rollFashionReward(stars: 3, fire: .high)
             let wasOwned = progress.fashionCount(for: item.id) > 0
             let beforeStage = max(1, progress.fashionStage(for: item.id))
             progress.wardrobe[item.id] = (progress.wardrobe[item.id] ?? 0) + 1
             if !wasOwned {
-                progress.equippedOutfit[item.category.rawValue] = item.id
+                let currentEquipped = progress.equippedItem(for: item.category)
+                if item.tier >= currentEquipped.tier {
+                    progress.equippedOutfit[item.category.rawValue] = item.id
+                }
             }
             let afterStage = max(1, progress.fashionStage(for: item.id))
             rewardedFashionInRound.append(item)
@@ -740,30 +1655,57 @@ public final class GameEngine: ObservableObject {
             progress.coins += 35
             roundCoinsEarned += 35
         }
+
+        if (progress.castleUnlocked["windmill"] ?? 0) > 0 {
+            progress.coins += 10
+            roundCoinsEarned += 10
+        }
+
         saveProgress()
         audio.sfxChestOpen()
         audio.speakText("太棒啦！打开神秘宝箱获得\(chosen.title)！", slow: false)
     }
 
-    /// 根据本局星级与火候难度抽取满满公主变装服饰（高星级 + 大火更容易掉落高级华丽/皇家神话服饰）
+    /// 根据本局星级与火候难度抽取满满公主变装服饰（限制最多前瞻当前总星数 +8 颗星，杜绝 0 星直接掉高阶）
     public func rollFashionReward(stars: Int, fire: FireDifficulty) -> PrincessFashionItem {
-        let x = Double.random(in: 0..<1)
-        let maxAllowedTier: Int
+        let rawRoll = Double.random(in: 0..<1)
+        let deerBoost: Double = equippedPet.kind == .auroraDeer ? (equippedPetStage >= 4 ? 0.30 : 0.15) : 0.0
+        let x = max(0.0, rawRoll - deerBoost)
+
+        let wantedMaxTier: Int
         if stars >= 3 && fire == .high {
-            maxAllowedTier = x < 0.22 ? 4 : (x < 0.58 ? 3 : 2)
+            wantedMaxTier = x < 0.22 ? 4 : (x < 0.58 ? 3 : 2)
         } else if stars >= 3 {
-            maxAllowedTier = x < 0.10 ? 4 : (x < 0.42 ? 3 : (x < 0.78 ? 2 : 1))
+            wantedMaxTier = x < 0.10 ? 4 : (x < 0.42 ? 3 : (x < 0.78 ? 2 : 1))
         } else if stars == 2 {
-            maxAllowedTier = x < 0.25 ? 3 : (x < 0.65 ? 2 : 1)
+            wantedMaxTier = x < 0.25 ? 3 : (x < 0.65 ? 2 : 1)
         } else {
-            maxAllowedTier = x < 0.35 ? 2 : 1
+            wantedMaxTier = x < 0.35 ? 2 : 1
         }
-        let tierPool = PrincessFashionItem.all.filter { $0.tier == maxAllowedTier }
-        let unowned = tierPool.filter { progress.fashionCount(for: $0.id) == 0 && progress.totalStars >= max(0, $0.needStars - 10) }
-        if !unowned.isEmpty && Double.random(in: 0..<1) < 0.45 {
-            return unowned.randomElement() ?? tierPool[0]
+
+        let maxAllowedNeedStars = progress.totalStars + 8
+        var selectedPool: [PrincessFashionItem] = []
+        for t in stride(from: wantedMaxTier, through: 1, by: -1) {
+            let candidates = PrincessFashionItem.all.filter {
+                $0.tier == t && $0.needStars <= maxAllowedNeedStars
+            }
+            if !candidates.isEmpty {
+                selectedPool = candidates
+                break
+            }
         }
-        return tierPool.randomElement() ?? PrincessFashionItem.all[0]
+        if selectedPool.isEmpty {
+            selectedPool = PrincessFashionItem.all.filter { $0.tier == 1 }
+        }
+
+        let notMaxed = selectedPool.filter { progress.fashionStage(for: $0.id) < PrincessFashionItem.maxStage }
+        let workingPool = notMaxed.isEmpty ? selectedPool : notMaxed
+        let unowned = workingPool.filter { progress.fashionCount(for: $0.id) == 0 }
+        let unownedBoost = fire.rareBoost
+        if !unowned.isEmpty && Double.random(in: 0..<1) < unownedBoost {
+            return unowned.randomElement() ?? workingPool[0]
+        }
+        return workingPool.randomElement() ?? PrincessFashionItem.all[0]
     }
 
     // MARK: - 当前题目与卡片数据
@@ -930,6 +1872,8 @@ public final class GameEngine: ObservableObject {
         questionIndex = 0
         rightCount = 0
         comboCount = 0
+        isFeverMode = false
+        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
         retryLeft = fire.retryAllowance
         retriedCurrent = false
         masteredCount = 0
@@ -937,7 +1881,6 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedFashionInRound = []
-        rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
         rainbowChestBurstMessage = nil
@@ -997,6 +1940,8 @@ public final class GameEngine: ObservableObject {
         questionIndex = 0
         rightCount = 0
         comboCount = 0
+        isFeverMode = false
+        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
         retryLeft = fire.retryAllowance
         retriedCurrent = false
         masteredCount = 0
@@ -1004,7 +1949,6 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedFashionInRound = []
-        rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
         rainbowChestBurstMessage = nil
@@ -1048,12 +1992,20 @@ public final class GameEngine: ObservableObject {
         } else {
             let prefix = currentSubject == .math ? "hjm_" : "hje_"
             let allSubjQuestions = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix(prefix) }
+            let maxStage = currentSubject == .math
+                ? (progress.freeUnlockAll ? HujiaoCurriculumRepository.mathStages.count : max(1, min(progress.mathUnlocked, HujiaoCurriculumRepository.mathStages.count)))
+                : (progress.freeUnlockAll ? HujiaoCurriculumRepository.englishStages.count : max(1, min(progress.englishUnlocked, HujiaoCurriculumRepository.englishStages.count)))
+            let unlockedPool: [CurriculumQuestion] = (1...maxStage).flatMap { stId in
+                currentSubject == .math
+                    ? HujiaoCurriculumRepository.questionsForMathStage(stId)
+                    : HujiaoCurriculumRepository.questionsForEnglishStage(stId)
+            }
             var pool: [CurriculumQuestion] = []
             if type == .wrong {
                 pool = allSubjQuestions.filter { (progress.wrong[$0.id] ?? 0) > 0 }
             }
             if pool.isEmpty {
-                pool = allSubjQuestions
+                pool = unlockedPool.isEmpty ? allSubjQuestions : unlockedPool
             }
             pool.shuffle()
             let picked = Array(pool.prefix(8))
@@ -1069,6 +2021,8 @@ public final class GameEngine: ObservableObject {
         questionIndex = 0
         rightCount = 0
         comboCount = 0
+        isFeverMode = false
+        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
         retryLeft = 2
         retriedCurrent = false
         masteredCount = 0
@@ -1076,7 +2030,6 @@ public final class GameEngine: ObservableObject {
         newDessertsInRound = []
         newFlashcardsInRound = []
         rewardedFashionInRound = []
-        rainbowCharge = 0
         roundCoinsEarned = 0
         floatingCoinGainText = nil
         rainbowChestBurstMessage = nil
@@ -1089,6 +2042,7 @@ public final class GameEngine: ObservableObject {
     public func goHome() {
         roundGeneration += 1
         audio.stopAllSpeech()
+        isFeverMode = false
         screenState = .home
         mascotLine = Self.mascotTips.randomElement() ?? mascotLine
     }
@@ -1206,10 +2160,11 @@ public final class GameEngine: ObservableObject {
             return [correctAnswer]
         }
         var set = Set<Int>([ans])
-        let offsets = [-2, -1, 1, 2, 10, -10, 3, -3]
+        let upper = max(120, ans + 30)
+        let offsets = [-2, -1, 1, 2, 10, -10, 20, -20, 3, -3]
         for off in offsets.shuffled() {
             let cand = ans + off
-            if cand >= 0 && cand <= 120 {
+            if cand >= 0 && cand <= upper {
                 set.insert(cand)
             }
             if set.count >= 4 { break }
@@ -1409,8 +2364,10 @@ public final class GameEngine: ObservableObject {
                 }
                 if let eng = q.englishAudio, !eng.isEmpty {
                     audio.speakEnglish(eng, slow: progress.tts.slow)
-                } else {
+                } else if q.answer.range(of: "[A-Za-z]", options: .regularExpression) != nil {
                     audio.speakEnglish(q.answer, slow: progress.tts.slow)
+                } else {
+                    audio.speakText("答对啦！\(Self.speakableText(q.answer))", slow: progress.tts.slow)
                 }
             }
 
@@ -1422,6 +2379,7 @@ public final class GameEngine: ObservableObject {
                     if left <= 0 {
                         progress.wrongMastered[q.id] = 1
                         progress.wrong.removeValue(forKey: q.id)
+                        masteredCount += 1
                         masteredNow = true
                     } else {
                         progress.wrong[q.id] = left
@@ -1454,7 +2412,14 @@ public final class GameEngine: ObservableObject {
             if retryLeft > 0 && !retriedCurrent {
                 retryLeft -= 1
                 retriedCurrent = true
-                comboCount = 0
+                var shieldMsg = ""
+                if equippedPet.kind == .phoenix && phoenixShieldsRemaining > 0 && comboCount > 0 {
+                    phoenixShieldsRemaining -= 1
+                    shieldMsg = "（🔥 凤凰护连击盾生效，保留 \(comboCount) 连击！）"
+                } else {
+                    comboCount = 0
+                }
+                isFeverMode = (comboCount >= 5)
                 rainbowCharge = max(0, rainbowCharge - 2)
                 isLocked = false
                 customerMood = .burnt
@@ -1464,14 +2429,24 @@ public final class GameEngine: ObservableObject {
                 showMathExplanation = true
                 audio.sfxBad()
 
-                chefBubble = "差一点点！看看「小锦囊」的方法提示，再试一次吧！"
-                tipMessage = "💡 \(hintText)（本局还能重做 \(retryLeft) 次）"
+                chefBubble = "差一点点！看看「小锦囊」的方法提示，再试一次吧！\(shieldMsg)"
+                tipMessage = "💡 \(hintText)（本局还能重做 \(retryLeft) 次）\(shieldMsg)"
                 tipStyle = "note"
                 return
             }
 
-            comboCount = 0
-            rainbowCharge = max(0, rainbowCharge - 2)
+            var shieldMsg = ""
+            if equippedPet.kind == .phoenix && phoenixShieldsRemaining > 0 && comboCount > 0 {
+                phoenixShieldsRemaining -= 1
+                shieldMsg = " · 🔥 凤凰守护保留连击！"
+            } else {
+                comboCount = 0
+            }
+            isFeverMode = (comboCount >= 5)
+            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -4 惩罚
+            if !retriedCurrent {
+                rainbowCharge = max(0, rainbowCharge - 2)
+            }
             judgeState = "bad"
             customerMood = .burnt
             potNope = true
@@ -1480,13 +2455,13 @@ public final class GameEngine: ObservableObject {
             progress.wrong[q.id] = (progress.wrong[q.id] ?? 0) + 1
             saveProgress()
 
-            chefBubble = "没关系，记住正确答案「\(q.answer)」哦！"
+            chefBubble = "没关系，记住正确答案「\(q.answer)」哦！\(shieldMsg)"
             tipMessage = "正确答案是【\(q.answer)】· \(q.explanation)"
             tipStyle = "no"
-            if currentSubject == .english, let eng = q.englishAudio {
+            if currentSubject == .english, let eng = q.englishAudio, !eng.isEmpty {
                 audio.speakEnglish(eng, slow: true)
             } else {
-                audio.speakText("正确答案是 \(q.answer)。\(q.explanation)", slow: true)
+                audio.speakText("正确答案是 \(Self.speakableText(q.answer))。\(Self.speakableText(q.explanation))", slow: true)
             }
 
             let gen = roundGeneration
@@ -1511,6 +2486,7 @@ public final class GameEngine: ObservableObject {
     public func selectInitial(_ ini: String) {
         guard !isLocked, currentMode != .whole else { return }
         audio.sfxTap()
+        keyBuffer = ""
         if pickedInitial == ini {
             pickedInitial = nil
         } else {
@@ -1657,7 +2633,13 @@ public final class GameEngine: ObservableObject {
 
     /// Mac 键盘快捷键直连处理（支持拼音、数学数字键盘、选择题 1~4）
     public func handleKeyInput(_ rawKey: String) {
-        guard screenState == .playing, !isLocked, !eyeRestActive, playLock == nil, parentGate == nil, !showParentSettings else { return }
+        guard screenState == .playing,
+              !isLocked,
+              !eyeRestActive,
+              playLock == nil,
+              parentGate == nil,
+              !showParentSettings,
+              !showBackupModal else { return }
         let key = rawKey.lowercased()
 
         // 数学与英语键盘直连
@@ -1727,12 +2709,18 @@ public final class GameEngine: ObservableObject {
         lastKeyTime = now
 
         if currentMode != .whole {
-            if pickedInitial == nil || (["z","c","s"].contains(pickedInitial ?? "") && mappedChar == "h") {
+            if let prev = pickedInitial, ["z", "c", "s"].contains(prev), mappedChar == "h" {
+                let digraph = prev + "h"
+                if availableInitials.contains(digraph) {
+                    selectInitial(digraph)
+                    return
+                }
+            }
+            if pickedInitial == nil {
                 if availableInitials.contains(keyBuffer) {
                     selectInitial(keyBuffer)
                     return
                 } else if availableInitials.contains(mappedChar) {
-                    keyBuffer = mappedChar
                     selectInitial(mappedChar)
                     return
                 }
@@ -1747,11 +2735,18 @@ public final class GameEngine: ObservableObject {
         }
 
         let bases = availableBaseFinals
+        let altBuffer = keyBuffer.replacingOccurrences(of: "ü", with: "u")
+        let altMapped = (mappedChar == "ü") ? "u" : mappedChar
         if bases.contains(keyBuffer) {
             selectBaseFinal(keyBuffer)
+        } else if bases.contains(altBuffer) {
+            selectBaseFinal(altBuffer)
         } else if bases.contains(mappedChar) {
             keyBuffer = mappedChar
             selectBaseFinal(mappedChar)
+        } else if bases.contains(altMapped) {
+            keyBuffer = altMapped
+            selectBaseFinal(altMapped)
         }
     }
 
@@ -1867,6 +2862,7 @@ public final class GameEngine: ObservableObject {
                     if left <= 0 {
                         progress.wrongMastered[word.id] = 1
                         progress.wrong.removeValue(forKey: word.id)
+                        masteredCount += 1
                         masteredNow = true
                     } else {
                         progress.wrong[word.id] = left
@@ -1894,11 +2890,19 @@ public final class GameEngine: ObservableObject {
             saveProgress()
 
             let gen = roundGeneration
+            let extraDelayNs: UInt64
+            if currentMode == .tri && progress.tts.slow {
+                extraDelayNs = 2_650_000_000
+            } else if progress.tts.slow {
+                extraDelayNs = 2_050_000_000
+            } else {
+                extraDelayNs = 1_550_000_000
+            }
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 550_000_000)
                 guard self.roundGeneration == gen else { return }
                 self.potShaking = false
-                try? await Task.sleep(nanoseconds: 1_550_000_000)
+                try? await Task.sleep(nanoseconds: extraDelayNs)
                 while self.eyeRestActive {
                     try? await Task.sleep(nanoseconds: 300_000_000)
                 }
@@ -1910,7 +2914,14 @@ public final class GameEngine: ObservableObject {
             if retryLeft > 0 && !retriedCurrent {
                 retryLeft -= 1
                 retriedCurrent = true
-                comboCount = 0
+                var shieldMsg = ""
+                if equippedPet.kind == .phoenix && phoenixShieldsRemaining > 0 && comboCount > 0 {
+                    phoenixShieldsRemaining -= 1
+                    shieldMsg = "（🔥 凤凰护连击盾生效，保留 \(comboCount) 连击！）"
+                } else {
+                    comboCount = 0
+                }
+                isFeverMode = (comboCount >= 5)
                 rainbowCharge = max(0, rainbowCharge - 2)
                 isLocked = false
                 customerMood = .burnt
@@ -1920,8 +2931,8 @@ public final class GameEngine: ObservableObject {
                     let wrongT = pickedTone ?? 1
                     pickedTone = nil
                     pickedTonedFinal = nil
-                    chefBubble = "食材对啦！只是调料放成了 \(wrongT) 声，换第 \(word.toneNumber) 声试试！"
-                    tipMessage = "🧂 声母韵母全对！只是声调选成第 \(wrongT) 声啦，请改点「第 \(word.toneNumber) 声」调料瓶（还剩 \(retryLeft) 次回锅）"
+                    chefBubble = "食材对啦！只是调料放成了 \(wrongT) 声，换第 \(word.toneNumber) 声试试！\(shieldMsg)"
+                    tipMessage = "🧂 声母韵母全对！只是声调选成第 \(wrongT) 声啦，请改点「第 \(word.toneNumber) 声」调料瓶（还剩 \(retryLeft) 次回锅）\(shieldMsg)"
                     tipStyle = "note"
                 } else {
                     pickedInitial = nil
@@ -1929,15 +2940,25 @@ public final class GameEngine: ObservableObject {
                     pickedBaseFinal = nil
                     pickedTone = nil
                     pickedTonedFinal = nil
-                    chefBubble = "差一点点，回锅再试一次吧！"
-                    tipMessage = "🍳 再想想～本局还能回锅 \(retryLeft) 次"
+                    chefBubble = "差一点点，回锅再试一次吧！\(shieldMsg)"
+                    tipMessage = "🍳 再想想～本局还能回锅 \(retryLeft) 次\(shieldMsg)"
                     tipStyle = "note"
                 }
                 return
             }
 
-            comboCount = 0
-            rainbowCharge = max(0, rainbowCharge - 2)
+            var shieldMsg = ""
+            if equippedPet.kind == .phoenix && phoenixShieldsRemaining > 0 && comboCount > 0 {
+                phoenixShieldsRemaining -= 1
+                shieldMsg = " · 🔥 凤凰守护保留连击！"
+            } else {
+                comboCount = 0
+            }
+            isFeverMode = (comboCount >= 5)
+            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -4 惩罚
+            if !retriedCurrent {
+                rainbowCharge = max(0, rainbowCharge - 2)
+            }
             judgeState = "bad"
             customerMood = .burnt
             potNope = true
@@ -1946,10 +2967,10 @@ public final class GameEngine: ObservableObject {
             saveProgress()
 
             if isOnlyToneWrong {
-                chefBubble = "记住哦：「\(ch)」是第 \(word.toneNumber) 声（\(word.tonedFinal)）！"
+                chefBubble = "记住哦：「\(ch)」是第 \(word.toneNumber) 声（\(word.tonedFinal)）！\(shieldMsg)"
                 tipMessage = "声调差一点点，正确是 \(word.fullSyllable)（第 \(word.toneNumber) 声 · \(ch) \(hint.phrase)）"
             } else {
-                chefBubble = "没关系，记住绿色的正确食材卡片哦！"
+                chefBubble = "没关系，记住绿色的正确食材卡片哦！\(shieldMsg)"
                 tipMessage = "不对哦，正确是 \(word.fullSyllable)（\(ch) · \(hint.phrase)）"
             }
             tipStyle = "no"
@@ -1980,7 +3001,7 @@ public final class GameEngine: ObservableObject {
         roundStars = stars
 
         progress.ensureDaily()
-        if rightCount >= 4 {
+        if stars >= 1 {
             progress.daily.rounds += 1
         }
 
@@ -1991,21 +3012,21 @@ public final class GameEngine: ObservableObject {
                 if stars > (progress.stars[lvKey] ?? 0) {
                     progress.stars[lvKey] = stars
                 }
-                if rightCount >= 4 && currentLevelNumber + 1 > progress.unlocked && currentLevelNumber < LevelRepository.levels.count {
+                if stars >= 1 && currentLevelNumber + 1 > progress.unlocked && currentLevelNumber < LevelRepository.levels.count {
                     progress.unlocked = currentLevelNumber + 1
                 }
             case .math:
                 if stars > (progress.mathStars[lvKey] ?? 0) {
                     progress.mathStars[lvKey] = stars
                 }
-                if rightCount >= 4 && currentLevelNumber + 1 > progress.mathUnlocked && currentLevelNumber < HujiaoCurriculumRepository.mathStages.count {
+                if stars >= 1 && currentLevelNumber + 1 > progress.mathUnlocked && currentLevelNumber < HujiaoCurriculumRepository.mathStages.count {
                     progress.mathUnlocked = currentLevelNumber + 1
                 }
             case .english:
                 if stars > (progress.englishStars[lvKey] ?? 0) {
                     progress.englishStars[lvKey] = stars
                 }
-                if rightCount >= 4 && currentLevelNumber + 1 > progress.englishUnlocked && currentLevelNumber < HujiaoCurriculumRepository.englishStages.count {
+                if stars >= 1 && currentLevelNumber + 1 > progress.englishUnlocked && currentLevelNumber < HujiaoCurriculumRepository.englishStages.count {
                     progress.englishUnlocked = currentLevelNumber + 1
                 }
             }
@@ -2013,6 +3034,8 @@ public final class GameEngine: ObservableObject {
 
         progress.history.append(
             HistoryEntry(
+                uid: UUID().uuidString,
+                ts: Date().timeIntervalSince1970,
                 d: GameProgress.todayString(),
                 subj: currentSubject.rawValue,
                 lv: currentLevelNumber,
@@ -2022,19 +3045,25 @@ public final class GameEngine: ObservableObject {
                 f: currentFire.rawValue
             )
         )
+        progress.history.sort {
+            let t0 = $0.ts ?? 0
+            let t1 = $1.ts ?? 0
+            if t0 != t1 { return t0 < t1 }
+            return $0.d < $1.d
+        }
         if progress.history.count > 60 {
             progress.history = Array(progress.history.suffix(60))
         }
 
         var gifts: [PrincessFashionItem] = []
         var upgrades: [FashionUpgradeEvent] = []
-        if rightCount >= 4 {
+        if stars >= 1 {
             let clearKey = "\(currentSubject.rawValue)_\(currentLevelNumber)"
             let isFirstClear = (specialMode == nil && (progress.cleared[clearKey] ?? 0) == 0)
             if specialMode == nil {
                 progress.cleared[clearKey] = 1
             }
-            for _ in 0..<currentFire.butterflyRolls {
+            for _ in 0..<currentFire.fashionRolls {
                 gifts.append(rollFashionReward(stars: stars, fire: currentFire))
             }
             if isFirstClear {
@@ -2049,12 +3078,10 @@ public final class GameEngine: ObservableObject {
             }
             for g in gifts {
                 progress.wardrobe[g.id] = (progress.wardrobe[g.id] ?? 0) + 1
-                // 若当前槽位装备的是更低稀有度且新获得了更高阶或新部位，可自动为公主换上新衣
-                let catKey = g.category.rawValue
-                if let currentId = progress.equippedOutfit[catKey],
-                   let currentItem = PrincessFashionItem.item(for: currentId),
-                   g.rarity > currentItem.rarity && (countBefore[g.id] ?? 0) == 0 {
-                    progress.equippedOutfit[catKey] = g.id
+                // 仅当掉落服饰严格高于当前已穿戴品阶且为首次解锁时自动换上，绝不覆盖更高阶穿搭
+                let currentItem = progress.equippedItem(for: g.category)
+                if g.tier > currentItem.tier && (countBefore[g.id] ?? 0) == 0 {
+                    progress.equippedOutfit[g.category.rawValue] = g.id
                 }
             }
 
@@ -2089,18 +3116,41 @@ public final class GameEngine: ObservableObject {
                 }
             }
 
-            // 通关额外星币奖励（精细化难度梯度）+ 生成局末「三选一神秘宝箱」
-            let clearBonus = isFirstClear ? 35 : (stars * 8)
+            // 通关额外星币奖励 + 萌宠/游乐园结算增益 + 局末「三选一神秘宝箱」
+            let mult = equippedPetStage >= 4 ? 2 : 1
+            var clearBonus = isFirstClear ? 35 : (stars * 8)
+            if equippedPet.kind == .corgiPilot {
+                clearBonus += 15 * mult
+            }
+            if (progress.castleUnlocked["air_balloon"] ?? 0) > 0 {
+                clearBonus += 8
+            }
+            if stars == 3 && (progress.castleUnlocked["fireworks"] ?? 0) > 0 {
+                clearBonus += 20
+                audio.sfxFirework()
+            }
             progress.coins += clearBonus
             roundCoinsEarned += clearBonus
 
-            let chestPool: [MysteryChestItem] = [
-                MysteryChestItem(id: 0, title: "58 枚星光币福袋", subtitle: "金光闪闪的裁缝星光币", emoji: "💰", rewardType: "coins", amount: 58, accentHex: "#F5A623"),
-                MysteryChestItem(id: 1, title: "皇家扭蛋券 ×1 + 15星币", subtitle: "可免费孵化 1 只五阶守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385"),
-                MysteryChestItem(id: 2, title: "高定华服变装盲盒", subtitle: "立刻获得 1 件公主礼服或皇冠首饰", emoji: "👗", rewardType: "fashion", amount: 1, accentHex: "#7A6EE6"),
-                MysteryChestItem(id: 3, title: "38 枚星光币礼盒", subtitle: "可升级高定礼服或投喂神兽", emoji: "🪙", rewardType: "coins", amount: 38, accentHex: "#3EA865")
+            let ticketTemplate = MysteryChestItem(id: 0, title: "皇家扭蛋券 ×1 + 15星币", subtitle: "可免费孵化 1 只五阶守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385")
+            let fashionTemplate = MysteryChestItem(id: 1, title: "高定华服变装盲盒", subtitle: "立刻获得 1 件公主礼服或皇冠首饰", emoji: "👗", rewardType: "fashion", amount: 1, accentHex: "#7A6EE6")
+            let optionalPool: [MysteryChestItem] = [
+                MysteryChestItem(id: 2, title: "58 枚星光币福袋", subtitle: "金光闪闪的裁缝星光币", emoji: "💰", rewardType: "coins", amount: 58, accentHex: "#F5A623"),
+                MysteryChestItem(id: 3, title: "星光锦缎 ×1 + 15星币", subtitle: "直接为任意公主华服 +1 升阶经验", emoji: "🧵", rewardType: "thread", amount: 1, accentHex: "#9B6EF3"),
+                MysteryChestItem(id: 4, title: "神兽糖果 ×1 + 15星币", subtitle: "可口高甜魔法糖果，直接 +3 成长值", emoji: "🌟", rewardType: "candy", amount: 1, accentHex: "#3A86FF"),
+                MysteryChestItem(id: 5, title: "38 枚星光币礼盒", subtitle: "可升级高定礼服或投喂神兽", emoji: "🪙", rewardType: "coins", amount: 38, accentHex: "#3EA865")
             ].shuffled()
-            mysteryChests = Array(chestPool.prefix(3)).enumerated().map { idx, item in
+
+            let pickedTemplates: [MysteryChestItem]
+            if stars == 3 && currentFire == .high {
+                pickedTemplates = ([ticketTemplate, fashionTemplate] + Array(optionalPool.prefix(1))).shuffled()
+            } else {
+                pickedTemplates = Array(([ticketTemplate, fashionTemplate] + optionalPool).shuffled().prefix(3))
+            }
+
+            let canPeek = progress.totalGlamourScore >= 500 || progress.suitBonusInfo().isHalfResonance
+            let peekIdx = canPeek ? Int.random(in: 0..<3) : -1
+            mysteryChests = pickedTemplates.enumerated().map { idx, item in
                 MysteryChestItem(
                     id: idx,
                     title: item.title,
@@ -2108,7 +3158,9 @@ public final class GameEngine: ObservableObject {
                     emoji: item.emoji,
                     rewardType: item.rewardType,
                     amount: item.amount,
-                    accentHex: item.accentHex
+                    accentHex: item.accentHex,
+                    fashionItemId: item.fashionItemId,
+                    isPeeked: idx == peekIdx
                 )
             }
             openedChestIndex = nil
@@ -2118,15 +3170,32 @@ public final class GameEngine: ObservableObject {
         }
 
         rewardedFashionInRound = gifts
+        refreshDailyDerivedState()
         saveProgress()
         screenState = .result
 
         if !gifts.isEmpty {
+            let gen = roundGeneration
+            let resetGen = stateResetGeneration
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 300_000_000)
+                while self.eyeRestActive {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard self.roundGeneration == gen
+                        && self.stateResetGeneration == resetGen
+                        && self.screenState == .result
+                        && self.playLock == nil else { return }
                 self.audio.sfxSpark()
                 if !upgrades.isEmpty {
                     try? await Task.sleep(nanoseconds: 650_000_000)
+                    while self.eyeRestActive {
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                    }
+                    guard self.roundGeneration == gen
+                            && self.stateResetGeneration == resetGen
+                            && self.screenState == .result
+                            && self.playLock == nil else { return }
                     self.pendingFashionUpgrades.append(contentsOf: upgrades)
                 }
             }
@@ -2185,6 +3254,12 @@ public final class GameEngine: ObservableObject {
 
     /// 每秒心跳：统计用眼时长、触发 20-20-20 望远护眼操、检查每日上限与睡前打烊
     public func tickEyeCareSecond() {
+        let today = GameProgress.todayString()
+        if progress.daily.d != today {
+            progress.ensureDaily()
+            refreshDailyDerivedState()
+        }
+
         // 如果正在护眼休息倒计时
         if eyeRestActive {
             if restRemaining > 0 {
@@ -2200,7 +3275,6 @@ public final class GameEngine: ObservableObject {
         checkPlayLockStatus(allowDuringQuestion: screenState != .playing)
         guard playLock == nil else { return }
 
-        let today = GameProgress.todayString()
         progress.playSeconds[today] = (progress.playSeconds[today] ?? 0) + 1
         unsavedPlaySeconds += 1
         continuousPlaySeconds += 1

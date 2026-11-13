@@ -12,6 +12,10 @@ public final class PinyinAudioEngine: ObservableObject {
     private let playerNode = AVAudioPlayerNode()
     private var audioFormat: AVAudioFormat?
     private var blendingTask: Task<Void, Never>?
+    private var isPlayerAttached = false
+    private var isPlayerConnected = false
+    private var isReconfiguringAudio = false
+    private var observerTokens: [NSObjectProtocol] = []
 
     // MARK: - 小学语文标准声母呼读音映射
     public static let initialCallouts: [String: String] = [
@@ -41,9 +45,9 @@ public final class PinyinAudioEngine: ObservableObject {
     // MARK: - 带调韵母四声精确同音字表（确保四声调料瓶点读 100% 准音）
     public static let tonedFinalCallouts: [String: String] = [
         // 单韵母四声
-        "ā": "阿", "á": "啊", "ǎ": "呵", "à": "爸",
+        "ā": "阿", "á": "啊", "ǎ": "啊", "à": "爸",
         "ō": "喔", "ó": "哦", "ǒ": "我", "ò": "卧",
-        "ē": "阿", "é": "鹅", "ě": "恶", "è": "饿",
+        "ē": "婀", "é": "鹅", "ě": "噁", "è": "饿",
         "ī": "衣", "í": "姨", "ǐ": "椅", "ì": "意",
         "ū": "屋", "ú": "无", "ǔ": "五", "ù": "雾",
         "ǖ": "迂", "ǘ": "鱼", "ǚ": "雨", "ǜ": "玉",
@@ -88,11 +92,13 @@ public final class PinyinAudioEngine: ObservableObject {
     ]
 
     private init() {
+        setupAudioSessionIfNeeded()
         setupAudioEngine()
+        setupAudioObservers()
         selectPreferredChineseVoice()
     }
 
-    private func setupAudioEngine() {
+    private func setupAudioSessionIfNeeded() {
         #if os(iOS)
         do {
             let session = AVAudioSession.sharedInstance()
@@ -102,18 +108,160 @@ public final class PinyinAudioEngine: ObservableObject {
             // 静默容错
         }
         #endif
-        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)
-        self.audioFormat = format
-        audioEngine.attach(playerNode)
-        if let format = format {
-            audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: format)
+    }
+
+    private func currentHardwareSampleRate() -> Double {
+        let outputSR = audioEngine.outputNode.outputFormat(forBus: 0).sampleRate
+        if outputSR > 0 {
+            return outputSR
         }
-        do {
-            try audioEngine.start()
+        #if os(iOS)
+        let sessionSR = AVAudioSession.sharedInstance().sampleRate
+        if sessionSR > 0 {
+            return sessionSR
+        }
+        #endif
+        return 44100.0
+    }
+
+    private func setupAudioEngine() {
+        rebuildAudioGraph(forceReconnect: true)
+    }
+
+    private func rebuildAudioGraph(forceReconnect: Bool = false) {
+        guard !isReconfiguringAudio else { return }
+        isReconfiguringAudio = true
+        defer { isReconfiguringAudio = false }
+
+        setupAudioSessionIfNeeded()
+
+        let targetSampleRate = currentHardwareSampleRate()
+        let needsFormatChange = audioFormat?.sampleRate != targetSampleRate
+
+        if forceReconnect || needsFormatChange || !isPlayerAttached || !isPlayerConnected {
+            if isPlayerAttached {
+                playerNode.stop()
+            }
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            if isPlayerAttached {
+                audioEngine.disconnectNodeInput(playerNode)
+                audioEngine.disconnectNodeOutput(playerNode)
+                audioEngine.detach(playerNode)
+                isPlayerAttached = false
+                isPlayerConnected = false
+            }
+            audioEngine.reset()
+
+            let finalSampleRate = currentHardwareSampleRate()
+            let format = AVAudioFormat(standardFormatWithSampleRate: finalSampleRate, channels: 1)
+            self.audioFormat = format
+
+            audioEngine.attach(playerNode)
+            isPlayerAttached = true
+
+            if let format = format {
+                audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: format)
+                isPlayerConnected = true
+            }
+        }
+
+        if !audioEngine.isRunning {
+            audioEngine.prepare()
+            do {
+                try audioEngine.start()
+            } catch {
+                // 静默容错
+                return
+            }
+        }
+
+        if isPlayerAttached && isPlayerConnected && audioEngine.isRunning && !playerNode.isPlaying {
             playerNode.play()
-        } catch {
-            // 静默容错
         }
+    }
+
+    private func ensureAudioReadyForPlayback() {
+        let hwRate = currentHardwareSampleRate()
+        let nodeFormat = playerNode.outputFormat(forBus: 0)
+        let rateMismatch = (audioFormat?.sampleRate != hwRate) || (nodeFormat.sampleRate != audioFormat?.sampleRate)
+        if !isPlayerAttached || !isPlayerConnected || !audioEngine.isRunning || rateMismatch {
+            rebuildAudioGraph(forceReconnect: rateMismatch || !isPlayerAttached || !isPlayerConnected)
+        } else if !playerNode.isPlaying {
+            playerNode.play()
+        }
+    }
+
+    private func setupAudioObservers() {
+        guard observerTokens.isEmpty else { return }
+        let center = NotificationCenter.default
+
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        let interruptionToken = center.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: session,
+            queue: .main
+        ) { [weak self] notification in
+            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+            Task { @MainActor [weak self] in
+                guard let self = self,
+                      let rawType = rawType,
+                      let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
+                switch type {
+                case .began:
+                    if self.isPlayerAttached {
+                        self.playerNode.pause()
+                    }
+                    if self.audioEngine.isRunning {
+                        self.audioEngine.pause()
+                    }
+                case .ended:
+                    let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions ?? 0)
+                    self.setupAudioSessionIfNeeded()
+                    if options.contains(.shouldResume) || !self.audioEngine.isRunning {
+                        self.rebuildAudioGraph(forceReconnect: true)
+                    }
+                @unknown default:
+                    break
+                }
+            }
+        }
+        observerTokens.append(interruptionToken)
+
+        let routeChangeToken = center.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: session,
+            queue: .main
+        ) { [weak self] notification in
+            let rawReason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            Task { @MainActor [weak self] in
+                guard let self = self,
+                      let rawReason = rawReason,
+                      let reason = AVAudioSession.RouteChangeReason(rawValue: rawReason) else { return }
+                switch reason {
+                case .newDeviceAvailable, .oldDeviceUnavailable, .categoryChange, .override, .wakeFromSleep, .routeConfigurationChange:
+                    self.rebuildAudioGraph(forceReconnect: true)
+                default:
+                    break
+                }
+            }
+        }
+        observerTokens.append(routeChangeToken)
+        #endif
+
+        let configChangeToken = center.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: audioEngine,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.rebuildAudioGraph(forceReconnect: true)
+            }
+        }
+        observerTokens.append(configChangeToken)
     }
 
     private func selectPreferredChineseVoice() {
@@ -156,6 +304,7 @@ public final class PinyinAudioEngine: ObservableObject {
 
     public func speakEnglish(_ text: String, slow: Bool = false) {
         guard !text.isEmpty else { return }
+        setupAudioSessionIfNeeded()
         blendingTask?.cancel()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
@@ -169,6 +318,7 @@ public final class PinyinAudioEngine: ObservableObject {
     }
 
     public func speakBilingual(english: String?, chinese: String, slow: Bool = false) {
+        setupAudioSessionIfNeeded()
         blendingTask?.cancel()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
@@ -210,6 +360,7 @@ public final class PinyinAudioEngine: ObservableObject {
     }
 
     private func speakUtteranceImmediate(_ text: String, slow: Bool = false, rateOverride: Float? = nil) {
+        setupAudioSessionIfNeeded()
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = preferredVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
         if let rateOverride = rateOverride {
@@ -283,6 +434,7 @@ public final class PinyinAudioEngine: ObservableObject {
         }
 
         blendingTask = Task { @MainActor in
+            guard !Task.isCancelled else { return }
             let stepDelay: UInt64 = slow ? 520_000_000 : 380_000_000
 
             if word.mode == .whole {
@@ -293,12 +445,14 @@ public final class PinyinAudioEngine: ObservableObject {
                 onHighlightStep("char")
                 speakUtteranceImmediate("\(word.character)，\(phrase)", slow: slow)
                 try? await Task.sleep(nanoseconds: 900_000_000)
+                guard !Task.isCancelled else { return }
                 onHighlightStep(nil)
                 return
             }
 
             // 1. 读声母
             if let ini = word.initial {
+                guard !Task.isCancelled else { return }
                 onHighlightStep("i")
                 let iniCallout = Self.initialCallouts[ini] ?? ini
                 speakUtteranceImmediate(iniCallout, slow: slow, rateOverride: slow ? 0.44 : 0.54)
@@ -308,6 +462,7 @@ public final class PinyinAudioEngine: ObservableObject {
 
             // 2. 如果是三拼，读介音
             if word.mode == .tri, let med = word.medial {
+                guard !Task.isCancelled else { return }
                 onHighlightStep("m")
                 let medCallout = Self.baseFinalCallouts[med] ?? med
                 speakUtteranceImmediate(medCallout, slow: slow, rateOverride: slow ? 0.44 : 0.54)
@@ -316,6 +471,7 @@ public final class PinyinAudioEngine: ObservableObject {
             }
 
             // 3. 读带调韵母（若为 j/q/x + u/un，自动按 ü/ün 真实读音播报）
+            guard !Task.isCancelled else { return }
             onHighlightStep("f")
             let effectiveToned = Self.normalizeJQXFinalForSpeech(tonedFinal: word.tonedFinal, initial: word.initial)
             let finCallout = Self.tonedFinalCallouts[effectiveToned] ?? word.character
@@ -336,15 +492,24 @@ public final class PinyinAudioEngine: ObservableObject {
     // MARK: - 趣味合成音效 (WebAudio 级实时波形合成)
 
     private func playTones(_ notes: [(freq: Double, delay: Double, duration: Double, wave: String, vol: Float)]) {
-        guard let format = audioFormat else { return }
-        if !audioEngine.isRunning {
-            try? audioEngine.start()
+        ensureAudioReadyForPlayback()
+        guard audioEngine.isRunning,
+              isPlayerAttached,
+              isPlayerConnected,
+              let format = audioFormat else { return }
+        let nodeFormat = playerNode.outputFormat(forBus: 0)
+        guard nodeFormat.sampleRate == format.sampleRate,
+              nodeFormat.channelCount == format.channelCount else {
+            return
+        }
+        if !playerNode.isPlaying {
             playerNode.play()
         }
         let sampleRate = format.sampleRate
         let totalDur = (notes.map { $0.delay + $0.duration }.max() ?? 0.2) + 0.06
         let frameCount = AVAudioFrameCount(totalDur * sampleRate)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+        guard frameCount > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
         buffer.frameLength = frameCount
         guard let channelData = buffer.floatChannelData?[0] else { return }
 
@@ -483,6 +648,41 @@ public final class PinyinAudioEngine: ObservableObject {
             (988,  0.06, 0.10, "sine", 0.15),
             (1318, 0.12, 0.14, "sine", 0.17),
             (1976, 0.18, 0.28, "sine", 0.19)
+        ])
+    }
+
+    /// 狂热连击爆发欢呼音效
+    public func sfxFever() {
+        playTones([
+            (523,  0.00, 0.08, "triangle", 0.12),
+            (659,  0.05, 0.09, "sine",     0.14),
+            (784,  0.10, 0.10, "sine",     0.15),
+            (1047, 0.15, 0.14, "sine",     0.17),
+            (1319, 0.21, 0.20, "sine",     0.16),
+            (1568, 0.27, 0.28, "sine",     0.15)
+        ])
+    }
+
+    /// 幸运大转盘飞转拨片音效
+    public func sfxWheelSpin() {
+        playTones([
+            (740,  0.00, 0.035, "triangle", 0.11),
+            (880,  0.05, 0.035, "triangle", 0.11),
+            (988,  0.11, 0.035, "triangle", 0.12),
+            (880,  0.18, 0.04,  "triangle", 0.11),
+            (784,  0.26, 0.045, "triangle", 0.10),
+            (1047, 0.36, 0.14,  "sine",     0.14)
+        ])
+    }
+
+    /// 花式搅拌旋转魔法音效
+    public func sfxTwirl() {
+        playTones([
+            (587,  0.00, 0.07, "sine",     0.12),
+            (740,  0.05, 0.08, "sine",     0.13),
+            (880,  0.10, 0.09, "triangle", 0.13),
+            (1175, 0.15, 0.14, "sine",     0.15),
+            (1480, 0.21, 0.22, "sine",     0.14)
         ])
     }
 }

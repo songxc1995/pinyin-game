@@ -27,6 +27,8 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
     public let secondaryHex: String
     public let accentHex: String
     public let favoriteFood: String
+    public let baseCoinPerQuestion: Int
+    public let skillShortTag: String
     public let skillDesc: String
     public let cheerLine: String
 
@@ -43,6 +45,38 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
         case 3: return "#E25247"
         case 2: return "#F07D2E"
         default: return "#7A6EE6"
+        }
+    }
+
+    public func effectiveSkillSummary(forStage stage: Int) -> String {
+        let mult = stage >= 4 ? 2 : 1
+        let coin = baseCoinPerQuestion * mult
+        let prefix = stage >= 4 ? "👑 4阶翻倍生效中 · " : ""
+        switch kind {
+        case .fireDragon:
+            return "\(prefix)每答对 1 题额外 +\(coin) 🪙"
+        case .unicorn:
+            return "\(prefix)每题 +\(coin) 🪙，3连击起额外 +1 彩虹能量 & 满槽 +\(10 * mult) 🪙"
+        case .nineTailFox:
+            return "\(prefix)每题 +\(coin) 🪙，\(15 * mult)% 概率灵感爆发 +\(12 * mult) 🪙"
+        case .azureDragon:
+            return "\(prefix)每题 +\(coin) 🪙，连击额外每层 +\(mult) 🪙（至多 +\(5 * mult)）"
+        case .phoenix:
+            return "\(prefix)每题 +\(coin) 🪙，每局保护连击不断 \(mult) 次"
+        case .pandaChef:
+            return "\(prefix)每题 +\(coin) 🪙，拼音/数学首答正确额外 +\(3 * mult) 🪙"
+        case .whale:
+            return "\(prefix)每题 +\(coin) 🪙，彩虹宝箱额外喷出 +\(12 * mult) 🪙"
+        case .luckyCat:
+            return "\(prefix)每题 +\(coin) 🪙，\(18 * mult)% 概率触发此题星币双倍"
+        case .owlDoctor:
+            return "\(prefix)每题 +\(coin) 🪙，攻克错题额外 +\(15 * mult) 🪙"
+        case .auroraDeer:
+            return "\(prefix)每题 +\(coin) 🪙，高阶华服掉落率 +\(15 * mult)%"
+        case .moonRabbit:
+            return "\(prefix)每题 +\(coin) 🪙，英语首答正确额外 +\(3 * mult) 🪙"
+        case .corgiPilot:
+            return "\(prefix)每题 +\(coin) 🪙，通关结算速递 +\(15 * mult) 🪙"
         }
     }
 
@@ -64,7 +98,7 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
     public static func stageVisualPerk(for stage: Int) -> String {
         switch stage {
         case 5: return "九彩极光大法阵 + 双层流光神翼 + 宝石皇冠 + 漫天星雨"
-        case 4: return "悬浮黄金皇冠 + 璀璨护体金盾 + 伴读星币加成翻倍"
+        case 4: return "悬浮黄金皇冠 + 璀璨护体金盾 + 伴读技能与星币加成翻倍"
         case 3: return "旋转星芒魔法阵 + 幻彩流光羽翼与星尘"
         case 2: return "双色呼吸柔光光环 + 灵动漂浮特效"
         default: return "软萌初始幼崽形态"
@@ -93,7 +127,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FFD166",
             accentHex: "#E63946",
             favoriteFood: "火焰脆皮烤肉",
-            skillDesc: "答对题目时额外加成 +5 星币",
+            baseCoinPerQuestion: 5,
+            skillShortTag: "🔥 每题+5币",
+            skillDesc: "答对题目时额外加成 +5 星币（4阶起翻倍至 +10）",
             cheerLine: "嗷呜～我的小火苗帮你把料理烤得香喷喷！"
         ),
         GuardianPetSpecies(
@@ -106,7 +142,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FF9EBB",
             accentHex: "#FFD166",
             favoriteFood: "彩虹棉花糖马卡龙",
-            skillDesc: "连击能量满槽时额外掉落星光祝福",
+            baseCoinPerQuestion: 3,
+            skillShortTag: "🌈 彩虹加速",
+            skillDesc: "每题 +3 星币，3连击起额外 +1 彩虹能量 & 满槽额外 +10 星币（4阶翻倍）",
             cheerLine: "叮咚✨ 独角兽的彩虹星尘为你照亮满分答案！"
         ),
         GuardianPetSpecies(
@@ -119,7 +157,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FFE5EC",
             accentHex: "#FB5607",
             favoriteFood: "蜜汁樱花豆皮寿司",
-            skillDesc: "摇动蓬松狐尾为你注入灵感",
+            baseCoinPerQuestion: 3,
+            skillShortTag: "🦊 灵感暴击",
+            skillDesc: "每题 +3 星币，15% 概率触发「狐仙灵感」额外 +12 星币（4阶概率与奖励翻倍）",
             cheerLine: "摇摇大尾巴～今天你也是最聪明的小厨神！"
         ),
         GuardianPetSpecies(
@@ -132,7 +172,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#90E0EF",
             accentHex: "#FFB703",
             favoriteFood: "水晶虾饺皇",
-            skillDesc: "呼风唤雨，助你乘风破浪连战连捷",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🐉 连击加码",
+            skillDesc: "每题 +2 星币，每多 1 层连击额外 +1 星币（至多 +5，4阶翻倍）",
             cheerLine: "腾云驾雾来陪你读书闯关，冲呀！"
         ),
         GuardianPetSpecies(
@@ -145,7 +187,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FCBF49",
             accentHex: "#D62828",
             favoriteFood: "黄金流沙蛋黄酥",
-            skillDesc: "华丽尾羽发光，守护你的每一次连击",
+            baseCoinPerQuestion: 3,
+            skillShortTag: "🔥 护连击盾",
+            skillDesc: "每题 +3 星币，每局免疫 1 次答错连击中断（4阶起加成翻倍至 2 次）",
             cheerLine: "啾啾～金羽闪耀，难题统统难不倒你！"
         ),
         GuardianPetSpecies(
@@ -158,7 +202,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FFFFFF",
             accentHex: "#3EA865",
             favoriteFood: "翡翠鲜笋小笼包",
-            skillDesc: "精通四声调料与加减口诀",
+            baseCoinPerQuestion: 3,
+            skillShortTag: "🐼 语数专精",
+            skillDesc: "每题 +3 星币，语文拼音与数学首次答对额外 +3 星币（4阶翻倍）",
             cheerLine: "嘿哈！吃饱竹笋小笼包，拼音数学全拿捏！"
         ),
         GuardianPetSpecies(
@@ -171,7 +217,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#BDE0FE",
             accentHex: "#FFBE0B",
             favoriteFood: "海盐蓝莓果冻杯",
-            skillDesc: "头顶喷出彩虹水柱为你欢呼",
+            baseCoinPerQuestion: 3,
+            skillShortTag: "🐳 彩虹加奖",
+            skillDesc: "每题 +3 星币，爆出彩虹宝箱时额外喷出 +12 星币（4阶翻倍）",
             cheerLine: "噗噜噜🐳 我喷出一道大彩虹送给你！"
         ),
         GuardianPetSpecies(
@@ -184,7 +232,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FFF3B0",
             accentHex: "#E63946",
             favoriteFood: "焦糖烤布丁小鱼干",
-            skillDesc: "金色猫爪摇一摇，星币滚滚来",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🐱 双倍招财",
+            skillDesc: "每题 +2 星币，18% 概率触发「招财双倍」本题星币翻倍（4阶概率翻倍）",
             cheerLine: "喵呜～金爪招一招，满屏金星飞过来！"
         ),
         GuardianPetSpecies(
@@ -197,7 +247,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#E0AAFF",
             accentHex: "#FFBE0B",
             favoriteFood: "坚果巧克力曲奇",
-            skillDesc: "头戴金穗博士帽，最懂算理与单词",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🦉 消错翻倍",
+            skillDesc: "每题 +2 星币，成功消灭错题本题目额外 +15 星币（4阶翻倍）",
             cheerLine: "咕咕🦉 仔细看题、认真听音，你一定能行！"
         ),
         GuardianPetSpecies(
@@ -210,7 +262,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#CBF3F0",
             accentHex: "#FF9F1C",
             favoriteFood: "鲜果抹茶千层蛋糕",
-            skillDesc: "鹿角盛开水晶花，带来森林好运",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🦌 华服幸运",
+            skillDesc: "每题 +2 星币，通关掉落高阶公主华服概率 +15%（4阶翻倍）",
             cheerLine: "呦呦鹿鸣～你看我的鹿角开出小花啦！"
         ),
         GuardianPetSpecies(
@@ -223,7 +277,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FFF0F3",
             accentHex: "#FFB703",
             favoriteFood: "桂花豆沙雪媚娘",
-            skillDesc: "长耳朵一抖一抖，陪你开心背单词",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🐰 英语专精",
+            skillDesc: "每题 +2 星币，英语关首次答对额外 +3 星币（4阶翻倍）",
             cheerLine: "蹦蹦跳跳🐰 我做了甜甜的雪媚娘奖励你！"
         ),
         GuardianPetSpecies(
@@ -236,7 +292,9 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
             secondaryHex: "#FEFAE0",
             accentHex: "#2A9D8F",
             favoriteFood: "芝士热狗华夫饼",
-            skillDesc: "戴着飞行护目镜，摇着小短腿为你助威",
+            baseCoinPerQuestion: 2,
+            skillShortTag: "🐶 通关速递",
+            skillDesc: "每题 +2 星币，每局通关结算额外速递 +15 星币（4阶翻倍）",
             cheerLine: "汪汪！小短腿火力全开，冲向下一关！"
         )
     ]
@@ -246,7 +304,7 @@ public struct GuardianPetSpecies: Identifiable, Equatable, Sendable {
     }
 }
 
-// MARK: - 🏰 皇家童话游乐园 8 大动态景观设施
+// MARK: - 🏰 皇家童话游乐园 8 大动态景观设施（含实质加成）
 public struct CastleAttraction: Identifiable, Equatable, Sendable {
     public let id: String
     public let name: String
@@ -256,6 +314,8 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
     public let primaryHex: String
     public let secondaryHex: String
     public let cheerSpeech: String
+    public let perkShortTag: String
+    public let perkDesc: String
 
     public static let all: [CastleAttraction] = [
         CastleAttraction(
@@ -266,7 +326,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "⛲",
             primaryHex: "#3685D6",
             secondaryHex: "#90E0EF",
-            cheerSpeech: "哗啦啦！音乐宝石喷泉正在为你喷洒幸运水珠！"
+            cheerSpeech: "哗啦啦！音乐宝石喷泉正在为你喷洒幸运水珠！",
+            perkShortTag: "💧 每题 +1 币",
+            perkDesc: "游乐园开园祝福：每答对 1 题额外 +1 幸运星币"
         ),
         CastleAttraction(
             id: "ferris_wheel",
@@ -276,7 +338,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🎡",
             primaryHex: "#E05385",
             secondaryHex: "#FFD166",
-            cheerSpeech: "彩虹糖果摩天轮转起来啦，坐上最高处看星星吧！"
+            cheerSpeech: "彩虹糖果摩天轮转起来啦，坐上最高处看星星吧！",
+            perkShortTag: "🌈 宝箱 +10 币",
+            perkDesc: "集满 8 格彩虹宝箱时额外掉落 +10 星币"
         ),
         CastleAttraction(
             id: "carousel",
@@ -286,7 +350,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🎠",
             primaryHex: "#F07D2E",
             secondaryHex: "#FFE5EC",
-            cheerSpeech: "叮叮当当，皇家旋转木马带你进入童话王国！"
+            cheerSpeech: "叮叮当当，皇家旋转木马带你进入童话王国！",
+            perkShortTag: "💖 摸宠 +1 次",
+            perkDesc: "每日免费「摸摸抱抱」互动次数 +1（3→4 次）"
         ),
         CastleAttraction(
             id: "air_balloon",
@@ -296,7 +362,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🎈",
             primaryHex: "#7A6EE6",
             secondaryHex: "#FF9EBB",
-            cheerSpeech: "呼——星空热气球飞上蓝天白云间啦！"
+            cheerSpeech: "呼——星空热气球飞上蓝天白云间啦！",
+            perkShortTag: "🎈 结算 +8 币",
+            perkDesc: "每局获星通关结算额外飘落 +8 星币"
         ),
         CastleAttraction(
             id: "windmill",
@@ -306,7 +374,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🍭",
             primaryHex: "#2FB380",
             secondaryHex: "#FFD166",
-            cheerSpeech: "呼呼转动的棒棒糖大风车，吹来甜甜的奶油香气！"
+            cheerSpeech: "呼呼转动的棒棒糖大风车，吹来甜甜的奶油香气！",
+            perkShortTag: "🎁 翻牌 +10 币",
+            perkDesc: "开启局末三选一神秘宝箱时额外附赠 +10 星币"
         ),
         CastleAttraction(
             id: "clock_tower",
@@ -316,7 +386,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🕰️",
             primaryHex: "#C8870A",
             secondaryHex: "#FFF3B0",
-            cheerSpeech: "铛——铛——魔法天文钟楼为你敲响胜利的钟声！"
+            cheerSpeech: "铛——铛——魔法天文钟楼为你敲响胜利的钟声！",
+            perkShortTag: "🎡 转盘 +15 币",
+            perkDesc: "每次旋转每日幸运小转盘额外赠送 +15 星币"
         ),
         CastleAttraction(
             id: "music_box",
@@ -326,7 +398,9 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🎶",
             primaryHex: "#9B6EF3",
             secondaryHex: "#E0AAFF",
-            cheerSpeech: "叮咚叮咚，水晶八音盒奏响了最动听的凯旋曲！"
+            cheerSpeech: "叮咚叮咚，水晶八音盒奏响了最动听的凯旋曲！",
+            perkShortTag: "🎵 连击 +1 币",
+            perkDesc: "达成 3 连击及以上时，每答对 1 题额外 +1 星币"
         ),
         CastleAttraction(
             id: "fireworks",
@@ -336,9 +410,15 @@ public struct CastleAttraction: Identifiable, Equatable, Sendable {
             icon: "🎆",
             primaryHex: "#E25247",
             secondaryHex: "#FFD166",
-            cheerSpeech: "砰！啪！漫天绚丽的皇家烟花为你绽放！"
+            cheerSpeech: "砰！啪！漫天绚丽的皇家烟花为你绽放！",
+            perkShortTag: "🎆 三星 +20 币",
+            perkDesc: "3 星通关自动放皇家烟花并额外奖励 +20 星币"
         )
     ]
+
+    public static func byId(_ id: String) -> CastleAttraction? {
+        all.first(where: { $0.id == id })
+    }
 }
 
 // MARK: - 👗 满满公主换装衣橱与珠宝首饰系统（5 大自由搭配部位 · 4 阶华丽度）
@@ -526,7 +606,7 @@ public struct PrincessFashionItem: Identifiable, Equatable, Sendable {
         PrincessFashionItem(
             id: "hair_5", category: .hairTiara, styleIndex: 5,
             name: "太阳神耀金凤凰圣冠", subtitle: "纯金凤羽镶红宝石，头顶绽放圣洁金辉",
-            tier: 4, costCoins: 640, needStars: 55, icon: "🐦‍🔥",
+            tier: 4, costCoins: 640, needStars: 55, icon: "🔥",
             primaryHex: "#FFB703", secondaryHex: "#FFF3B0", accentHex: "#D62828"
         ),
 
@@ -584,7 +664,7 @@ public struct PrincessFashionItem: Identifiable, Equatable, Sendable {
         PrincessFashionItem(
             id: "wings_2", category: .wings, styleIndex: 2,
             name: "纯白雪绒白天鹅羽翼", subtitle: "洁白蓬松的层叠鹅羽，圣洁优雅",
-            tier: 2, costCoins: 240, needStars: 16, icon: "🪽",
+            tier: 2, costCoins: 240, needStars: 16, icon: "🕊️",
             primaryHex: "#A2D2FF", secondaryHex: "#FFFFFF", accentHex: "#FFD166"
         ),
         PrincessFashionItem(
@@ -634,7 +714,7 @@ public struct PrincessFashionItem: Identifiable, Equatable, Sendable {
         PrincessFashionItem(
             id: "wand_4", category: .wand, styleIndex: 4,
             name: "冰雪极光天鹅水晶竖琴", subtitle: "弹奏出梦幻彩音符的宝石小竖琴",
-            tier: 4, costCoins: 480, needStars: 38, icon: "🪉",
+            tier: 4, costCoins: 480, needStars: 38, icon: "🎻",
             primaryHex: "#00B4D8", secondaryHex: "#E0AAFF", accentHex: "#FFD166"
         ),
         PrincessFashionItem(
@@ -662,26 +742,404 @@ public struct PrincessFashionItem: Identifiable, Equatable, Sendable {
     }
 }
 
+// MARK: - 👑 六大高定套装图鉴与套装共鸣系统（styleIndex 0...5）
+public struct PrincessFashionSuit: Identifiable, Equatable, Sendable {
+    public var id: Int { styleIndex }
+    public let styleIndex: Int
+    public let name: String
+    public let subtitle: String
+    public let stageThemeName: String
+    public let primaryHex: String
+    public let secondaryHex: String
+    public let accentHex: String
+    public let fullCoinBonus: Int
+
+    public var itemIds: [String] {
+        ["dress_\(styleIndex)", "hair_\(styleIndex)", "jewel_\(styleIndex)", "wings_\(styleIndex)", "wand_\(styleIndex)"]
+    }
+
+    public var items: [PrincessFashionItem] {
+        itemIds.map { PrincessFashionItem.byId($0) }
+    }
+
+    public static let all: [PrincessFashionSuit] = [
+        PrincessFashionSuit(
+            styleIndex: 0,
+            name: "草莓甜心厨娘套装",
+            subtitle: "甜美波点围裙配荷叶双马尾，料理城初心启航",
+            stageThemeName: "🍓 甜心莓果厨房舞台",
+            primaryHex: "#FF85A1",
+            secondaryHex: "#FFF0F5",
+            accentHex: "#E63946",
+            fullCoinBonus: 1
+        ),
+        PrincessFashionSuit(
+            styleIndex: 1,
+            name: "薄荷马卡龙仙子套装",
+            subtitle: "清爽薄荷泡泡袖配透明仙翼，元气飘浮气球",
+            stageThemeName: "🧁 马卡龙花园舞台",
+            primaryHex: "#2EC4B6",
+            secondaryHex: "#CBF3F0",
+            accentHex: "#FF9F1C",
+            fullCoinBonus: 1
+        ),
+        PrincessFashionSuit(
+            styleIndex: 2,
+            name: "樱花晨露森林套装",
+            subtitle: "花瓣叠纱裙配粉玫瑰花冠与天鹅绒羽翼",
+            stageThemeName: "🌸 樱花飘落庭院舞台",
+            primaryHex: "#FF6B9D",
+            secondaryHex: "#FFE3EE",
+            accentHex: "#52B788",
+            fullCoinBonus: 2
+        ),
+        PrincessFashionSuit(
+            styleIndex: 3,
+            name: "冰雪天鹅水晶套装",
+            subtitle: "冰蓝曳地礼服配水晶天鹅冠与琉璃蝶翼",
+            stageThemeName: "❄️ 极光冰晶雪宫舞台",
+            primaryHex: "#3A86FF",
+            secondaryHex: "#CAF0F8",
+            accentHex: "#9B5DE5",
+            fullCoinBonus: 2
+        ),
+        PrincessFashionSuit(
+            styleIndex: 4,
+            name: "璀璨星月极光套装",
+            subtitle: "紫金星河礼服配七星女神冠与天鹅水晶竖琴",
+            stageThemeName: "🌌 星月极光银河舞台",
+            primaryHex: "#7209B7",
+            secondaryHex: "#F72585",
+            accentHex: "#FFD166",
+            fullCoinBonus: 3
+        ),
+        PrincessFashionSuit(
+            styleIndex: 5,
+            name: "太阳神金蔷薇套装",
+            subtitle: "加冕黄金宫廷裙配凤凰圣冠与九天流金神翼",
+            stageThemeName: "👑 黄金蔷薇皇家殿堂",
+            primaryHex: "#F59E0B",
+            secondaryHex: "#FEF3C7",
+            accentHex: "#E11D48",
+            fullCoinBonus: 3
+        )
+    ]
+
+    public static func byStyleIndex(_ styleIndex: Int) -> PrincessFashionSuit {
+        all.first(where: { $0.styleIndex == styleIndex }) ?? all[0]
+    }
+}
+
+public struct SuitBonusInfo: Equatable, Sendable {
+    public let suit: PrincessFashionSuit
+    public let suitName: String
+    public let matchedCount: Int
+    public let isHalfResonance: Bool
+    public let isFullResonance: Bool
+    public let glamourBonusPercent: Int
+    public let glamourMultiplier: Double
+    public let stageThemeId: Int
+    public let coinBonus: Int
+}
+
+// MARK: - 🎨 满满公主发色、表情、舞台 Pose 个性化定义
+public struct HairColorOption: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let primaryHex: String
+    public let highlightHex: String
+    public let shadowHex: String
+    public let needStars: Int
+    public let needGlamour: Int
+    public let unlockDesc: String
+
+    public static let all: [HairColorOption] = [
+        HairColorOption(id: "caramel", name: "焦糖暖棕", primaryHex: "#5A332B", highlightHex: "#8B5A4C", shadowHex: "#3A1E19", needStars: 0, needGlamour: 0, unlockDesc: "默认解锁"),
+        HairColorOption(id: "honey", name: "蜜糖金发", primaryHex: "#E9A93B", highlightHex: "#FFE082", shadowHex: "#B87314", needStars: 6, needGlamour: 0, unlockDesc: "累计 6 ★ 解锁"),
+        HairColorOption(id: "sakura", name: "樱花蜜粉", primaryHex: "#F472B6", highlightHex: "#FBCFE8", shadowHex: "#BE185D", needStars: 0, needGlamour: 350, unlockDesc: "华丽度 350 解锁"),
+        HairColorOption(id: "silver", name: "冰雪银霜", primaryHex: "#CBD5E1", highlightHex: "#F8FAFC", shadowHex: "#64748B", needStars: 24, needGlamour: 0, unlockDesc: "累计 24 ★ 解锁"),
+        HairColorOption(id: "aurora", name: "星空幻紫", primaryHex: "#8B5CF6", highlightHex: "#DDD6FE", shadowHex: "#5B21B6", needStars: 0, needGlamour: 500, unlockDesc: "华丽度 500 解锁")
+    ]
+
+    public static func byId(_ id: String) -> HairColorOption {
+        all.first(where: { $0.id == id }) ?? all[0]
+    }
+}
+
+public struct PrincessExpression: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let emoji: String
+    public let needStars: Int
+    public let unlockDesc: String
+
+    public static let all: [PrincessExpression] = [
+        PrincessExpression(id: "smile", name: "甜美微笑", emoji: "😊", needStars: 0, unlockDesc: "默认解锁"),
+        PrincessExpression(id: "wink", name: "俏皮 Wink", emoji: "😉", needStars: 0, unlockDesc: "默认解锁"),
+        PrincessExpression(id: "starry", name: "闪亮星星眼", emoji: "🤩", needStars: 10, unlockDesc: "累计 10 ★ 解锁"),
+        PrincessExpression(id: "pout", name: "甜酷嘟嘟嘴", emoji: "😗", needStars: 20, unlockDesc: "累计 20 ★ 解锁")
+    ]
+
+    public static func byId(_ id: String) -> PrincessExpression {
+        all.first(where: { $0.id == id }) ?? all[0]
+    }
+}
+
+public struct PrincessPose: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let name: String
+    public let emoji: String
+    public let needGlamour: Int
+    public let needStars: Int
+    public let unlockDesc: String
+
+    public static let all: [PrincessPose] = [
+        PrincessPose(id: "curtsy", name: "优雅拎裙礼", emoji: "🩰", needGlamour: 0, needStars: 0, unlockDesc: "默认解锁"),
+        PrincessPose(id: "wand_up", name: "魔法举杖礼", emoji: "🪄", needGlamour: 350, needStars: 0, unlockDesc: "华丽度 350 解锁"),
+        PrincessPose(id: "leap", name: "星光轻盈跃起", emoji: "🌟", needGlamour: 500, needStars: 0, unlockDesc: "华丽度 500 解锁")
+    ]
+
+    public static func byId(_ id: String) -> PrincessPose {
+        all.first(where: { $0.id == id }) ?? all[0]
+    }
+}
+
+// MARK: - ✨ 华丽度舞会爵位与成长里程碑系统
+public struct GlamourRankInfo: Equatable, Sendable {
+    public let level: Int
+    public let title: String
+    public let coinBonus: Int
+    public let currentMinScore: Int
+    public let nextMinScore: Int?
+    public let nextTitle: String?
+    public let frameHex: String
+
+    public static let tiers: [(minScore: Int, title: String, coinBonus: Int, frameHex: String)] = [
+        (0,   "🎀 甜心见习公主", 0, "#E2C9A8"),
+        (200, "🌸 星光舞会少女", 1, "#FF85A1"),
+        (350, "💎 优雅花冠名媛", 2, "#3A86FF"),
+        (500, "✨ 璀璨水晶殿下", 3, "#9D4EDD"),
+        (650, "👑 绝代风华女王", 4, "#F59E0B")
+    ]
+
+    public static func compute(score: Int) -> GlamourRankInfo {
+        var lv = 0
+        for (i, t) in tiers.enumerated() where score >= t.minScore {
+            lv = i
+        }
+        let cur = tiers[lv]
+        let next = lv + 1 < tiers.count ? tiers[lv + 1] : nil
+        return GlamourRankInfo(
+            level: lv,
+            title: cur.title,
+            coinBonus: cur.coinBonus,
+            currentMinScore: cur.minScore,
+            nextMinScore: next?.minScore,
+            nextTitle: next?.title,
+            frameHex: cur.frameHex
+        )
+    }
+}
+
+public struct StarMilestone: Identifiable, Equatable, Sendable {
+    public var id: Int { needStars }
+    public let needStars: Int
+    public let title: String
+    public let rewardCoins: Int
+    public let rewardTickets: Int
+    public let rewardStarThread: Int
+    public let rewardPetCandy: Int
+    public let rewardDesc: String
+
+    public static let all: [StarMilestone] = [
+        StarMilestone(needStars: 10, title: "🌱 初露锋芒", rewardCoins: 60, rewardTickets: 1, rewardStarThread: 1, rewardPetCandy: 0, rewardDesc: "+60 🪙 +1 🎟️ +1 🧵"),
+        StarMilestone(needStars: 20, title: "🍓 甜蜜摘星", rewardCoins: 80, rewardTickets: 1, rewardStarThread: 0, rewardPetCandy: 1, rewardDesc: "+80 🪙 +1 🎟️ +1 🌟"),
+        StarMilestone(needStars: 30, title: "🧁 烘焙新星", rewardCoins: 100, rewardTickets: 1, rewardStarThread: 1, rewardPetCandy: 0, rewardDesc: "+100 🪙 +1 🎟️ +1 🧵"),
+        StarMilestone(needStars: 40, title: "🌸 花园精灵", rewardCoins: 120, rewardTickets: 1, rewardStarThread: 0, rewardPetCandy: 1, rewardDesc: "+120 🪙 +1 🎟️ +1 🌟"),
+        StarMilestone(needStars: 50, title: "✨ 半程辉煌", rewardCoins: 150, rewardTickets: 2, rewardStarThread: 1, rewardPetCandy: 1, rewardDesc: "+150 🪙 +2 🎟️ +1 🧵 +1 🌟"),
+        StarMilestone(needStars: 60, title: "💎 水晶公主", rewardCoins: 180, rewardTickets: 2, rewardStarThread: 2, rewardPetCandy: 0, rewardDesc: "+180 🪙 +2 🎟️ +2 🧵"),
+        StarMilestone(needStars: 70, title: "🦄 神兽挚友", rewardCoins: 200, rewardTickets: 2, rewardStarThread: 0, rewardPetCandy: 2, rewardDesc: "+200 🪙 +2 🎟️ +2 🌟"),
+        StarMilestone(needStars: 80, title: "👑 皇家荣光", rewardCoins: 240, rewardTickets: 2, rewardStarThread: 2, rewardPetCandy: 1, rewardDesc: "+240 🪙 +2 🎟️ +2 🧵 +1 🌟"),
+        StarMilestone(needStars: 90, title: "🌈 大圆满女王", rewardCoins: 320, rewardTickets: 3, rewardStarThread: 2, rewardPetCandy: 2, rewardDesc: "+320 🪙 +3 🎟️ +2 🧵 +2 🌟")
+    ]
+}
+
+public struct CollectionMilestoneStatus: Equatable, Sendable {
+    public let subject: SubjectKind
+    public let currentCount: Int
+    public let step: Int
+    public let maxCount: Int
+    public let lastClaimedThreshold: Int
+    public let nextTarget: Int?
+    public let canClaim: Bool
+    public let rewardCoins: Int
+    public let rewardTickets: Int
+    public let rewardStarThread: Int
+    public let rewardDesc: String
+}
+
+// MARK: - 💃 每日公主舞会主题挑战 & 🎡 每日幸运小转盘
+public struct DailyBallTheme: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let title: String
+    public let subtitle: String
+    public let emoji: String
+    public let targetStyleIndex: Int
+    public let preferredCategory: PrincessFashionCategory
+    public let minMatchingPieces: Int
+    public let minGlamour: Int
+    public let rewardCoins: Int
+    public let rewardStarThread: Int
+
+    public static let all: [DailyBallTheme] = [
+        DailyBallTheme(
+            id: "ball_strawberry",
+            title: "🍓 甜心莓果茶话会",
+            subtitle: "穿戴至少 3 件【草莓甜心厨娘】部件，且华丽度 ≥ 220",
+            emoji: "🍓",
+            targetStyleIndex: 0,
+            preferredCategory: .dress,
+            minMatchingPieces: 3,
+            minGlamour: 220,
+            rewardCoins: 35,
+            rewardStarThread: 1
+        ),
+        DailyBallTheme(
+            id: "ball_macaron",
+            title: "🧁 马卡龙糖果派对",
+            subtitle: "穿戴至少 2 件【薄荷马卡龙仙子】部件，且华丽度 ≥ 240",
+            emoji: "🧁",
+            targetStyleIndex: 1,
+            preferredCategory: .hairTiara,
+            minMatchingPieces: 2,
+            minGlamour: 240,
+            rewardCoins: 40,
+            rewardStarThread: 1
+        ),
+        DailyBallTheme(
+            id: "ball_sakura",
+            title: "🌸 樱花森林花神祭",
+            subtitle: "穿戴至少 2 件【樱花晨露森林】部件，且华丽度 ≥ 280",
+            emoji: "🌸",
+            targetStyleIndex: 2,
+            preferredCategory: .wings,
+            minMatchingPieces: 2,
+            minGlamour: 280,
+            rewardCoins: 45,
+            rewardStarThread: 1
+        ),
+        DailyBallTheme(
+            id: "ball_snow",
+            title: "❄️ 冰雪水晶宫廷舞会",
+            subtitle: "穿戴至少 2 件【冰雪天鹅水晶】部件，且华丽度 ≥ 320",
+            emoji: "❄️",
+            targetStyleIndex: 3,
+            preferredCategory: .jewelry,
+            minMatchingPieces: 2,
+            minGlamour: 320,
+            rewardCoins: 50,
+            rewardStarThread: 1
+        ),
+        DailyBallTheme(
+            id: "ball_aurora",
+            title: "🌌 璀璨星河极光夜宴",
+            subtitle: "穿戴至少 1 件【璀璨星月极光】部件，且华丽度 ≥ 360",
+            emoji: "🌌",
+            targetStyleIndex: 4,
+            preferredCategory: .wand,
+            minMatchingPieces: 1,
+            minGlamour: 360,
+            rewardCoins: 60,
+            rewardStarThread: 1
+        ),
+        DailyBallTheme(
+            id: "ball_phoenix",
+            title: "👑 黄金蔷薇加冕盛典",
+            subtitle: "穿戴至少 1 件【太阳神金蔷薇】部件，且华丽度 ≥ 400",
+            emoji: "👑",
+            targetStyleIndex: 5,
+            preferredCategory: .dress,
+            minMatchingPieces: 1,
+            minGlamour: 400,
+            rewardCoins: 70,
+            rewardStarThread: 1
+        )
+    ]
+
+    public static func today(date: Date = Date()) -> DailyBallTheme {
+        var cal = Calendar(identifier: .gregorian)
+        cal.locale = Locale(identifier: "en_US_POSIX")
+        let dayOfYear = cal.ordinality(of: .day, in: .year, for: date) ?? 1
+        let year = cal.component(.year, from: date)
+        let idx = abs(year * 37 + dayOfYear) % all.count
+        return all[idx]
+    }
+}
+
+public struct DailyWheelSlice: Identifiable, Equatable, Sendable {
+    public let id: Int
+    public let title: String
+    public let emoji: String
+    public let rewardType: String // "coins", "ticket", "thread", "candy"
+    public let amount: Int
+    public let colorHex: String
+
+    public static let all: [DailyWheelSlice] = [
+        DailyWheelSlice(id: 0, title: "+30 星币", emoji: "🪙", rewardType: "coins", amount: 30, colorHex: "#FFD166"),
+        DailyWheelSlice(id: 1, title: "扭蛋券 ×1", emoji: "🎟️", rewardType: "ticket", amount: 1, colorHex: "#FF85A1"),
+        DailyWheelSlice(id: 2, title: "星光锦缎 ×1", emoji: "🧵", rewardType: "thread", amount: 1, colorHex: "#9B6EF3"),
+        DailyWheelSlice(id: 3, title: "+50 星币", emoji: "💰", rewardType: "coins", amount: 50, colorHex: "#2FB380"),
+        DailyWheelSlice(id: 4, title: "神兽糖果 ×1", emoji: "🌟", rewardType: "candy", amount: 1, colorHex: "#3A86FF"),
+        DailyWheelSlice(id: 5, title: "+80 星币大礼", emoji: "👑", rewardType: "coins", amount: 80, colorHex: "#F07D2E")
+    ]
+}
+
 // MARK: - 🎁 局末结算「三选一神秘宝箱」定义
 public struct MysteryChestItem: Identifiable, Equatable, Sendable {
     public let id: Int // 0, 1, 2
     public let title: String
     public let subtitle: String
     public let emoji: String
-    public let rewardType: String // "coins", "ticket", "pet_exp", "butterfly", "fashion"
+    public let rewardType: String // "coins", "ticket", "fashion", "thread", "candy"
     public let amount: Int
     public let accentHex: String
     public var fashionItemId: String? = nil
+    public var isPeeked: Bool = false
 }
 
 // MARK: - 🎰 扭蛋开盒动画事件
 public struct GachaHatchEvent: Identifiable, Equatable, Sendable {
-    public let id = UUID()
+    public let id: UUID
     public let pet: GuardianPetSpecies
     public let isNew: Bool
     public let fromStage: Int
     public let toStage: Int
     public let totalExp: Int
+    public let isMaxOverflow: Bool
+    public let overflowCandy: Int
+    public let overflowCoins: Int
+
+    public init(
+        id: UUID = UUID(),
+        pet: GuardianPetSpecies,
+        isNew: Bool,
+        fromStage: Int,
+        toStage: Int,
+        totalExp: Int,
+        isMaxOverflow: Bool = false,
+        overflowCandy: Int = 0,
+        overflowCoins: Int = 0
+    ) {
+        self.id = id
+        self.pet = pet
+        self.isNew = isNew
+        self.fromStage = fromStage
+        self.toStage = toStage
+        self.totalExp = totalExp
+        self.isMaxOverflow = isMaxOverflow
+        self.overflowCandy = overflowCandy
+        self.overflowCoins = overflowCoins
+    }
 }
 
 // MARK: - 👗 满满公主高定华服解锁与升阶庆典事件

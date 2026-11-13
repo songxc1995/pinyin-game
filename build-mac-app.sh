@@ -44,7 +44,7 @@ let package = Package(
 )
 EOF
 
-echo "🍲 正在编译 SwiftUI 原生应用《${APP_NAME}》（沪教一年级语数英冒险屋）..."
+echo "🍲 正在编译 SwiftUI 原生应用《${APP_NAME}》v5.0（沪教一年级语数英冒险屋）..."
 cd "$PKG_DIR"
 swift build -c release
 
@@ -81,9 +81,9 @@ cat > "$CONTENTS_DIR/Info.plist" << 'EOF'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>4.0.0</string>
+    <string>5.0</string>
     <key>CFBundleVersion</key>
-    <string>400</string>
+    <string>500</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>

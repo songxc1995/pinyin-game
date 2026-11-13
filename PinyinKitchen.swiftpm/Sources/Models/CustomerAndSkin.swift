@@ -87,60 +87,6 @@ public struct PotSkin: Identifiable, Equatable, Sendable {
     ]
 }
 
-// MARK: - 20 种蝴蝶图鉴与 3 阶进化
-public struct ButterflySpecies: Identifiable, Equatable, Sendable {
-    public let id: String   // 对应原版 t
-    public let name: String
-    public let primaryHex: String
-    public let secondaryHex: String
-    public let rarity: Int  // 1 普通 / 2 漂亮 / 3 稀有
-
-    public var rarityName: String {
-        switch rarity {
-        case 3: return "稀有"
-        case 2: return "漂亮"
-        default: return "普通"
-        }
-    }
-
-    public static let evolutionThresholds = [0, 1, 3, 6]
-    public static func stageName(for stage: Int) -> String {
-        switch stage {
-        case 3: return "华丽"
-        case 2: return "闪耀"
-        case 1: return "初见"
-        default: return "未见过"
-        }
-    }
-
-    public static let all: [ButterflySpecies] = [
-        ButterflySpecies(id: "r", name: "辣椒红",   primaryHex: "#D2544B", secondaryHex: "#F09595", rarity: 1),
-        ButterflySpecies(id: "o", name: "南瓜橙",   primaryHex: "#E8873B", secondaryHex: "#FAC775", rarity: 1),
-        ButterflySpecies(id: "y", name: "柠檬黄",   primaryHex: "#EF9F27", secondaryHex: "#FAE3A8", rarity: 1),
-        ButterflySpecies(id: "g", name: "青苹果",   primaryHex: "#639922", secondaryHex: "#C0DD97", rarity: 1),
-        ButterflySpecies(id: "m", name: "薄荷绿",   primaryHex: "#1D9E75", secondaryHex: "#9FE1CB", rarity: 1),
-        ButterflySpecies(id: "b", name: "天空蓝",   primaryHex: "#378ADD", secondaryHex: "#B5D4F4", rarity: 1),
-        ButterflySpecies(id: "p", name: "紫葡萄",   primaryHex: "#7F77DD", secondaryHex: "#CECBF6", rarity: 1),
-        ButterflySpecies(id: "k", name: "樱花粉",   primaryHex: "#D4537E", secondaryHex: "#F4C0D1", rarity: 2),
-        ButterflySpecies(id: "s", name: "海水双色", primaryHex: "#0F6E56", secondaryHex: "#85B7EB", rarity: 2),
-        ButterflySpecies(id: "w", name: "雪花白",   primaryHex: "#5F5E5A", secondaryHex: "#EFEDE7", rarity: 2),
-        ButterflySpecies(id: "d", name: "金翅蝶",   primaryHex: "#BA7517", secondaryHex: "#FAC775", rarity: 3),
-        ButterflySpecies(id: "h", name: "彩虹蝶",   primaryHex: "#D4537E", secondaryHex: "#378ADD", rarity: 3),
-        ButterflySpecies(id: "a", name: "玫瑰粉",   primaryHex: "#E86A8F", secondaryHex: "#F9C9D6", rarity: 2),
-        ButterflySpecies(id: "c", name: "珊瑚橘",   primaryHex: "#F2704A", secondaryHex: "#FBC9A6", rarity: 1),
-        ButterflySpecies(id: "e", name: "翡翠青",   primaryHex: "#2FA38A", secondaryHex: "#A9E6D6", rarity: 2),
-        ButterflySpecies(id: "f", name: "火焰红",   primaryHex: "#C0392B", secondaryHex: "#F5B041", rarity: 3),
-        ButterflySpecies(id: "i", name: "靛青蓝",   primaryHex: "#3C4F9E", secondaryHex: "#A9B6EE", rarity: 2),
-        ButterflySpecies(id: "j", name: "芥末黄",   primaryHex: "#C9A227", secondaryHex: "#F2E49C", rarity: 1),
-        ButterflySpecies(id: "l", name: "薰衣草",   primaryHex: "#9B7FD4", secondaryHex: "#DCCEF7", rarity: 1),
-        ButterflySpecies(id: "n", name: "夜空蓝",   primaryHex: "#1B3A6B", secondaryHex: "#7FA8E8", rarity: 3)
-    ]
-
-    public static func byId(_ id: String) -> ButterflySpecies {
-        all.first(where: { $0.id == id }) ?? all[0]
-    }
-}
-
 // MARK: - 火候难度与厨神头衔
 public enum FireDifficulty: String, CaseIterable, Codable, Sendable {
     case low  = "low"
@@ -171,7 +117,7 @@ public enum FireDifficulty: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    public var butterflyRolls: Int {
+    public var fashionRolls: Int {
         self == .high ? 2 : 1
     }
 
@@ -196,6 +142,61 @@ public enum FireDifficulty: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public struct ChefRankMilestone: Identifiable, Equatable, Sendable {
+    public var id: Int { level }
+    public let level: Int
+    public let minStars: Int
+    public let name: String
+    public let rewardCoins: Int
+    public let rewardTickets: Int
+    public let rewardStarThread: Int
+    public let rewardPetCandy: Int
+    public let rewardDesc: String
+
+    public static let all: [ChefRankMilestone] = [
+        ChefRankMilestone(
+            level: 0, minStars: 0, name: "🎀 甜心小学徒",
+            rewardCoins: 0, rewardTickets: 0, rewardStarThread: 0, rewardPetCandy: 0,
+            rewardDesc: "初始启程头衔"
+        ),
+        ChefRankMilestone(
+            level: 1, minStars: 8, name: "🍓 掌勺小厨娘",
+            rewardCoins: 100, rewardTickets: 1, rewardStarThread: 1, rewardPetCandy: 0,
+            rewardDesc: "+100 🪙 +1 🎟️ +1 🧵"
+        ),
+        ChefRankMilestone(
+            level: 2, minStars: 18, name: "🧁 星光甜点师",
+            rewardCoins: 120, rewardTickets: 1, rewardStarThread: 1, rewardPetCandy: 0,
+            rewardDesc: "+120 🪙 +1 🎟️ +1 🧵"
+        ),
+        ChefRankMilestone(
+            level: 3, minStars: 30, name: "🪄 魔法料理师",
+            rewardCoins: 150, rewardTickets: 1, rewardStarThread: 0, rewardPetCandy: 1,
+            rewardDesc: "+150 🪙 +1 🎟️ +1 🌟"
+        ),
+        ChefRankMilestone(
+            level: 4, minStars: 45, name: "👑 皇家小主厨",
+            rewardCoins: 180, rewardTickets: 2, rewardStarThread: 1, rewardPetCandy: 0,
+            rewardDesc: "+180 🪙 +2 🎟️ +1 🧵"
+        ),
+        ChefRankMilestone(
+            level: 5, minStars: 62, name: "💎 璀璨料理公主",
+            rewardCoins: 220, rewardTickets: 2, rewardStarThread: 0, rewardPetCandy: 1,
+            rewardDesc: "+220 🪙 +2 🎟️ +1 🌟"
+        ),
+        ChefRankMilestone(
+            level: 6, minStars: 80, name: "✨ 传奇全能女王",
+            rewardCoins: 260, rewardTickets: 2, rewardStarThread: 2, rewardPetCandy: 0,
+            rewardDesc: "+260 🪙 +2 🎟️ +2 🧵"
+        ),
+        ChefRankMilestone(
+            level: 7, minStars: 90, name: "🌈 料理城大圆满女王",
+            rewardCoins: 300, rewardTickets: 3, rewardStarThread: 2, rewardPetCandy: 2,
+            rewardDesc: "+300 🪙 +3 🎟️ +2 🧵 +2 🌟"
+        )
+    ]
+}
+
 public struct ChefRankInfo: Sendable {
     public let level: Int
     public let name: String
@@ -204,27 +205,37 @@ public struct ChefRankInfo: Sendable {
     public let nextMinStars: Int?
     public let progressPercent: Double
 
+    public var currentMilestone: ChefRankMilestone {
+        ChefRankMilestone.all.first(where: { $0.level == level }) ?? ChefRankMilestone.all[0]
+    }
+
     public static func compute(totalStars: Int) -> ChefRankInfo {
-        let ranks: [(min: Int, name: String)] = [
-            (0,  "🎀 甜心小学徒"),
-            (8,  "🍓 掌勺小厨娘"),
-            (18, "🧁 星光甜点师"),
-            (30, "🪄 魔法料理师"),
-            (45, "👑 皇家小主厨"),
-            (62, "💎 璀璨料理公主"),
-            (80, "🌈 传奇全能女王")
-        ]
+        let ranks = ChefRankMilestone.all
         var lv = 0
-        for (i, r) in ranks.enumerated() where totalStars >= r.min {
+        for (i, r) in ranks.enumerated() where totalStars >= r.minStars {
             lv = i
         }
         let cur = ranks[lv]
         if lv + 1 < ranks.count {
             let nx = ranks[lv + 1]
-            let pct = min(1.0, max(0.0, Double(totalStars - cur.min) / Double(nx.min - cur.min)))
-            return ChefRankInfo(level: lv, name: cur.name, currentMinStars: cur.min, nextRankName: nx.name, nextMinStars: nx.min, progressPercent: pct)
+            let pct = min(1.0, max(0.0, Double(totalStars - cur.minStars) / Double(nx.minStars - cur.minStars)))
+            return ChefRankInfo(
+                level: lv,
+                name: cur.name,
+                currentMinStars: cur.minStars,
+                nextRankName: nx.name,
+                nextMinStars: nx.minStars,
+                progressPercent: pct
+            )
         } else {
-            return ChefRankInfo(level: lv, name: cur.name, currentMinStars: cur.min, nextRankName: nil, nextMinStars: nil, progressPercent: 1.0)
+            return ChefRankInfo(
+                level: lv,
+                name: cur.name,
+                currentMinStars: cur.minStars,
+                nextRankName: nil,
+                nextMinStars: nil,
+                progressPercent: 1.0
+            )
         }
     }
 }
