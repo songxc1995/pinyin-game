@@ -278,7 +278,7 @@ public struct MainContainerView: View {
                         .fill(LinearGradient(colors: [Color(hex: "#FFE8C2"), Color(hex: "#FFC97A")], startPoint: .top, endPoint: .bottom))
                         .frame(width: 48, height: 48)
                         .shadow(color: Color(hex: "#D9953B"), radius: 0, x: 0, y: 3)
-                    PotVectorView(skin: engine.currentPotSkin, size: 38, gentleMotion: gentleMotion)
+                    PotVectorView(skin: engine.currentPotSkin, size: 38, animated: false, gentleMotion: gentleMotion)
                 }
             }
             .buttonStyle(.plain)
@@ -407,27 +407,37 @@ public struct MainContainerView: View {
 
     // MARK: - 语数英三大场馆切换卡片条
     private var subjectVenueSwitcherBar: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                venueButtonsContent
+            }
+            VStack(spacing: 8) {
+                venueButtonsContent
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var venueButtonsContent: some View {
         let pinyinCount = LevelRepository.allUniqueCharacters.count
         let mathCount = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix("hjm_") }.count
         let englishCount = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix("hje_") }.count
 
-        return LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 8) {
-            venueButton(
-                subject: .pinyin,
-                badge: "\(LevelRepository.levels.count)关 · \(pinyinCount)字",
-                desc: "声母+无调韵母+四声调料瓶"
-            )
-            venueButton(
-                subject: .math,
-                badge: "\(HujiaoCurriculumRepository.mathStages.count)关 · \(mathCount)题",
-                desc: "沪教一上/一下 · 5大互动教具"
-            )
-            venueButton(
-                subject: .english,
-                badge: "\(HujiaoCurriculumRepository.englishStages.count)关 · \(englishCount)题",
-                desc: "沪教牛津上海版 · 听说与鲜果拼句"
-            )
-        }
+        venueButton(
+            subject: .pinyin,
+            badge: "\(LevelRepository.levels.count)关 · \(pinyinCount)字",
+            desc: "声母+无调韵母+四声调料瓶"
+        )
+        venueButton(
+            subject: .math,
+            badge: "\(HujiaoCurriculumRepository.mathStages.count)关 · \(mathCount)题",
+            desc: "沪教一上/一下 · 5大互动教具"
+        )
+        venueButton(
+            subject: .english,
+            badge: "\(HujiaoCurriculumRepository.englishStages.count)关 · \(englishCount)题",
+            desc: "沪教牛津上海版 · 听说与鲜果拼句"
+        )
     }
 
     private func venueButton(subject: SubjectKind, badge: String, desc: String) -> some View {
@@ -443,37 +453,50 @@ public struct MainContainerView: View {
                 }
             }
         } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(subject.title)
-                            .font(.system(size: 15.5, weight: .black))
-                            .foregroundColor(isSelected ? .white : Color(hex: "#3B2E22"))
-                        Text(badge)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(subject.title)
+                        .font(.system(size: 15.5, weight: .black))
+                        .foregroundColor(isSelected ? .white : Color(hex: "#3B2E22"))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+
+                    Spacer(minLength: 4)
+
+                    if isSelected {
+                        Text("当前场馆 ✓")
                             .font(.system(size: 10.5, weight: .heavy))
-                            .foregroundColor(isSelected ? color : .white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(isSelected ? Color.white : color))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.black.opacity(0.16)))
                     }
+                }
+                .frame(minHeight: 22)
+
+                HStack(spacing: 6) {
+                    Text(badge)
+                        .font(.system(size: 10.5, weight: .heavy))
+                        .foregroundColor(isSelected ? color : .white)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(isSelected ? Color.white : color))
+
                     Text(desc)
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(isSelected ? Color.white.opacity(0.92) : Color(hex: "#8A7765"))
                         .lineLimit(1)
-                }
-                Spacer()
-                if isSelected {
-                    Text("当前场馆 ✓")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.black.opacity(0.16)))
+                        .minimumScaleFactor(0.76)
+                        .frame(minWidth: 0, idealWidth: 115, maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(isSelected ? color : Color.white.opacity(0.92))
@@ -529,7 +552,7 @@ public struct MainContainerView: View {
                 engine.activeTab = .garden
                 engine.audio.speakText("满满小公主的魔法衣橱！", slow: false)
             } label: {
-                PrincessAvatarVectorView(progress: engine.progress, size: 44, animated: true, gentleMotion: gentleMotion)
+                PrincessAvatarVectorView(progress: engine.progress, size: 44, animated: false, gentleMotion: gentleMotion)
             }
             .buttonStyle(.plain)
 
@@ -538,7 +561,7 @@ public struct MainContainerView: View {
                 engine.activeTab = .paradise
                 engine.audio.speakText("\(pet.name)陪你闯关！", slow: false)
             } label: {
-                GuardianPetVectorView(species: pet, stage: petStage, size: 42, animated: true, gentleMotion: gentleMotion)
+                GuardianPetVectorView(species: pet, stage: petStage, size: 42, animated: false, gentleMotion: gentleMotion)
             }
             .buttonStyle(.plain)
 
@@ -694,7 +717,7 @@ public struct MainContainerView: View {
                         engine.audio.sfxWin()
                     } label: {
                         VStack(spacing: 4) {
-                            PotVectorView(skin: skin, size: 54, gentleMotion: gentleMotion)
+                            PotVectorView(skin: skin, size: 54, animated: false, gentleMotion: gentleMotion)
                             Text(skin.name)
                                 .font(.system(size: 12.5, weight: .heavy))
                                 .foregroundColor(Color(hex: "#3B2E22"))

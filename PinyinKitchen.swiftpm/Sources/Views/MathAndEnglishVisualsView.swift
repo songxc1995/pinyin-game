@@ -2365,8 +2365,9 @@ public struct EnglishBlenderVectorView: View {
                         endPoint: .bottom
                     )
                 )
-                .frame(width: 90, height: steamActive ? 56 : 42)
-                .offset(y: steamActive ? 0 : 7)
+                .frame(width: 90, height: 56)
+                .scaleEffect(x: 1.0, y: steamActive ? 1.0 : (42.0 / 56.0), anchor: .bottom)
+                .offset(y: 0)
 
             Text(steamActive ? "🍹🍓🍊" : "🍎🍋🍑")
                 .font(.system(size: 23))

@@ -15,6 +15,8 @@ public final class PinyinAudioEngine: ObservableObject {
     private var isPlayerAttached = false
     private var isPlayerConnected = false
     private var isReconfiguringAudio = false
+    private var needsAudioGraphRebuild = false
+    private var audioIdlePauseTask: Task<Void, Never>?
     private var observerTokens: [NSObjectProtocol] = []
 
     // MARK: - 小学语文标准声母呼读音映射
@@ -93,7 +95,6 @@ public final class PinyinAudioEngine: ObservableObject {
 
     private init() {
         setupAudioSessionIfNeeded()
-        setupAudioEngine()
         setupAudioObservers()
         selectPreferredChineseVoice()
     }
@@ -124,10 +125,6 @@ public final class PinyinAudioEngine: ObservableObject {
         return 44100.0
     }
 
-    private func setupAudioEngine() {
-        rebuildAudioGraph(forceReconnect: true)
-    }
-
     private func rebuildAudioGraph(forceReconnect: Bool = false) {
         guard !isReconfiguringAudio else { return }
         isReconfiguringAudio = true
@@ -138,7 +135,7 @@ public final class PinyinAudioEngine: ObservableObject {
         let targetSampleRate = currentHardwareSampleRate()
         let needsFormatChange = audioFormat?.sampleRate != targetSampleRate
 
-        if forceReconnect || needsFormatChange || !isPlayerAttached || !isPlayerConnected {
+        if forceReconnect || needsAudioGraphRebuild || needsFormatChange || !isPlayerAttached || !isPlayerConnected {
             if isPlayerAttached {
                 playerNode.stop()
             }
@@ -166,6 +163,7 @@ public final class PinyinAudioEngine: ObservableObject {
                 isPlayerConnected = true
             }
         }
+        needsAudioGraphRebuild = false
 
         if !audioEngine.isRunning {
             audioEngine.prepare()
@@ -186,10 +184,25 @@ public final class PinyinAudioEngine: ObservableObject {
         let hwRate = currentHardwareSampleRate()
         let nodeFormat = playerNode.outputFormat(forBus: 0)
         let rateMismatch = (audioFormat?.sampleRate != hwRate) || (nodeFormat.sampleRate != audioFormat?.sampleRate)
-        if !isPlayerAttached || !isPlayerConnected || !audioEngine.isRunning || rateMismatch {
-            rebuildAudioGraph(forceReconnect: rateMismatch || !isPlayerAttached || !isPlayerConnected)
+        if needsAudioGraphRebuild || !isPlayerAttached || !isPlayerConnected || !audioEngine.isRunning || rateMismatch {
+            rebuildAudioGraph(forceReconnect: needsAudioGraphRebuild || rateMismatch || !isPlayerAttached || !isPlayerConnected)
         } else if !playerNode.isPlaying {
             playerNode.play()
+        }
+    }
+
+    private func scheduleIdleAudioPause(after duration: Double) {
+        audioIdlePauseTask?.cancel()
+        let delayNs = UInt64(max(1.5, duration + 2.5) * 1_000_000_000)
+        audioIdlePauseTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: delayNs)
+            guard !Task.isCancelled, let self = self else { return }
+            if self.isPlayerAttached && self.playerNode.isPlaying {
+                self.playerNode.pause()
+            }
+            if self.audioEngine.isRunning {
+                self.audioEngine.pause()
+            }
         }
     }
 
@@ -212,6 +225,7 @@ public final class PinyinAudioEngine: ObservableObject {
                       let type = AVAudioSession.InterruptionType(rawValue: rawType) else { return }
                 switch type {
                 case .began:
+                    self.audioIdlePauseTask?.cancel()
                     if self.isPlayerAttached {
                         self.playerNode.pause()
                     }
@@ -221,8 +235,10 @@ public final class PinyinAudioEngine: ObservableObject {
                 case .ended:
                     let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions ?? 0)
                     self.setupAudioSessionIfNeeded()
-                    if options.contains(.shouldResume) || !self.audioEngine.isRunning {
+                    if options.contains(.shouldResume) && self.audioEngine.isRunning {
                         self.rebuildAudioGraph(forceReconnect: true)
+                    } else {
+                        self.needsAudioGraphRebuild = true
                     }
                 @unknown default:
                     break
@@ -243,7 +259,11 @@ public final class PinyinAudioEngine: ObservableObject {
                       let reason = AVAudioSession.RouteChangeReason(rawValue: rawReason) else { return }
                 switch reason {
                 case .newDeviceAvailable, .oldDeviceUnavailable, .categoryChange, .override, .wakeFromSleep, .routeConfigurationChange:
-                    self.rebuildAudioGraph(forceReconnect: true)
+                    if self.audioEngine.isRunning {
+                        self.rebuildAudioGraph(forceReconnect: true)
+                    } else {
+                        self.needsAudioGraphRebuild = true
+                    }
                 default:
                     break
                 }
@@ -258,7 +278,12 @@ public final class PinyinAudioEngine: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.rebuildAudioGraph(forceReconnect: true)
+                guard let self = self else { return }
+                if self.audioEngine.isRunning {
+                    self.rebuildAudioGraph(forceReconnect: true)
+                } else {
+                    self.needsAudioGraphRebuild = true
+                }
             }
         }
         observerTokens.append(configChangeToken)
@@ -492,6 +517,7 @@ public final class PinyinAudioEngine: ObservableObject {
     // MARK: - 趣味合成音效 (WebAudio 级实时波形合成)
 
     private func playTones(_ notes: [(freq: Double, delay: Double, duration: Double, wave: String, vol: Float)]) {
+        audioIdlePauseTask?.cancel()
         ensureAudioReadyForPlayback()
         guard audioEngine.isRunning,
               isPlayerAttached,
@@ -544,6 +570,7 @@ public final class PinyinAudioEngine: ObservableObject {
         }
 
         playerNode.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+        scheduleIdleAudioPause(after: totalDur)
     }
 
     public func sfxTap() {

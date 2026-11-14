@@ -1749,6 +1749,22 @@ public struct RoundResultView: View {
                 }
             }
         }
+        .onDisappear {
+            withAnimation(.easeOut(duration: 0.1)) {
+                chestWiggle = false
+            }
+        }
+        .onCompatChange(of: gentleMotion) { isGentle in
+            if isGentle {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    chestWiggle = false
+                }
+            } else {
+                withAnimation(.easeInOut(duration: 0.28).repeatForever(autoreverses: true)) {
+                    chestWiggle = true
+                }
+            }
+        }
     }
 
     @ViewBuilder

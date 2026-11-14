@@ -141,15 +141,29 @@ public struct PrincessAvatarVectorView: View {
     }
 
     public var body: some View {
-        Group {
-            if animated {
-                TimelineView(.animation(minimumInterval: gentleMotion ? 1.0 / 12.0 : 1.0 / 30.0)) { timeline in
-                    avatarComposition(time: timeline.date.timeIntervalSinceReferenceDate)
+        let interval: TimeInterval = gentleMotion ? (1.0 / 8.0) : (size <= 64 ? (1.0 / 10.0) : (1.0 / 12.0))
+        ZStack {
+            Group {
+                if animated {
+                    TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: interval)) { timeline in
+                        avatarCanvas(time: timeline.date.timeIntervalSinceReferenceDate)
+                    }
+                } else {
+                    avatarCanvas(time: 0)
                 }
-            } else {
-                avatarComposition(time: 0)
+            }
+            .scaleEffect(x: twirlFlare ? 1.09 : 1.0, y: twirlFlare ? 0.97 : 1.0)
+            .rotation3DEffect(
+                .degrees(twirlAngle),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.45
+            )
+
+            if twirlSparkOpacity > 0.01 {
+                twirlSparkBurstLayer
             }
         }
+        .frame(width: size, height: size)
         .onCompatChange(of: twirlTrigger) { _ in
             triggerTwirlAnimation()
         }
@@ -174,8 +188,7 @@ public struct PrincessAvatarVectorView: View {
         }
     }
 
-    @ViewBuilder
-    private func avatarComposition(time: TimeInterval) -> some View {
+    private func avatarCanvas(time: TimeInterval) -> some View {
         let motionRate: Double = gentleMotion ? 0.42 : 1.0
         let ampScale: CGFloat = gentleMotion ? 0.50 : 1.0
         let t = animated ? time * motionRate : 0.0
@@ -185,23 +198,29 @@ public struct PrincessAvatarVectorView: View {
         let auraSpin = animated ? (t * 22.0).truncatingRemainder(dividingBy: 360.0) : 0.0
         let shimmerPos = animated ? CGFloat((t * 0.45).truncatingRemainder(dividingBy: 1.6)) - 0.3 : 0.45
 
-        ZStack {
-            // A. 套装共鸣光圈 + 高定星环背光
-            resonanceAuraLayer(auraSpin: auraSpin, t: t, ampScale: ampScale)
+        return Canvas { context, canvasSize in
+            let w = size
+            let h = size
+            let padX = (canvasSize.width - w) * 0.5
+            let padY = (canvasSize.height - h) * 0.5
+            let sx = w / 160.0
+            let sy = h / 160.0
 
-            // B. 核心小公主高定 7 层矢量画布
-            Canvas { context, canvasSize in
-                let w = canvasSize.width
-                let h = canvasSize.height
-                let sx = w / 160.0
-                let sy = h / 160.0
+            // A. 套装共鸣光圈 + 高定星环背光（纯 Canvas 绘制，避免每帧触发布局重算）
+            context.drawLayer { auraCtx in
+                auraCtx.translateBy(x: padX, y: padY)
+                drawResonanceAura(context: &auraCtx, auraSpin: auraSpin, t: t, ampScale: ampScale)
+            }
 
+            // B. 核心小公主高定 7 层矢量画布（呼吸偏移动画在画布层内部完成）
+            context.drawLayer { bodyCtx in
+                bodyCtx.translateBy(x: padX, y: padY + breath)
                 let poseLift: CGFloat = pose.id == "leap" ? -6.5 : 0.0
                 let skirtLiftL: CGFloat = pose.id == "curtsy" ? -2.2 : 0.0
 
                 // 0. 舞台投影 & 4/5阶脚下旋转星阵
                 drawStagePedestal(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     auraSpin: auraSpin,
@@ -211,7 +230,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 1. 梦幻背饰与神翼
                 drawBackWings(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift,
@@ -221,7 +240,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 2. 柔顺长卷发后景（随 HairColorOption & hairTiara.styleIndex 分化）
                 drawBackHair(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift,
@@ -230,7 +249,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 3. 小公主双腿与芭蕾/玛丽珍鞋
                 drawLegsAndShoes(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift
@@ -238,7 +257,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 4. 高定礼服裙装（6 大轮廓 + 5 阶刺绣/蕾丝/星钻/拖尾/虹彩扫光）
                 drawDress(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift,
@@ -250,7 +269,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 5. 项链与耳坠珠宝
                 drawJewelry(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift
@@ -258,7 +277,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 6. 甜美脸庞、4 种可切换表情与高光刘海
                 drawFaceAndFrontHair(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift
@@ -266,7 +285,7 @@ public struct PrincessAvatarVectorView: View {
 
                 // 7. 皇冠发饰
                 drawTiara(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift
@@ -274,122 +293,122 @@ public struct PrincessAvatarVectorView: View {
 
                 // 8. 双手 Pose 与魔法手持道具
                 drawArmsAndWand(
-                    context: &context,
+                    context: &bodyCtx,
                     sx: sx,
                     sy: sy,
                     dy: poseLift,
                     sway: skirtSway
                 )
             }
-            .frame(width: size, height: size)
-            .offset(y: breath)
-            .scaleEffect(x: twirlFlare ? 1.09 : 1.0, y: twirlFlare ? 0.97 : 1.0)
-            .rotation3DEffect(
-                .degrees(twirlAngle),
-                axis: (x: 0, y: 1, z: 0),
-                perspective: 0.45
-            )
-
-            // C. 点击转圈爆发星芒
-            if twirlSparkOpacity > 0.01 {
-                twirlSparkBurstLayer
-            }
         }
-        .frame(width: size, height: size)
+        .frame(width: size * 1.16, height: size * 1.16)
     }
 
-    // MARK: - 外层套装共鸣光圈 & 粒子星环
-    @ViewBuilder
-    private func resonanceAuraLayer(auraSpin: Double, t: Double, ampScale: CGFloat) -> some View {
+    // MARK: - 外层套装共鸣光圈 & 粒子星环（纯 GraphicsContext 绘制）
+    private func drawResonanceAura(context: inout GraphicsContext, auraSpin: Double, t: Double, ampScale: CGFloat) {
+        let cx = size * 0.5
+        let cy = size * 0.5
+        let center = CGPoint(x: cx, y: cy)
         let auraColor = Color(hex: suitBonus.suit.primaryHex)
         let accentColor = Color(hex: suitBonus.suit.accentHex)
 
         if suitBonus.isFullResonance {
             // 5件全套大共鸣：皇家粒子光环
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(hex: "#FFD166").opacity(0.42),
-                            auraColor.opacity(0.28),
-                            accentColor.opacity(0.14),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: size * 0.06,
-                        endRadius: size * 0.56
-                    )
+            let glowR = size * 0.56
+            let glowRect = CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)
+            context.fill(
+                Circle().path(in: glowRect),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        Color(hex: "#FFD166").opacity(0.42),
+                        auraColor.opacity(0.28),
+                        accentColor.opacity(0.14),
+                        Color.clear
+                    ]),
+                    center: center,
+                    startRadius: size * 0.06,
+                    endRadius: glowR
                 )
-                .frame(width: size * 1.12, height: size * 1.12)
+            )
 
-            Circle()
-                .stroke(
-                    AngularGradient(
-                        colors: [
+            let ringR = size * 0.49
+            let ringRect = CGRect(x: -ringR, y: -ringR, width: ringR * 2, height: ringR * 2)
+            context.drawLayer { layer in
+                layer.translateBy(x: cx, y: cy)
+                layer.rotate(by: .degrees(auraSpin))
+                layer.stroke(
+                    Circle().path(in: ringRect),
+                    with: .conicGradient(
+                        Gradient(colors: [
                             Color(hex: "#FFD166"),
                             auraColor,
                             Color.white.opacity(0.9),
                             accentColor,
                             Color(hex: "#FFD166")
-                        ],
-                        center: .center
+                        ]),
+                        center: .zero
                     ),
                     style: StrokeStyle(lineWidth: 2.6, dash: [8, 5])
                 )
-                .frame(width: size * 0.98, height: size * 0.98)
-                .rotationEffect(.degrees(auraSpin))
+            }
 
             // 环绕皇家共鸣粒子（纯几何星点）
-            Canvas { context, canvasSize in
-                let cx = canvasSize.width * 0.5
-                let cy = canvasSize.height * 0.5
-                let orbitR = canvasSize.width * 0.46
-                for idx in 0..<8 {
-                    let baseAngle = Double(idx) * (.pi / 4.0) + (auraSpin * .pi / 180.0)
-                    let px = cx + CGFloat(cos(baseAngle)) * orbitR
-                    let py = cy + CGFloat(sin(baseAngle)) * orbitR * 0.88
-                    let pulse = animated ? (0.75 + 0.25 * sin(t * 4.0 + Double(idx))) * Double(ampScale) : 0.9
-                    let r = size * (idx % 2 == 0 ? 0.036 : 0.025) * CGFloat(0.75 + 0.25 * pulse)
-                    let star = PrincessVectorShapes.starPath(center: CGPoint(x: px, y: py), outerRadius: r, innerRadius: r * 0.42, points: 4)
-                    let col = idx % 2 == 0 ? Color(hex: "#FFD166") : auraColor
-                    context.fill(star, with: .color(col.opacity(0.92)))
-                }
+            let orbitR = size * 0.46
+            for idx in 0..<8 {
+                let baseAngle = Double(idx) * (.pi / 4.0) + (auraSpin * .pi / 180.0)
+                let px = cx + CGFloat(cos(baseAngle)) * orbitR
+                let py = cy + CGFloat(sin(baseAngle)) * orbitR * 0.88
+                let pulse = animated ? (0.75 + 0.25 * sin(t * 4.0 + Double(idx))) * Double(ampScale) : 0.9
+                let r = size * (idx % 2 == 0 ? 0.036 : 0.025) * CGFloat(0.75 + 0.25 * pulse)
+                let star = PrincessVectorShapes.starPath(center: CGPoint(x: px, y: py), outerRadius: r, innerRadius: r * 0.42, points: 4)
+                let col = idx % 2 == 0 ? Color(hex: "#FFD166") : auraColor
+                context.fill(star, with: .color(col.opacity(0.92)))
             }
-            .frame(width: size, height: size)
         } else if suitBonus.isHalfResonance || effectiveMaxStage >= 3 {
             // 3件小共鸣柔光圈 / 高阶单品光晕
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(hex: suitBonus.suit.secondaryHex).opacity(0.45),
-                            auraColor.opacity(0.18),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: size * 0.05,
-                        endRadius: size * 0.52
-                    )
+            let glowR = size * 0.52
+            let glowRect = CGRect(x: cx - glowR, y: cy - glowR, width: glowR * 2, height: glowR * 2)
+            context.fill(
+                Circle().path(in: glowRect),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        Color(hex: suitBonus.suit.secondaryHex).opacity(0.45),
+                        auraColor.opacity(0.18),
+                        Color.clear
+                    ]),
+                    center: center,
+                    startRadius: size * 0.05,
+                    endRadius: glowR
                 )
-                .frame(width: size * 1.04, height: size * 1.04)
+            )
 
             if suitBonus.isHalfResonance {
-                Circle()
-                    .stroke(
-                        auraColor.opacity(0.48),
+                let ringR = size * 0.46
+                let ringRect = CGRect(x: -ringR, y: -ringR, width: ringR * 2, height: ringR * 2)
+                context.drawLayer { layer in
+                    layer.translateBy(x: cx, y: cy)
+                    layer.rotate(by: .degrees(auraSpin * 0.6))
+                    layer.stroke(
+                        Circle().path(in: ringRect),
+                        with: .color(auraColor.opacity(0.48)),
                         style: StrokeStyle(lineWidth: 1.8, dash: [5, 5])
                     )
-                    .frame(width: size * 0.92, height: size * 0.92)
-                    .rotationEffect(.degrees(auraSpin * 0.6))
+                }
             }
         }
 
         // Lv.5 传世神装专属九彩极光内阵
         if effectiveMaxStage >= 5 {
-            Circle()
-                .stroke(
-                    AngularGradient(
-                        colors: [
+            let haloR = size * 0.52
+            let haloRect = CGRect(x: -haloR, y: -haloR, width: haloR * 2, height: haloR * 2)
+            context.drawLayer { layer in
+                layer.opacity = 0.85
+                layer.translateBy(x: cx, y: cy)
+                layer.rotate(by: .degrees(-auraSpin * 0.9))
+                layer.stroke(
+                    Circle().path(in: haloRect),
+                    with: .conicGradient(
+                        Gradient(colors: [
                             Color(hex: "#FF595E"),
                             Color(hex: "#FFCA3A"),
                             Color(hex: "#8AC926"),
@@ -397,14 +416,12 @@ public struct PrincessAvatarVectorView: View {
                             Color(hex: "#9B6EF3"),
                             Color(hex: "#FF758F"),
                             Color(hex: "#FF595E")
-                        ],
-                        center: .center
+                        ]),
+                        center: .zero
                     ),
                     style: StrokeStyle(lineWidth: 2.2, dash: [4, 4])
                 )
-                .frame(width: size * 1.04, height: size * 1.04)
-                .rotationEffect(.degrees(-auraSpin * 0.9))
-                .opacity(0.85)
+            }
         }
     }
 
@@ -1681,47 +1698,57 @@ public struct PrincessAvatarVectorView: View {
 // MARK: - 2. 🎭 六大梦幻舞台背景视图 (PrincessStageBackdropView)
 public struct PrincessStageBackdropView: View {
     public let stageThemeId: Int
+    public var animated: Bool = true
     public var gentleMotion: Bool = false
 
-    public init(stageThemeId: Int, gentleMotion: Bool = false) {
+    public init(stageThemeId: Int, animated: Bool = true, gentleMotion: Bool = false) {
         self.stageThemeId = stageThemeId
+        self.animated = animated
         self.gentleMotion = gentleMotion
     }
 
     public var body: some View {
         let theme = ((stageThemeId % 6) + 6) % 6
-        TimelineView(.animation(minimumInterval: gentleMotion ? 1.0 / 8.0 : 1.0 / 24.0)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            let drift = gentleMotion ? time * 0.25 : time * 0.72
-
-            Canvas { context, size in
-                let w = size.width
-                let h = size.height
-
-                // 1. 主题天空与剧院幕布底色
-                let skyColors: [Color] = skyPalette(for: theme)
-                let bgRect = CGRect(origin: .zero, size: size)
-                context.fill(
-                    Path(bgRect),
-                    with: .linearGradient(
-                        Gradient(colors: skyColors),
-                        startPoint: CGPoint(x: w * 0.5, y: 0),
-                        endPoint: CGPoint(x: w * 0.5, y: h)
-                    )
-                )
-
-                // 2. 舞台背景主题建筑 / 极光 / 花廊
-                drawThemeScenery(context: &context, theme: theme, w: w, h: h, drift: drift)
-
-                // 3. 顶部双侧舞台丝绒幕布 / 拱门装饰
-                drawCurtainArch(context: &context, theme: theme, w: w, h: h)
-
-                // 4. 聚光灯柱 & 梦幻 T 台地台
-                drawRunwayStage(context: &context, theme: theme, w: w, h: h)
-
-                // 5. 主题漂浮花瓣/泡泡/星芒粒子
-                drawAmbientParticles(context: &context, theme: theme, w: w, h: h, drift: drift)
+        if animated {
+            let interval: TimeInterval = gentleMotion ? (1.0 / 8.0) : (1.0 / 12.0)
+            TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: interval)) { timeline in
+                backdropCanvas(theme: theme, time: timeline.date.timeIntervalSinceReferenceDate)
             }
+        } else {
+            backdropCanvas(theme: theme, time: 0)
+        }
+    }
+
+    private func backdropCanvas(theme: Int, time: TimeInterval) -> some View {
+        let drift = gentleMotion ? time * 0.25 : time * 0.72
+
+        return Canvas { context, size in
+            let w = size.width
+            let h = size.height
+
+            // 1. 主题天空与剧院幕布底色
+            let skyColors: [Color] = skyPalette(for: theme)
+            let bgRect = CGRect(origin: .zero, size: size)
+            context.fill(
+                Path(bgRect),
+                with: .linearGradient(
+                    Gradient(colors: skyColors),
+                    startPoint: CGPoint(x: w * 0.5, y: 0),
+                    endPoint: CGPoint(x: w * 0.5, y: h)
+                )
+            )
+
+            // 2. 舞台背景主题建筑 / 极光 / 花廊
+            drawThemeScenery(context: &context, theme: theme, w: w, h: h, drift: drift)
+
+            // 3. 顶部双侧舞台丝绒幕布 / 拱门装饰
+            drawCurtainArch(context: &context, theme: theme, w: w, h: h)
+
+            // 4. 聚光灯柱 & 梦幻 T 台地台
+            drawRunwayStage(context: &context, theme: theme, w: w, h: h)
+
+            // 5. 主题漂浮花瓣/泡泡/星芒粒子
+            drawAmbientParticles(context: &context, theme: theme, w: w, h: h, drift: drift)
         }
     }
 

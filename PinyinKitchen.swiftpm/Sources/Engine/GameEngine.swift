@@ -129,6 +129,8 @@ public final class GameEngine: ObservableObject {
     @Published public var showParentSettings: Bool = false
     private var continuousPlaySeconds: Int = 0
     private var unsavedPlaySeconds: Int = 0
+    private var pendingPlaySeconds: Int = 0
+    private var pendingPlayDate: String = ""
     private var bedtimeOverrideUntil: Date? = nil
     private var warnedDate: String = ""
 
@@ -246,10 +248,35 @@ public final class GameEngine: ObservableObject {
         return merged
     }
 
+    private var liveTodayPlaySeconds: Int {
+        let today = GameProgress.todayString()
+        let pending = (pendingPlayDate.isEmpty || pendingPlayDate == today) ? pendingPlaySeconds : 0
+        return progress.todayPlaySeconds + pending
+    }
+
+    private func snapshotProgressWithPendingPlaySeconds() -> GameProgress {
+        var snapshot = progress
+        if pendingPlaySeconds > 0 {
+            let dateKey = pendingPlayDate.isEmpty ? GameProgress.todayString() : pendingPlayDate
+            snapshot.playSeconds[dateKey] = (snapshot.playSeconds[dateKey] ?? 0) + pendingPlaySeconds
+        }
+        snapshot.trimPlayTimeHistory()
+        return snapshot
+    }
+
+    private func flushPendingPlaySeconds() {
+        guard pendingPlaySeconds > 0 else { return }
+        let dateKey = pendingPlayDate.isEmpty ? GameProgress.todayString() : pendingPlayDate
+        progress.playSeconds[dateKey] = (progress.playSeconds[dateKey] ?? 0) + pendingPlaySeconds
+        progress.trimPlayTimeHistory()
+        pendingPlaySeconds = 0
+    }
+
     public func saveProgress() {
+        let snapshot = snapshotProgressWithPendingPlaySeconds()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(progress) else { return }
+        guard let data = try? encoder.encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
         if let url = Self.saveFileURL() {
             try? data.write(to: url, options: .atomic)
@@ -260,9 +287,10 @@ public final class GameEngine: ObservableObject {
     }
 
     public func exportJSONString() -> String {
+        let snapshot = snapshotProgressWithPendingPlaySeconds()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(progress),
+        guard let data = try? encoder.encode(snapshot),
               let str = String(data: data, encoding: .utf8) else {
             return "{}"
         }
@@ -420,6 +448,7 @@ public final class GameEngine: ObservableObject {
         stateResetGeneration += 1
         roundGeneration += 1
         audio.stopAllSpeech()
+        flushPendingPlaySeconds()
 
         // 护眼设置与今日游戏时长属于家长管控，清空学习记录时保留
         let keepEye = progress.eyeCare
@@ -445,6 +474,7 @@ public final class GameEngine: ObservableObject {
     public func resetRewardsOnlyKeepLearning() {
         stateResetGeneration += 1
         audio.stopAllSpeech()
+        flushPendingPlaySeconds()
 
         var clean = GameProgress()
         // 保留学习记录与偏好
@@ -3249,13 +3279,14 @@ public final class GameEngine: ObservableObject {
 
     /// 今日已玩分钟数（向上取整方便展示）
     public var todayPlayedMinutes: Int {
-        Int(ceil(Double(progress.todayPlaySeconds) / 60.0))
+        Int(ceil(Double(liveTodayPlaySeconds) / 60.0))
     }
 
     /// 每秒心跳：统计用眼时长、触发 20-20-20 望远护眼操、检查每日上限与睡前打烊
     public func tickEyeCareSecond() {
         let today = GameProgress.todayString()
         if progress.daily.d != today {
+            flushPendingPlaySeconds()
             progress.ensureDaily()
             refreshDailyDerivedState()
         }
@@ -3275,28 +3306,41 @@ public final class GameEngine: ObservableObject {
         checkPlayLockStatus(allowDuringQuestion: screenState != .playing)
         guard playLock == nil else { return }
 
-        progress.playSeconds[today] = (progress.playSeconds[today] ?? 0) + 1
+        if pendingPlayDate != today {
+            flushPendingPlaySeconds()
+            pendingPlayDate = today
+        }
+
+        let prevRestMin = minutesUntilNextEyeRest
+        let prevPlayedMin = todayPlayedMinutes
+
+        pendingPlaySeconds += 1
         unsavedPlaySeconds += 1
         continuousPlaySeconds += 1
 
+        // 仅当展示的分钟数跳变时同步至 @Published progress，避免每秒触发整棵 SwiftUI 视图树重排
+        if minutesUntilNextEyeRest != prevRestMin || todayPlayedMinutes != prevPlayedMin {
+            flushPendingPlaySeconds()
+        }
+
         if unsavedPlaySeconds >= 15 {
             unsavedPlaySeconds = 0
-            progress.trimPlayTimeHistory()
             saveProgress()
         }
 
         // 距离每日上限还剩 3 分钟时温馨提醒
         if progress.eyeCare.dailyLimitEnabled {
             let limitSec = progress.todayAllowedMinutes * 60
-            let usedSec = progress.playSeconds[today] ?? 0
+            let usedSec = liveTodayPlaySeconds
             let leftSec = limitSec - usedSec
             if leftSec > 0 && leftSec <= 180 && warnedDate != today {
+                flushPendingPlaySeconds()
                 warnedDate = today
                 timeWarning = "⏰ 今日护眼约定时间还剩最后 3 分钟，打完这一关就让眼睛休息吧！"
-            } else if leftSec > 180 {
+            } else if leftSec > 180 && timeWarning != nil {
                 timeWarning = nil
             }
-        } else {
+        } else if timeWarning != nil {
             timeWarning = nil
         }
 
@@ -3310,6 +3354,7 @@ public final class GameEngine: ObservableObject {
     }
 
     public func startEyeRestBreak() {
+        flushPendingPlaySeconds()
         continuousPlaySeconds = 0
         restRemaining = max(15, progress.eyeCare.restSeconds)
         eyeRestActive = true
@@ -3319,6 +3364,7 @@ public final class GameEngine: ObservableObject {
     }
 
     public func completeEyeRest() {
+        flushPendingPlaySeconds()
         eyeRestActive = false
         restRemaining = 0
         continuousPlaySeconds = 0
@@ -3329,7 +3375,7 @@ public final class GameEngine: ObservableObject {
     public func checkPlayLockStatus(allowDuringQuestion: Bool) {
         let now = Date()
         if let overrideUntil = bedtimeOverrideUntil, now < overrideUntil {
-            playLock = nil
+            if playLock != nil { playLock = nil }
             return
         }
 
@@ -3340,8 +3386,9 @@ public final class GameEngine: ObservableObject {
             let wake = progress.eyeCare.wakeHour
             let isInBedtime: Bool = (bed > wake) ? (hour >= bed || hour < wake) : (hour >= bed && hour < wake)
             if isInBedtime && allowDuringQuestion {
+                flushPendingPlaySeconds()
                 audio.stopAllSpeech()
-                playLock = .bedtime
+                if playLock != .bedtime { playLock = .bedtime }
                 return
             }
         }
@@ -3349,14 +3396,17 @@ public final class GameEngine: ObservableObject {
         // 2. 检查每日时长上限
         if progress.eyeCare.dailyLimitEnabled {
             let limitSec = progress.todayAllowedMinutes * 60
-            if progress.todayPlaySeconds >= limitSec && allowDuringQuestion {
+            if liveTodayPlaySeconds >= limitSec && allowDuringQuestion {
+                flushPendingPlaySeconds()
                 audio.stopAllSpeech()
-                playLock = .dailyLimit
+                if playLock != .dailyLimit { playLock = .dailyLimit }
                 return
             }
         }
 
-        playLock = nil
+        if playLock != nil {
+            playLock = nil
+        }
     }
 
     public func requestParentGate(_ purpose: ParentGatePurpose) {

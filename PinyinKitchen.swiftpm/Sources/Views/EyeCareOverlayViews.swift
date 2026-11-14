@@ -185,6 +185,20 @@ public struct EyeRestOverlayView: View {
                             breatheScale = true
                         }
                     }
+                    .onDisappear {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            breatheScale = false
+                        }
+                    }
+                    .onCompatChange(of: engine.progress.eyeCare.gentleMotion) { isGentle in
+                        if isGentle {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                breatheScale = false
+                            }
+                        } else {
+                            breatheScale = true
+                        }
+                    }
 
                     Text("🌿 小熊护眼时间 · 让眼睛做个深呼吸")
                         .font(.system(size: 24, weight: .black))

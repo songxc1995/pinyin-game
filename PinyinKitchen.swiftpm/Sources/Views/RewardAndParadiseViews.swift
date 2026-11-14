@@ -17,30 +17,37 @@ public struct FireworkSparkBurstView: View {
         let outerDist: CGFloat = expand ? (gentleMotion ? 36 : 48) : 4
         let innerDist: CGFloat = expand ? (gentleMotion ? 20 : 28) : 2
 
-        ZStack {
-            ForEach(0..<12, id: \.self) { i in
-                let angle = Double(i) * (Double.pi * 2.0 / 12.0)
-                Circle()
-                    .fill(Color(hex: colorHex))
-                    .frame(width: expand ? 4.5 : 9, height: expand ? 4.5 : 9)
-                    .shadow(color: Color(hex: colorHex), radius: gentleMotion ? 2 : 5)
-                    .offset(x: CGFloat(cos(angle)) * outerDist, y: CGFloat(sin(angle)) * outerDist)
-                    .opacity(expand ? 0.0 : 1.0)
+        Color.clear
+            .frame(width: 12, height: 12)
+            .overlay {
+                ZStack {
+                    ForEach(0..<12, id: \.self) { i in
+                        let angle = Double(i) * (Double.pi * 2.0 / 12.0)
+                        Circle()
+                            .fill(Color(hex: colorHex))
+                            .frame(width: 9, height: 9)
+                            .scaleEffect(expand ? 0.5 : 1.0)
+                            .shadow(color: Color(hex: colorHex), radius: gentleMotion ? 2 : 5)
+                            .offset(x: CGFloat(cos(angle)) * outerDist, y: CGFloat(sin(angle)) * outerDist)
+                            .opacity(expand ? 0.0 : 1.0)
+                    }
+                    ForEach(0..<6, id: \.self) { j in
+                        let angle = Double(j) * (Double.pi / 3.0) + 0.25
+                        Circle()
+                            .fill(Color(hex: "#FFD166"))
+                            .frame(width: 6.5, height: 6.5)
+                            .scaleEffect(expand ? (3.5 / 6.5) : 1.0)
+                            .offset(x: CGFloat(cos(angle)) * innerDist, y: CGFloat(sin(angle)) * innerDist)
+                            .opacity(expand ? 0.0 : 0.95)
+                    }
+                }
+                .allowsHitTesting(false)
             }
-            ForEach(0..<6, id: \.self) { j in
-                let angle = Double(j) * (Double.pi / 3.0) + 0.25
-                Circle()
-                    .fill(Color(hex: "#FFD166"))
-                    .frame(width: expand ? 3.5 : 6.5, height: expand ? 3.5 : 6.5)
-                    .offset(x: CGFloat(cos(angle)) * innerDist, y: CGFloat(sin(angle)) * innerDist)
-                    .opacity(expand ? 0.0 : 0.95)
+            .onAppear {
+                withAnimation(.easeOut(duration: dur)) {
+                    expand = true
+                }
             }
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: dur)) {
-                expand = true
-            }
-        }
     }
 }
 
@@ -69,215 +76,153 @@ public struct CompanionPetStageWidget: View {
         let charge = max(0, min(8, engine.rainbowCharge))
 
         VStack(spacing: 6) {
-            ZStack(alignment: .trailing) {
-                HStack(spacing: 10) {
-                    // 满满小公主实时盛装形象 + 守护萌宠双伴读
-                    HStack(spacing: 5) {
-                        Button {
-                            engine.audio.sfxSpark()
-                            engine.audio.speakText("满满小公主身穿\(dress.name)，为你加油！", slow: false)
-                        } label: {
-                            PrincessAvatarVectorView(
-                                progress: engine.progress,
-                                size: 54,
-                                animated: true,
-                                gentleMotion: gentle
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            engine.audio.sfxPetHappy()
-                            engine.audio.speakText("\(pet.name)为你加油！\(pet.cheerLine)", slow: false)
-                        } label: {
-                            GuardianPetVectorView(
-                                species: pet,
-                                stage: stage,
-                                size: 50,
-                                animated: true,
-                                showHeartBurst: engine.petHeartBurst,
-                                gentleMotion: gentle,
-                                talentActive: engine.petTalentActive
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        // 第一行：宠物名字 + 阶位 + 实效技能标签 + 凤凰护盾 + 华丽度 / 狂热
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 5) {
-                                Text("👑 满满 & \(pet.name)")
-                                    .font(.system(size: 12.5, weight: .heavy))
-                                    .foregroundColor(Color(hex: "#4A2E14"))
-                                    .lineLimit(1)
-
-                                Text(GuardianPetSpecies.stageName(for: stage))
-                                    .font(.system(size: 10, weight: .heavy))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color(hex: pet.primaryHex)))
-
-                                Text(pet.effectiveSkillSummary(forStage: stage))
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(Color(hex: "#9A3412"))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color(hex: "#FFEDD5")))
-
-                                if pet.kind == .phoenix {
-                                    let shields = engine.phoenixShieldsRemaining
-                                    Text(shields > 0 ? "🔥 护盾 ×\(shields)" : "🔥 护盾已用")
-                                        .font(.system(size: 10, weight: .black))
-                                        .foregroundColor(shields > 0 ? .white : Color(hex: "#9CA3AF"))
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 2)
-                                        .background(
-                                            Capsule().fill(
-                                                shields > 0
-                                                    ? Color(hex: "#E25247")
-                                                    : Color.black.opacity(0.08)
-                                            )
-                                        )
-                                }
-
-                                Text("✨ \(engine.progress.totalGlamourScore)")
-                                    .font(.system(size: 10, weight: .heavy))
-                                    .foregroundColor(Color(hex: "#BE185D"))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color(hex: "#FCE7F3")))
-
-                                if engine.isFeverMode {
-                                    Text("🔥 狂热 1.5x")
-                                        .font(.system(size: 10, weight: .black))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 2)
-                                        .background(
-                                            Capsule().fill(
-                                                LinearGradient(
-                                                    colors: [Color(hex: "#FF595E"), Color(hex: "#F59E0B")],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                        )
-                                }
-                            }
-                        }
-
-                        // 第二行：8 格彩虹连击能量槽（渐亮 + 6/7/8 发光提醒）
-                        HStack(spacing: 6) {
-                            Text("🌈 彩虹能量")
-                                .font(.system(size: 11, weight: .heavy))
-                                .foregroundColor(charge >= 6 ? Color(hex: "#E05385") : Color(hex: "#7A6EE6"))
-
-                            HStack(spacing: 3) {
-                                ForEach(0..<8, id: \.self) { idx in
-                                    let filled = idx < charge
-                                    let col = Color(hex: rainbowColors[idx])
-                                    let nearReadyGlow = filled && charge >= 6 && !gentle
-                                    RoundedRectangle(cornerRadius: 3.5)
-                                        .fill(
-                                            filled
-                                                ? col.opacity(0.55 + Double(idx + 1) * 0.056)
-                                                : Color.black.opacity(0.08)
-                                        )
-                                        .frame(width: 14, height: filled && charge >= 7 ? 10 : 8)
-                                        .shadow(
-                                            color: nearReadyGlow ? col.opacity(0.75) : .clear,
-                                            radius: charge >= 7 ? 4 : 2
-                                        )
-                                        .scaleEffect(filled ? (charge >= 7 ? 1.12 : 1.04) : 1.0)
-                                        .animation(.spring(response: 0.28), value: charge)
-                                }
-                            }
-
-                            Text("\(charge)/8")
-                                .font(.system(size: 10.5, weight: .black, design: .rounded))
-                                .foregroundColor(charge >= 6 ? Color(hex: "#E05385") : Color(hex: "#8A7765"))
-
-                            if charge == 6 {
-                                Text("✨ 快集满啦!")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundColor(Color(hex: "#7A6EE6"))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 1.5)
-                                    .background(Capsule().fill(Color(hex: "#EFEFFD")))
-                            } else if charge == 7 {
-                                Text("🌟 再对1题爆大奖!")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 1.5)
-                                    .background(
-                                        Capsule().fill(
-                                            LinearGradient(
-                                                colors: [Color(hex: "#F59E0B"), Color(hex: "#E05385")],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                    )
-                            }
-                        }
-                    }
-
-                    Spacer(minLength: 4)
-
-                    // 右侧：实时星币胶囊 + 飞金币落点光效与弹跳
-                    VStack(alignment: .trailing, spacing: 3) {
-                        ZStack {
-                            if coinLandingPulse {
-                                Capsule()
-                                    .stroke(Color(hex: "#F59E0B"), lineWidth: 2.5)
-                                    .frame(width: 84, height: 30)
-                                    .scaleEffect(1.26)
-                                    .opacity(0.25)
-                                    .transition(.opacity)
-                            }
-
-                            HStack(spacing: 4) {
-                                Text("🪙")
-                                    .font(.system(size: 14))
-                                Text("\(engine.progress.coins)")
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundColor(Color(hex: "#B45309"))
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4.5)
-                            .background(
-                                Capsule().fill(
-                                    coinLandingPulse
-                                        ? Color(hex: "#FDE68A")
-                                        : Color(hex: "#FFF8E1")
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 6) {
+                    // 顶部行：满满小公主与守护萌宠双伴读 + 名称与徽标 + 右侧实时星币
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Button {
+                                engine.audio.sfxSpark()
+                                engine.audio.speakText("满满小公主身穿\(dress.name)，为你加油！", slow: false)
+                            } label: {
+                                PrincessAvatarVectorView(
+                                    progress: engine.progress,
+                                    size: 48,
+                                    animated: true,
+                                    gentleMotion: gentle
                                 )
-                            )
-                            .overlay(
-                                Capsule().stroke(
-                                    coinLandingPulse ? Color(hex: "#F59E0B") : Color(hex: "#FCD34D").opacity(0.6),
-                                    lineWidth: coinLandingPulse ? 2 : 1
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                engine.audio.sfxPetHappy()
+                                engine.audio.speakText("\(pet.name)为你加油！\(pet.cheerLine)", slow: false)
+                            } label: {
+                                GuardianPetVectorView(
+                                    species: pet,
+                                    stage: stage,
+                                    size: 44,
+                                    animated: true,
+                                    showHeartBurst: engine.petHeartBurst,
+                                    gentleMotion: gentle,
+                                    talentActive: engine.petTalentActive
                                 )
-                            )
-                            .scaleEffect(coinLandingPulse ? (gentle ? 1.07 : 1.15) : 1.0)
-                            .animation(.spring(response: 0.28, dampingFraction: 0.55), value: coinLandingPulse)
+                            }
+                            .buttonStyle(.plain)
                         }
 
-                        if let gain = engine.floatingCoinGainText {
-                            Text(gain)
-                                .font(.system(size: 11, weight: .black))
-                                .foregroundColor(Color(hex: "#E25247"))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("👑 满满 & \(pet.name)")
+                                .font(.system(size: 12.5, weight: .heavy))
+                                .foregroundColor(Color(hex: "#4A2E14"))
                                 .lineLimit(1)
-                                .transition(.scale.combined(with: .opacity))
-                        } else {
-                            HStack(spacing: 6) {
-                                Text("🎟️ ×\(engine.progress.gachaTickets)")
-                                Text("🌟 ×\(engine.progress.petCandy)")
+                                .minimumScaleFactor(0.85)
+
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 4) {
+                                    petStageBadge(pet: pet, stage: stage)
+                                    glamourScoreBadge
+                                    phoenixShieldBadge(pet: pet)
+                                    feverModeBadge
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 4) {
+                                        petStageBadge(pet: pet, stage: stage)
+                                        glamourScoreBadge
+                                    }
+                                    if pet.kind == .phoenix || engine.isFeverMode {
+                                        HStack(spacing: 4) {
+                                            phoenixShieldBadge(pet: pet)
+                                            feverModeBadge
+                                        }
+                                    }
+                                }
                             }
-                            .font(.system(size: 10.5, weight: .bold))
-                            .foregroundColor(Color(hex: "#8A7765"))
+                        }
+
+                        Spacer(minLength: 4)
+
+                        // 右侧：实时星币胶囊 + 飞金币落点光效与弹跳
+                        VStack(alignment: .trailing, spacing: 3) {
+                            ZStack {
+                                if coinLandingPulse {
+                                    Capsule()
+                                        .stroke(Color(hex: "#F59E0B"), lineWidth: 2.5)
+                                        .frame(width: 84, height: 30)
+                                        .scaleEffect(1.26)
+                                        .opacity(0.25)
+                                        .transition(.opacity)
+                                }
+
+                                HStack(spacing: 4) {
+                                    Text("🪙")
+                                        .font(.system(size: 14))
+                                    Text("\(engine.progress.coins)")
+                                        .font(.system(size: 15, weight: .black, design: .rounded))
+                                        .foregroundColor(Color(hex: "#B45309"))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4.5)
+                                .background(
+                                    Capsule().fill(
+                                        coinLandingPulse
+                                            ? Color(hex: "#FDE68A")
+                                            : Color(hex: "#FFF8E1")
+                                    )
+                                )
+                                .overlay(
+                                    Capsule().stroke(
+                                        coinLandingPulse ? Color(hex: "#F59E0B") : Color(hex: "#FCD34D").opacity(0.6),
+                                        lineWidth: coinLandingPulse ? 2 : 1
+                                    )
+                                )
+                                .scaleEffect(coinLandingPulse ? (gentle ? 1.07 : 1.15) : 1.0)
+                                .animation(.spring(response: 0.28, dampingFraction: 0.55), value: coinLandingPulse)
+                            }
+
+                            if let gain = engine.floatingCoinGainText {
+                                Text(gain)
+                                    .font(.system(size: 11, weight: .black))
+                                    .foregroundColor(Color(hex: "#E25247"))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .transition(.scale.combined(with: .opacity))
+                            } else {
+                                HStack(spacing: 6) {
+                                    Text("🎟️ ×\(engine.progress.gachaTickets)")
+                                    Text("🌟 ×\(engine.progress.petCandy)")
+                                }
+                                .font(.system(size: 10.5, weight: .bold))
+                                .foregroundColor(Color(hex: "#8A7765"))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                            }
+                        }
+                    }
+
+                    // 中间行：独立占满左栏的实效技能说明胶囊（不与姓名拥挤裁切）
+                    Text(pet.effectiveSkillSummary(forStage: stage))
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#9A3412"))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(hex: "#FFEDD5")))
+
+                    // 底部行：8 格彩虹连击能量槽（渐亮 + 6/7/8 发光提醒，禁止折行）
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) {
+                            rainbowEnergyBarCore(charge: charge, gentle: gentle, barWidth: 14)
+                            rainbowChargeMilestoneBadge(charge: charge)
+                            Spacer(minLength: 0)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                rainbowEnergyBarCore(charge: charge, gentle: gentle, barWidth: 12)
+                                Spacer(minLength: 0)
+                            }
+                            rainbowChargeMilestoneBadge(charge: charge)
                         }
                     }
                 }
@@ -289,7 +234,7 @@ public struct CompanionPetStageWidget: View {
                         let arcY = -sin(coinFlyProgress * Double.pi) * (gentle ? 16.0 : 32.0) - CGFloat(idx * 4)
                         Text("🪙")
                             .font(.system(size: 14))
-                            .offset(x: offsetX - 18, y: arcY - 8)
+                            .offset(x: offsetX - 18, y: arcY + 12)
                             .opacity(Double(1.0 - max(0.0, (coinFlyProgress - 0.72) / 0.28)))
                     }
                     .allowsHitTesting(false)
@@ -364,6 +309,141 @@ public struct CompanionPetStageWidget: View {
             }
         }
     }
+
+    private func petStageBadge(pet: GuardianPetSpecies, stage: Int) -> some View {
+        Text(GuardianPetSpecies.stageName(for: stage))
+            .font(.system(size: 10, weight: .heavy))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color(hex: pet.primaryHex)))
+    }
+
+    private var glamourScoreBadge: some View {
+        Text("✨ \(engine.progress.totalGlamourScore)")
+            .font(.system(size: 10, weight: .heavy))
+            .foregroundColor(Color(hex: "#BE185D"))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color(hex: "#FCE7F3")))
+    }
+
+    @ViewBuilder
+    private func phoenixShieldBadge(pet: GuardianPetSpecies) -> some View {
+        if pet.kind == .phoenix {
+            let shields = engine.phoenixShieldsRemaining
+            Text(shields > 0 ? "🔥 护盾 ×\(shields)" : "🔥 护盾已用")
+                .font(.system(size: 10, weight: .black))
+                .foregroundColor(shields > 0 ? .white : Color(hex: "#9CA3AF"))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill(
+                        shields > 0
+                            ? Color(hex: "#E25247")
+                            : Color.black.opacity(0.08)
+                    )
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var feverModeBadge: some View {
+        if engine.isFeverMode {
+            Text("🔥 狂热 1.5x")
+                .font(.system(size: 10, weight: .black))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#FF595E"), Color(hex: "#F59E0B")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                )
+        }
+    }
+
+    @ViewBuilder
+    private func rainbowEnergyBarCore(charge: Int, gentle: Bool, barWidth: CGFloat) -> some View {
+        Text("🌈 彩虹能量")
+            .font(.system(size: 11, weight: .heavy))
+            .foregroundColor(charge >= 6 ? Color(hex: "#E05385") : Color(hex: "#7A6EE6"))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+
+        HStack(spacing: 3) {
+            ForEach(0..<8, id: \.self) { idx in
+                let filled = idx < charge
+                let col = Color(hex: rainbowColors[idx])
+                let nearReadyGlow = filled && charge >= 6 && !gentle
+                RoundedRectangle(cornerRadius: 3.5)
+                    .fill(
+                        filled
+                            ? col.opacity(0.55 + Double(idx + 1) * 0.056)
+                            : Color.black.opacity(0.08)
+                    )
+                    .frame(width: barWidth, height: 10)
+                    .shadow(
+                        color: nearReadyGlow ? col.opacity(0.75) : .clear,
+                        radius: charge >= 7 ? 4 : 2
+                    )
+                    .scaleEffect(
+                        x: filled ? (charge >= 7 ? 1.12 : 1.04) : 1.0,
+                        y: filled ? (charge >= 7 ? 1.12 : 0.83) : 0.80
+                    )
+                    .animation(.spring(response: 0.28), value: charge)
+            }
+        }
+
+        Text("\(charge)/8")
+            .font(.system(size: 10.5, weight: .black, design: .rounded))
+            .foregroundColor(charge >= 6 ? Color(hex: "#E05385") : Color(hex: "#8A7765"))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    @ViewBuilder
+    private func rainbowChargeMilestoneBadge(charge: Int) -> some View {
+        if charge == 6 {
+            Text("✨ 快集满啦!")
+                .font(.system(size: 10, weight: .black))
+                .foregroundColor(Color(hex: "#7A6EE6"))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(Capsule().fill(Color(hex: "#EFEFFD")))
+        } else if charge == 7 {
+            Text("🌟 再对1题爆大奖!")
+                .font(.system(size: 10, weight: .black))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1.5)
+                .background(
+                    Capsule().fill(
+                        LinearGradient(
+                            colors: [Color(hex: "#F59E0B"), Color(hex: "#E05385")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                )
+        }
+    }
 }
 
 // MARK: - 3. 🎰 皇家梦幻扭蛋机动态矢量图 (GachaponMachineVectorView)
@@ -393,8 +473,8 @@ public struct GachaponMachineVectorView: View {
     ]
 
     public var body: some View {
-        let interval: TimeInterval = gentleMotion ? (1.0 / 15.0) : (1.0 / 30.0)
-        TimelineView(.animation(minimumInterval: interval)) { timeline in
+        let interval: TimeInterval = gentleMotion ? (1.0 / 8.0) : (isSpinning ? (1.0 / 15.0) : (1.0 / 12.0))
+        TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: interval)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let bodyShakeDeg: Double = isSpinning
                 ? sin(t * 28.0) * (gentleMotion ? 2.4 : 5.2)
@@ -404,75 +484,128 @@ public struct GachaponMachineVectorView: View {
                 : CGFloat(sin(t * 2.0)) * (gentleMotion ? 1.0 : 2.2)
             let crankDeg: Double = isSpinning ? (t * 480.0).truncatingRemainder(dividingBy: 360.0) : 0.0
 
-            ZStack {
+            Canvas { context, canvasSize in
+                let cx = canvasSize.width * 0.5
+                let cy = canvasSize.height * 0.5
+
                 // 柔和皇家背光（旋转时绽放黄金流光）
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
+                let glowScale: CGFloat = isSpinning ? CGFloat(1.06 + 0.05 * sin(t * 10.0)) : 1.0
+                context.drawLayer { glowCtx in
+                    glowCtx.translateBy(x: cx, y: cy)
+                    glowCtx.scaleBy(x: glowScale, y: glowScale)
+                    let glowRect = CGRect(x: -115, y: -115, width: 230, height: 230)
+                    glowCtx.fill(
+                        Circle().path(in: glowRect),
+                        with: .radialGradient(
+                            Gradient(colors: [
                                 Color(hex: isSpinning ? "#FFCA3A" : "#FFD166").opacity(isSpinning ? 0.62 : 0.40),
                                 Color(hex: "#FF758F").opacity(isSpinning ? 0.25 : 0.08),
                                 Color.clear
-                            ],
-                            center: .center,
+                            ]),
+                            center: .zero,
                             startRadius: 8,
                             endRadius: 118
                         )
                     )
-                    .frame(width: 230, height: 230)
-                    .scaleEffect(isSpinning ? (1.06 + 0.05 * sin(t * 10.0)) : 1.0)
+                }
 
-                VStack(spacing: -10) {
-                    // 1. 顶部皇家金冠顶盖
-                    ZStack {
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "#FF6B6B"), Color(hex: "#E63946")],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .frame(width: 124, height: 26)
-                            .overlay(Capsule().stroke(Color(hex: "#FFD166"), lineWidth: 2.5))
-                            .shadow(color: Color(hex: "#C1121F").opacity(0.25), radius: 4, y: 2)
+                // 机身（底座 + 透明玻璃球舱 + 12 颗彩蛋 + 顶冠）
+                context.drawLayer { bodyCtx in
+                    bodyCtx.translateBy(x: cx, y: cy + bodyBounceY)
+                    bodyCtx.rotate(by: .degrees(bodyShakeDeg))
 
-                        Text("👑 ROYAL GACHA")
-                            .font(.system(size: 10.5, weight: .black, design: .rounded))
-                            .foregroundColor(Color(hex: "#FFF8E1"))
+                    // 3. 扭蛋机红金底座 + 旋转金旋钮 + 高光出球口 (zIndex 1)
+                    let baseRect = CGRect(x: -78, y: 39, width: 156, height: 96)
+                    let basePath = RoundedRectangle(cornerRadius: 22).path(in: baseRect)
+                    let baseShadowPath = RoundedRectangle(cornerRadius: 22).path(in: baseRect.offsetBy(dx: 0, dy: 5).insetBy(dx: -1.5, dy: -1.5))
+                    bodyCtx.fill(baseShadowPath, with: .color(Color(hex: "#780000").opacity(0.16)))
+                    bodyCtx.fill(
+                        basePath,
+                        with: .linearGradient(
+                            Gradient(colors: [Color(hex: "#E63946"), Color(hex: "#C1121F")]),
+                            startPoint: CGPoint(x: 0, y: 39),
+                            endPoint: CGPoint(x: 0, y: 135)
+                        )
+                    )
+                    bodyCtx.stroke(basePath, with: .color(Color(hex: "#FFD166")), lineWidth: 3)
+
+                    // 金色旋转把手 (center y = 75.5)
+                    let crankRect = CGRect(x: -21, y: 54.5, width: 42, height: 42)
+                    let crankPath = Circle().path(in: crankRect)
+                    bodyCtx.fill(
+                        crankPath,
+                        with: .linearGradient(
+                            Gradient(colors: [Color(hex: "#FFF3B0"), Color(hex: "#F5A623")]),
+                            startPoint: CGPoint(x: 0, y: 54.5),
+                            endPoint: CGPoint(x: 0, y: 96.5)
+                        )
+                    )
+                    bodyCtx.stroke(crankPath, with: .color(Color(hex: "#8A4B12")), lineWidth: 2)
+
+                    bodyCtx.drawLayer { handleCtx in
+                        handleCtx.translateBy(x: 0, y: 75.5)
+                        handleCtx.rotate(by: .degrees(crankDeg))
+                        let barPath = RoundedRectangle(cornerRadius: 3.75).path(in: CGRect(x: -15, y: -3.75, width: 30, height: 7.5))
+                        handleCtx.fill(barPath, with: .color(Color(hex: "#8A4B12")))
                     }
-                    .zIndex(3)
 
-                    // 2. 透明玻璃球舱 + 12 颗双向均匀翻滚的彩色扭蛋球 + 玻璃反光
-                    ZStack {
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        Color.white.opacity(0.95),
-                                        Color(hex: "#E0F4FF").opacity(0.66),
-                                        Color(hex: "#BDE0FE").opacity(0.42)
-                                    ],
-                                    center: .topLeading,
-                                    startRadius: 10,
-                                    endRadius: 96
-                                )
-                            )
-                            .frame(width: 168, height: 168)
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [Color.white, Color(hex: "#FFD166"), Color(hex: "#F07D2E")],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 4
-                                    )
-                            )
+                    // 出蛋滑道口 (center y = 115.5)
+                    let chuteRect = CGRect(x: -33, y: 103.5, width: 66, height: 24)
+                    let chutePath = RoundedRectangle(cornerRadius: 10).path(in: chuteRect)
+                    if isSpinning {
+                        bodyCtx.drawLayer { chuteShadow in
+                            chuteShadow.addFilter(.shadow(color: Color(hex: "#FFD166").opacity(0.85), radius: 6))
+                            chuteShadow.fill(chutePath, with: .color(Color(hex: "#2B1810")))
+                        }
+                    } else {
+                        bodyCtx.fill(chutePath, with: .color(Color(hex: "#2B1810")))
+                    }
+                    bodyCtx.stroke(
+                        chutePath,
+                        with: .color(isSpinning ? Color(hex: "#FFF3B0") : Color(hex: "#FFD166")),
+                        lineWidth: isSpinning ? 2.4 : 1.6
+                    )
 
-                        // 12 颗彩色扭蛋球（TimelineView 驱动，解决原动画状态不变 Bug）
-                        ForEach(0..<12, id: \.self) { i in
+                    if isSpinning {
+                        let orbRect = CGRect(x: -7, y: 108.5, width: 14, height: 14)
+                        bodyCtx.fill(
+                            Circle().path(in: orbRect),
+                            with: .radialGradient(
+                                Gradient(colors: [Color(hex: "#FFF3B0"), Color(hex: "#FF758F")]),
+                                center: CGPoint(x: 0, y: 115.5),
+                                startRadius: 1,
+                                endRadius: 9
+                            )
+                        )
+                    } else {
+                        bodyCtx.draw(
+                            Text("🎁").font(.system(size: 11)),
+                            at: CGPoint(x: 0, y: 115.5)
+                        )
+                    }
+
+                    // 2. 透明玻璃球舱 + 12 颗双向均匀翻滚的彩色扭蛋球 + 玻璃反光 (zIndex 2, center y = -35)
+                    let globeCenterY: CGFloat = -35
+                    let globeRect = CGRect(x: -84, y: globeCenterY - 84, width: 168, height: 168)
+                    let globePath = Circle().path(in: globeRect)
+                    bodyCtx.fill(
+                        globePath,
+                        with: .radialGradient(
+                            Gradient(colors: [
+                                Color.white.opacity(0.95),
+                                Color(hex: "#E0F4FF").opacity(0.66),
+                                Color(hex: "#BDE0FE").opacity(0.42)
+                            ]),
+                            center: CGPoint(x: -56, y: globeCenterY - 56),
+                            startRadius: 10,
+                            endRadius: 96
+                        )
+                    )
+
+                    bodyCtx.drawLayer { globeLayer in
+                        globeLayer.clip(to: globePath)
+
+                        for i in 0..<12 {
                             let pair = capsuleColors[i % capsuleColors.count]
                             let col = i % 4
                             let row = i / 4
@@ -492,146 +625,91 @@ public struct GachaponMachineVectorView: View {
                             let clampedY = max(-52.0, min(52.0, restY * (isSpinning ? 0.45 : 1.0) + spinOffsetY))
                             let ballRot = isSpinning ? (angle * 55.0) : Double(i * 15) + sin(t * 2.0 + Double(i)) * 6.0
 
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: pair.0), Color(hex: pair.1)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
+                            globeLayer.drawLayer { ballCtx in
+                                ballCtx.translateBy(x: clampedX, y: globeCenterY + clampedY)
+                                ballCtx.rotate(by: .degrees(ballRot))
+                                let bRect = CGRect(x: -15, y: -15, width: 30, height: 30)
+                                let bPath = Circle().path(in: bRect)
+                                ballCtx.fill(
+                                    bPath,
+                                    with: .linearGradient(
+                                        Gradient(colors: [Color(hex: pair.0), Color(hex: pair.1)]),
+                                        startPoint: CGPoint(x: 0, y: -15),
+                                        endPoint: CGPoint(x: 0, y: 15)
                                     )
-                                    .frame(width: 30, height: 30)
-                                    .overlay(Circle().stroke(Color.white.opacity(0.88), lineWidth: 1.5))
-                                    .shadow(color: Color.black.opacity(0.14), radius: 2, y: 1)
-
-                                Path { p in
-                                    p.move(to: CGPoint(x: 2, y: 15))
-                                    p.addLine(to: CGPoint(x: 28, y: 15))
-                                }
-                                .stroke(Color.white.opacity(0.75), lineWidth: 1.2)
-                                .frame(width: 30, height: 30)
-
-                                Text("★")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundColor(.white.opacity(0.92))
-                                    .offset(y: -5)
+                                )
+                                ballCtx.stroke(bPath, with: .color(Color.white.opacity(0.88)), lineWidth: 1.5)
+                                var belt = Path()
+                                belt.move(to: CGPoint(x: -13, y: 0))
+                                belt.addLine(to: CGPoint(x: 13, y: 0))
+                                ballCtx.stroke(belt, with: .color(Color.white.opacity(0.75)), lineWidth: 1.2)
+                                ballCtx.draw(
+                                    Text("★")
+                                        .font(.system(size: 10, weight: .black))
+                                        .foregroundColor(.white.opacity(0.92)),
+                                    at: CGPoint(x: 0, y: -5)
+                                )
                             }
-                            .rotationEffect(.degrees(ballRot))
-                            .offset(x: clampedX, y: clampedY)
                         }
 
                         // 双层玻璃高光反光弧
-                        Circle()
-                            .trim(from: 0.56, to: 0.77)
-                            .stroke(Color.white.opacity(0.82), style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                            .frame(width: 146, height: 146)
-
-                        Circle()
-                            .trim(from: 0.08, to: 0.16)
-                            .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                            .frame(width: 146, height: 146)
-                    }
-                    .clipShape(Circle())
-                    .zIndex(2)
-
-                    // 3. 扭蛋机红金底座 + 旋转金旋钮 + 高光出球口
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 22)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "#E63946"), Color(hex: "#C1121F")],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                        let arc1 = Path { p in
+                            p.addArc(
+                                center: CGPoint(x: 0, y: globeCenterY),
+                                radius: 73,
+                                startAngle: .degrees(0.56 * 360.0),
+                                endAngle: .degrees(0.77 * 360.0),
+                                clockwise: false
                             )
-                            .frame(width: 156, height: 96)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 22)
-                                    .stroke(Color(hex: "#FFD166"), lineWidth: 3)
-                            )
-                            .shadow(color: Color(hex: "#780000").opacity(0.28), radius: 8, y: 5)
-
-                        VStack(spacing: 7) {
-                            // 金色旋转把手
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: "#FFF3B0"), Color(hex: "#F5A623")],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .frame(width: 42, height: 42)
-                                    .overlay(Circle().stroke(Color(hex: "#8A4B12"), lineWidth: 2))
-
-                                Capsule()
-                                    .fill(Color(hex: "#8A4B12"))
-                                    .frame(width: 30, height: 7.5)
-                                    .rotationEffect(.degrees(crankDeg))
-                            }
-
-                            // 出蛋滑道口（带发光高光边与出球光晕）
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color(hex: "#2B1810"))
-                                    .frame(width: 66, height: 24)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(
-                                                isSpinning ? Color(hex: "#FFF3B0") : Color(hex: "#FFD166"),
-                                                lineWidth: isSpinning ? 2.4 : 1.6
-                                            )
-                                    )
-                                    .shadow(
-                                        color: isSpinning ? Color(hex: "#FFD166").opacity(0.85) : .clear,
-                                        radius: 6
-                                    )
-
-                                if isSpinning {
-                                    Circle()
-                                        .fill(
-                                            RadialGradient(
-                                                colors: [Color(hex: "#FFF3B0"), Color(hex: "#FF758F")],
-                                                center: .center,
-                                                startRadius: 1,
-                                                endRadius: 9
-                                            )
-                                        )
-                                        .frame(width: 14, height: 14)
-                                } else {
-                                    Text("🎁")
-                                        .font(.system(size: 11))
-                                }
-                            }
                         }
-                        .offset(y: 4)
-                    }
-                    .zIndex(1)
-                }
-                .rotationEffect(.degrees(bodyShakeDeg))
-                .offset(y: bodyBounceY)
+                        globeLayer.stroke(arc1, with: .color(Color.white.opacity(0.82)), style: StrokeStyle(lineWidth: 6, lineCap: .round))
 
-                // 右上角保底小标签
-                VStack {
-                    HStack {
-                        Spacer()
-                        Text("✨ \(pityRemaining) 抽保底神话")
-                            .font(.system(size: 10, weight: .black))
-                            .foregroundColor(Color(hex: "#5E340B"))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3.5)
-                            .background(
-                                Capsule().fill(Color(hex: "#FFF8E1"))
-                                    .overlay(Capsule().stroke(Color(hex: "#FFD166"), lineWidth: 1.5))
+                        let arc2 = Path { p in
+                            p.addArc(
+                                center: CGPoint(x: 0, y: globeCenterY),
+                                radius: 73,
+                                startAngle: .degrees(0.08 * 360.0),
+                                endAngle: .degrees(0.16 * 360.0),
+                                clockwise: false
                             )
+                        }
+                        globeLayer.stroke(arc2, with: .color(Color.white.opacity(0.55)), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                     }
-                    Spacer()
+
+                    bodyCtx.stroke(
+                        globePath,
+                        with: .linearGradient(
+                            Gradient(colors: [Color.white, Color(hex: "#FFD166"), Color(hex: "#F07D2E")]),
+                            startPoint: CGPoint(x: -84, y: globeCenterY - 84),
+                            endPoint: CGPoint(x: 84, y: globeCenterY + 84)
+                        ),
+                        lineWidth: 4
+                    )
+
+                    // 1. 顶部皇家金冠顶盖 (zIndex 3, center y = -122)
+                    let capRect = CGRect(x: -66, y: -135, width: 132, height: 26)
+                    let capPath = RoundedRectangle(cornerRadius: 13).path(in: capRect)
+                    let capShadowPath = RoundedRectangle(cornerRadius: 13).path(in: capRect.offsetBy(dx: 0, dy: 2.5))
+                    bodyCtx.fill(capShadowPath, with: .color(Color(hex: "#C1121F").opacity(0.18)))
+                    bodyCtx.fill(
+                        capPath,
+                        with: .linearGradient(
+                            Gradient(colors: [Color(hex: "#FF6B6B"), Color(hex: "#E63946")]),
+                            startPoint: CGPoint(x: 0, y: -135),
+                            endPoint: CGPoint(x: 0, y: -109)
+                        )
+                    )
+                    bodyCtx.stroke(capPath, with: .color(Color(hex: "#FFD166")), lineWidth: 2.5)
+                    bodyCtx.draw(
+                        Text("👑 ROYAL GACHA")
+                            .font(.system(size: 10.5, weight: .black, design: .rounded))
+                            .foregroundColor(Color(hex: "#FFF8E1")),
+                        at: CGPoint(x: 0, y: -122)
+                    )
                 }
-                .padding(4)
             }
         }
+        .frame(width: 240, height: 268)
     }
 }
 
@@ -668,7 +746,7 @@ public struct CastleDioramaAnimatedView: View {
         let unlocked = engine.progress.castleUnlocked
         let ownedPets = GuardianPetSpecies.all.filter { (engine.progress.pets[$0.id] ?? 0) > 0 }
         let gentle = engine.progress.eyeCare.gentleMotion
-        let interval: TimeInterval = gentle ? (1.0 / 15.0) : (1.0 / 30.0)
+        let interval: TimeInterval = gentle ? (1.0 / 8.0) : (1.0 / 12.0)
 
         GeometryReader { geo in
             let w = max(240, geo.size.width)
@@ -696,7 +774,7 @@ public struct CastleDioramaAnimatedView: View {
                     }
 
                 // 2. 全比例自适应动态景观 Canvas（全部采用 xRatio * w / yRatio * h）
-                TimelineView(.animation(minimumInterval: interval)) { timeline in
+                TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: interval)) { timeline in
                     let speed = gentle ? 0.42 : 1.0
                     let t = timeline.date.timeIntervalSinceReferenceDate * speed
 
@@ -711,6 +789,7 @@ public struct CastleDioramaAnimatedView: View {
                     }
                     .frame(width: w, height: h)
                 }
+                .frame(width: w, height: h)
                 .allowsHitTesting(false)
 
                 // 3. 8 座设施按比例热区点击气泡触发层
@@ -1331,9 +1410,10 @@ public struct RewardParadiseTabView: View {
     public var body: some View {
         GeometryReader { outerGeo in
             let isWide = outerGeo.size.width >= 760
+            let petDetailWide = isWide ? outerGeo.size.width >= 900 : outerGeo.size.width >= 560
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
-                    headerWealthBar
+                    headerWealthBar(isWide: isWide)
                     if let toast = engine.petFeedToast {
                         toastBanner(toast)
                     }
@@ -1342,7 +1422,7 @@ public struct RewardParadiseTabView: View {
                     petInteractiveHouseSection(isWide: isWide)
 
                     // 2. 🎰 奢华扭蛋机台 + 萌宠图鉴详情双路升阶
-                    gachaAndInspectedPetSection(isWide: isWide)
+                    gachaAndInspectedPetSection(isWide: isWide, petDetailWide: petDetailWide)
 
                     // 3. 🌟 12 只守护神兽全图鉴网格
                     petCodexGridSection
@@ -1359,17 +1439,20 @@ public struct RewardParadiseTabView: View {
     }
 
     // MARK: - 顶部财富条（自适应换行防挤压）
-    private var headerWealthBar: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                titleCluster
-                Spacer(minLength: 8)
-                currencyPills
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                titleCluster
-                ScrollView(.horizontal, showsIndicators: false) {
+    private func headerWealthBar(isWide: Bool) -> some View {
+        Group {
+            if isWide {
+                HStack(spacing: 10) {
+                    titleCluster
+                    Spacer(minLength: 8)
                     currencyPills
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    titleCluster
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        currencyPills
+                    }
                 }
             }
         }
@@ -1677,18 +1760,18 @@ public struct RewardParadiseTabView: View {
     }
 
     // MARK: - 2. 🎰 奢华扭蛋机台 + 选中神兽详情与双路升阶
-    private func gachaAndInspectedPetSection(isWide: Bool) -> some View {
+    private func gachaAndInspectedPetSection(isWide: Bool, petDetailWide: Bool) -> some View {
         Group {
             if isWide {
                 HStack(alignment: .top, spacing: 16) {
                     gachaMachineCard
                         .frame(minWidth: 300, maxWidth: 360)
-                    inspectedPetDetailCard
+                    inspectedPetDetailCard(isHorizontal: petDetailWide)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 14) {
                     gachaMachineCard
-                    inspectedPetDetailCard
+                    inspectedPetDetailCard(isHorizontal: petDetailWide)
                 }
             }
         }
@@ -1700,16 +1783,34 @@ public struct RewardParadiseTabView: View {
         let gentle = engine.progress.eyeCare.gentleMotion
 
         return VStack(spacing: 10) {
-            Text("🎰 奢华皇家扭蛋机")
-                .font(.system(size: 17, weight: .black))
-                .foregroundColor(Color(hex: "#4A2E14"))
+            HStack(spacing: 8) {
+                Text("🎰 奢华皇家扭蛋机")
+                    .font(.system(size: 16.5, weight: .black))
+                    .foregroundColor(Color(hex: "#4A2E14"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Spacer(minLength: 4)
+
+                Text("✨ \(pityLeft) 抽保底神话")
+                    .font(.system(size: 10.5, weight: .black))
+                    .foregroundColor(Color(hex: "#5E340B"))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(Color(hex: "#FFF8E1"))
+                            .overlay(Capsule().stroke(Color(hex: "#FFD166"), lineWidth: 1.5))
+                    )
+            }
 
             GachaponMachineVectorView(
                 isSpinning: engine.isSpinningGacha,
                 pityRemaining: pityLeft,
                 gentleMotion: gentle
             )
-            .frame(height: 238)
+            .frame(height: 268)
 
             // 神话保底倒计时 & 防连非保护提示
             VStack(spacing: 4) {
@@ -1790,7 +1891,7 @@ public struct RewardParadiseTabView: View {
         )
     }
 
-    private var inspectedPetDetailCard: some View {
+    private func inspectedPetDetailCard(isHorizontal: Bool) -> some View {
         let pet = inspectedPet
         let ownedCount = engine.progress.pets[pet.id] ?? 0
         let stage = engine.progress.petStage(for: pet.id)
@@ -1872,7 +1973,7 @@ public struct RewardParadiseTabView: View {
             }
 
             // 预览舞台 + 技能详情 + 双路升阶
-            ViewThatFits(in: .horizontal) {
+            if isHorizontal {
                 HStack(alignment: .top, spacing: 16) {
                     inspectedPetAvatarBox(pet: pet, ownedCount: ownedCount, stage: stage, gentle: gentle)
                     inspectedPetInfoAndUpgradeColumn(
@@ -1885,6 +1986,7 @@ public struct RewardParadiseTabView: View {
                         isMaxStage: isMaxStage
                     )
                 }
+            } else {
                 VStack(alignment: .leading, spacing: 12) {
                     inspectedPetAvatarBox(pet: pet, ownedCount: ownedCount, stage: stage, gentle: gentle)
                         .frame(maxWidth: .infinity)
@@ -2698,7 +2800,7 @@ private struct InteractiveCrackEggView: View {
     let gentleMotion: Bool
 
     var body: some View {
-        let interval: TimeInterval = gentleMotion ? (1.0 / 15.0) : (1.0 / 30.0)
+        let interval: TimeInterval = gentleMotion ? (1.0 / 10.0) : (1.0 / 20.0)
         TimelineView(.animation(minimumInterval: interval)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let shakeAmp: Double = crackLevel == 2 ? (gentleMotion ? 4 : 9) : (crackLevel == 1 ? (gentleMotion ? 2.5 : 5) : 1.8)
@@ -2778,5 +2880,6 @@ private struct InteractiveCrackEggView: View {
             }
             .frame(width: eggSize * 1.15, height: eggSize * 1.15)
         }
+        .frame(width: eggSize * 1.15, height: eggSize * 1.15)
     }
 }

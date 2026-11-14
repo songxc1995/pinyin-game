@@ -9,10 +9,8 @@ public struct PotVectorView: View {
     public let steamOn: Bool
     public let fire: FireDifficulty
     public var size: CGFloat = 170
+    public let animated: Bool
     public let gentleMotion: Bool
-
-    @State private var flamePhase: Bool = false
-    @State private var steamLiftPhase: Bool = false
 
     public init(
         skin: PotSkin,
@@ -22,6 +20,7 @@ public struct PotVectorView: View {
         steamOn: Bool = false,
         fire: FireDifficulty = .mid,
         size: CGFloat = 170,
+        animated: Bool = true,
         gentleMotion: Bool = false
     ) {
         self.skin = skin
@@ -31,73 +30,15 @@ public struct PotVectorView: View {
         self.steamOn = steamOn
         self.fire = fire
         self.size = size
+        self.animated = animated
         self.gentleMotion = gentleMotion
     }
 
     public var body: some View {
+        let shouldAnimate = animated && !gentleMotion
+        let flameScaleUnit: CGFloat = min(1.0, max(0.30, size / 140.0))
+
         ZStack(alignment: .bottom) {
-            if isHot {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color(hex: "#FFB347").opacity(gentleMotion ? 0.25 : 0.42),
-                                Color(hex: "#FF6B6B").opacity(0.14),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 10,
-                            endRadius: size * 0.65
-                        )
-                    )
-                    .frame(width: size * 1.25, height: size * 1.05)
-                    .offset(y: -size * 0.08)
-            }
-
-            // 顶部蒸汽与糊锅小黑烟
-            if steamOn {
-                HStack(spacing: 14) {
-                    ForEach(0..<4, id: \.self) { i in
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.92), Color(hex: "#FFF4E3").opacity(0.45)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .frame(width: 9, height: i.isMultiple(of: 2) ? 30 : 24)
-                            .shadow(color: Color(hex: "#F07D2E").opacity(0.32), radius: 4)
-                            .offset(y: gentleMotion ? (isShaking ? -28 : -22) : (steamLiftPhase ? -38 : -20))
-                            .opacity(gentleMotion ? 0.85 : (steamLiftPhase ? 0.95 : 0.55))
-                            .animation(
-                                gentleMotion
-                                    ? .easeInOut(duration: 0.35)
-                                    : .easeInOut(duration: 0.85).repeatForever(autoreverses: true).delay(Double(i) * 0.14),
-                                value: gentleMotion ? isShaking : steamLiftPhase
-                            )
-                    }
-                }
-                .offset(y: -size * 0.62)
-                .onAppear {
-                    if !gentleMotion { steamLiftPhase = true }
-                }
-                .onCompatChange(of: gentleMotion) { isGentle in
-                    steamLiftPhase = !isGentle
-                }
-            }
-
-            if isNope {
-                HStack(spacing: 10) {
-                    Text("💨")
-                    Text("☁️")
-                    Text("💨")
-                }
-                .font(.system(size: 22))
-                .offset(y: -size * 0.65)
-                .transition(.scale.combined(with: .opacity))
-            }
-
             // 锅体主体
             Canvas { context, canvasSize in
                 let w = canvasSize.width
@@ -219,44 +160,143 @@ public struct PotVectorView: View {
             .animation(gentleMotion ? .easeOut(duration: 0.25) : .spring(response: 0.28, dampingFraction: 0.45), value: isShaking)
             .animation(gentleMotion ? .easeOut(duration: 0.25) : .spring(response: 0.22, dampingFraction: 0.40), value: isNope)
 
-            // 底部灶火苗动画（支持柔和护眼动效模式）
-            ZStack {
-                Ellipse()
-                    .fill(Color(hex: "#FF9800").opacity(gentleMotion ? 0.16 : 0.26))
-                    .frame(width: size * 0.56, height: 10)
-                    .offset(y: 7)
+            // 底部灶火苗动画（固定外框 + 仅在 animated && !gentleMotion 时以 20fps Canvas 绘制，避免触发布局重算）
+            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: !shouldAnimate)) { timeline in
+                let t = shouldAnimate ? timeline.date.timeIntervalSinceReferenceDate : 0.0
+                Canvas { context, canvasSize in
+                    let fireScale: CGFloat = fire == .high ? 1.22 : (fire == .low ? 0.80 : 1.0)
+                    let cx = canvasSize.width * 0.5
+                    let baseY = canvasSize.height - 6 * flameScaleUnit
 
-                HStack(spacing: 6) {
-                    ForEach(0..<5, id: \.self) { i in
+                    // 火苗底部柔光椭圆
+                    let glowW = min(canvasSize.width, size * 0.56)
+                    let glowH = 10 * flameScaleUnit
+                    let glowRect = CGRect(x: cx - glowW * 0.5, y: baseY - glowH * 0.35, width: glowW, height: glowH)
+                    context.fill(
+                        Ellipse().path(in: glowRect),
+                        with: .color(Color(hex: "#FF9800").opacity(gentleMotion ? 0.16 : 0.26))
+                    )
+
+                    let spacing = 6.0 * flameScaleUnit
+                    let capW = 13.0 * fireScale * flameScaleUnit
+                    let totalW = 5.0 * capW + 4.0 * spacing
+                    let startX = cx - totalW * 0.5
+                    let grad = Gradient(colors: [Color(hex: "#FFF59D"), Color(hex: "#FF9800"), Color(hex: "#E64A19")])
+
+                    for i in 0..<5 {
                         let hScale: CGFloat = (i == 2) ? 1.25 : ((i == 1 || i == 3) ? 1.1 : 0.9)
-                        let fireScale: CGFloat = fire == .high ? 1.22 : (fire == .low ? 0.80 : 1.0)
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "#FFF59D"), Color(hex: "#FF9800"), Color(hex: "#E64A19")],
-                                    startPoint: .bottom,
-                                    endPoint: .top
+                        let baseH = 18.0 * hScale * fireScale * flameScaleUnit
+                        let wave: Double = shouldAnimate
+                            ? 0.5 + 0.5 * sin(t * (Double.pi / 0.48) - Double(i) * 0.45)
+                            : 0.46
+                        let stretchY = shouldAnimate ? CGFloat(0.88 + 0.26 * wave) : 1.0
+                        let deg: Double = shouldAnimate
+                            ? (i % 2 == 0 ? (-4.0 + 9.0 * wave) : (4.0 - 9.0 * wave))
+                            : 0.0
+
+                        let flameX = startX + CGFloat(i) * (capW + spacing) + capW * 0.5
+                        let drawH = baseH * stretchY
+                        let rect = CGRect(x: -capW * 0.5, y: -drawH, width: capW, height: drawH)
+                        let capsulePath = Capsule().path(in: rect)
+
+                        context.drawLayer { layer in
+                            layer.translateBy(x: flameX, y: baseY)
+                            if abs(deg) > 0.05 {
+                                layer.rotate(by: .degrees(deg))
+                            }
+                            layer.fill(
+                                capsulePath,
+                                with: .linearGradient(
+                                    grad,
+                                    startPoint: CGPoint(x: 0, y: 0),
+                                    endPoint: CGPoint(x: 0, y: -drawH)
                                 )
                             )
-                            .frame(width: 13 * fireScale, height: 18 * hScale * fireScale)
-                            .scaleEffect(y: gentleMotion ? 1.0 : (flamePhase ? 1.14 : 0.88), anchor: .bottom)
-                            .rotationEffect(.degrees(gentleMotion ? 0 : (flamePhase ? Double(i % 2 == 0 ? 5 : -5) : Double(i % 2 == 0 ? -4 : 4))))
-                            .animation(
-                                gentleMotion
-                                    ? .easeOut(duration: 0.2)
-                                    : .easeInOut(duration: 0.48).repeatForever(autoreverses: true).delay(Double(i) * 0.07),
-                                value: flamePhase
-                            )
+                        }
                     }
                 }
             }
-            .offset(y: 6)
+            .frame(width: max(size * 0.85, 118 * flameScaleUnit), height: 34 * flameScaleUnit)
+            .offset(y: 6 * flameScaleUnit)
         }
-        .onAppear {
-            if !gentleMotion { flamePhase = true }
+        .frame(width: size, height: size * 0.82)
+        .background(alignment: .bottom) {
+            if isHot {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(hex: "#FFB347").opacity(gentleMotion ? 0.25 : 0.42),
+                                Color(hex: "#FF6B6B").opacity(0.14),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 10,
+                            endRadius: size * 0.65
+                        )
+                    )
+                    .frame(width: size * 1.25, height: size * 1.05)
+                    .offset(y: -size * 0.08)
+                    .allowsHitTesting(false)
+            }
         }
-        .onCompatChange(of: gentleMotion) { isGentle in
-            flamePhase = !isGentle
+        .overlay(alignment: .bottom) {
+            Group {
+                if steamOn {
+                    TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: !shouldAnimate)) { timeline in
+                        let t = shouldAnimate ? timeline.date.timeIntervalSinceReferenceDate : 0.0
+                        Canvas { context, canvasSize in
+                            let cx = canvasSize.width * 0.5
+                            let spacing: CGFloat = 14
+                            let capW: CGFloat = 9
+                            let totalW = 4 * capW + 3 * spacing
+                            let startX = cx - totalW * 0.5
+                            let grad = Gradient(colors: [Color.white.opacity(0.92), Color(hex: "#FFF4E3").opacity(0.45)])
+
+                            for i in 0..<4 {
+                                let capH: CGFloat = i.isMultiple(of: 2) ? 30 : 24
+                                let wave: Double = shouldAnimate
+                                    ? 0.5 + 0.5 * sin(t * (Double.pi / 0.85) - Double(i) * 0.52)
+                                    : (isShaking ? 0.55 : 0.25)
+                                let liftOffset: CGFloat = gentleMotion
+                                    ? (isShaking ? -6 : 0)
+                                    : CGFloat(-18.0 * wave)
+                                let alpha: Double = gentleMotion
+                                    ? 0.85
+                                    : (0.55 + 0.40 * wave)
+                                let x = startX + CGFloat(i) * (capW + spacing)
+                                let y = canvasSize.height - capH - 6 + liftOffset
+                                let rect = CGRect(x: x, y: y, width: capW, height: capH)
+                                context.drawLayer { layer in
+                                    layer.opacity = alpha
+                                    layer.addFilter(.shadow(color: Color(hex: "#F07D2E").opacity(0.32), radius: 4))
+                                    layer.fill(
+                                        Capsule().path(in: rect),
+                                        with: .linearGradient(
+                                            grad,
+                                            startPoint: CGPoint(x: x, y: y),
+                                            endPoint: CGPoint(x: x, y: y + capH)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .frame(width: 96, height: 64)
+                    .offset(y: -size * 0.62)
+                }
+                if isNope {
+                    HStack(spacing: 10) {
+                        Text("💨")
+                        Text("☁️")
+                        Text("💨")
+                    }
+                    .font(.system(size: 22))
+                    .offset(y: -size * 0.65)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .allowsHitTesting(false)
         }
     }
 }

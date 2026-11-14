@@ -76,6 +76,8 @@ public struct PrincessWardrobeTabView: View {
 
         GeometryReader { geo in
             let isWide = geo.size.width >= 820
+            let stageWidth = min(400, max(320, geo.size.width * 0.38))
+            let rightColWidth = isWide ? max(300, geo.size.width - stageWidth - 16) : geo.size.width
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 14) {
                     glamourTopBar
@@ -92,13 +94,14 @@ public struct PrincessWardrobeTabView: View {
                                 stage: stage,
                                 isEquipped: isEquipped
                             )
-                            .frame(width: min(400, max(320, geo.size.width * 0.38)))
+                            .frame(width: stageWidth)
 
                             studioRightColumnView(
                                 item: item,
                                 ownedCount: ownedCount,
                                 stage: stage,
-                                isEquipped: isEquipped
+                                isEquipped: isEquipped,
+                                availableWidth: rightColWidth
                             )
                             .frame(maxWidth: .infinity)
                         }
@@ -115,7 +118,8 @@ public struct PrincessWardrobeTabView: View {
                                 item: item,
                                 ownedCount: ownedCount,
                                 stage: stage,
-                                isEquipped: isEquipped
+                                isEquipped: isEquipped,
+                                availableWidth: rightColWidth
                             )
                         }
                     }
@@ -554,7 +558,8 @@ public struct PrincessWardrobeTabView: View {
         item: PrincessFashionItem,
         ownedCount: Int,
         stage: Int,
-        isEquipped: Bool
+        isEquipped: Bool,
+        availableWidth: CGFloat
     ) -> some View {
         VStack(spacing: 14) {
             inspectedItemInspectorCard(
@@ -566,7 +571,7 @@ public struct PrincessWardrobeTabView: View {
 
             suitOneTapBarCard
 
-            customizationStudioCard
+            customizationStudioCard(availableWidth: availableWidth)
         }
     }
 
@@ -884,10 +889,11 @@ public struct PrincessWardrobeTabView: View {
     }
 
     // MARK: - 个性妆造栏（发色 / 表情 / 站姿）
-    private var customizationStudioCard: some View {
+    private func customizationStudioCard(availableWidth: CGFloat) -> some View {
         let curHair = engine.progress.currentHairColor
         let curExpr = engine.progress.currentExpression
         let curPose = engine.progress.currentPose
+        let fitsSingleRowChips = availableWidth >= 590
 
         return VStack(alignment: .leading, spacing: 10) {
             Text("🎨 满满公主个性妆造（发色 · 表情 · 站姿）")
@@ -946,93 +952,46 @@ public struct PrincessWardrobeTabView: View {
                 }
             }
 
-            // 2. 表情与 3. 站姿
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("甜美表情")
-                        .font(.system(size: 11.5, weight: .heavy))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 7) {
-                            ForEach(PrincessExpression.all) { expr in
-                                let unlocked = engine.progress.isExpressionUnlocked(expr)
-                                let selected = (curExpr.id == expr.id)
-                                Button {
-                                    engine.setExpression(expr)
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Text(expr.emoji)
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(expr.name)
-                                                .font(.system(size: 11, weight: .heavy))
-                                                .foregroundColor(unlocked ? Color(hex: "#3B2E22") : .gray)
-                                            if !unlocked {
-                                                Text("🔒 \(expr.unlockDesc)")
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(Color(hex: "#B45309"))
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 11)
-                                            .fill(selected ? Color(hex: "#EFEFFD") : Color(hex: "#FAF7F2"))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 11)
-                                                    .stroke(selected ? Color(hex: "#7A6EE6") : Color.black.opacity(0.08), lineWidth: selected ? 1.8 : 1.0)
-                                            )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // 2. 甜美表情（独立整行展示，避免与站姿并排挤压裁切）
+            VStack(alignment: .leading, spacing: 5) {
+                Text("甜美表情")
+                    .font(.system(size: 11.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#8A7765"))
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("舞台站姿")
-                        .font(.system(size: 11.5, weight: .heavy))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 7) {
-                            ForEach(PrincessPose.all) { pose in
-                                let unlocked = engine.progress.isPoseUnlocked(pose)
-                                let selected = (curPose.id == pose.id)
-                                Button {
-                                    engine.setPose(pose)
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Text(pose.emoji)
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(pose.name)
-                                                .font(.system(size: 11, weight: .heavy))
-                                                .foregroundColor(unlocked ? Color(hex: "#3B2E22") : .gray)
-                                            if !unlocked {
-                                                Text("🔒 \(pose.unlockDesc)")
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(Color(hex: "#B45309"))
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 11)
-                                            .fill(selected ? Color(hex: "#FEF3C7") : Color(hex: "#FAF7F2"))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 11)
-                                                    .stroke(selected ? Color(hex: "#F59E0B") : Color.black.opacity(0.08), lineWidth: selected ? 1.8 : 1.0)
-                                            )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
+                if fitsSingleRowChips {
+                    HStack(spacing: 8) {
+                        ForEach(PrincessExpression.all) { expr in
+                            expressionOptionChip(expr: expr, curExpr: curExpr, fixedSingleLine: true)
+                        }
+                    }
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 125, maximum: 220), spacing: 8)], alignment: .leading, spacing: 8) {
+                        ForEach(PrincessExpression.all) { expr in
+                            expressionOptionChip(expr: expr, curExpr: curExpr, fixedSingleLine: false)
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // 3. 舞台站姿（独立整行展示）
+            VStack(alignment: .leading, spacing: 5) {
+                Text("舞台站姿")
+                    .font(.system(size: 11.5, weight: .heavy))
+                    .foregroundColor(Color(hex: "#8A7765"))
+
+                if fitsSingleRowChips {
+                    HStack(spacing: 8) {
+                        ForEach(PrincessPose.all) { pose in
+                            poseOptionChip(pose: pose, curPose: curPose, fixedSingleLine: true)
+                        }
+                    }
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 125, maximum: 220), spacing: 8)], alignment: .leading, spacing: 8) {
+                        ForEach(PrincessPose.all) { pose in
+                            poseOptionChip(pose: pose, curPose: curPose, fixedSingleLine: false)
+                        }
+                    }
+                }
             }
         }
         .padding(14)
@@ -1041,6 +1000,80 @@ public struct PrincessWardrobeTabView: View {
                 .fill(Color.white.opacity(0.95))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color(hex: "#7A6EE6").opacity(0.28), lineWidth: 1.5))
         )
+    }
+
+    private func expressionOptionChip(expr: PrincessExpression, curExpr: PrincessExpression, fixedSingleLine: Bool) -> some View {
+        customizationOptionChip(
+            emoji: expr.emoji,
+            title: expr.name,
+            unlocked: engine.progress.isExpressionUnlocked(expr),
+            unlockDesc: expr.unlockDesc,
+            selected: curExpr.id == expr.id,
+            selectedBgHex: "#EFEFFD",
+            accentHex: "#7A6EE6",
+            fixedSingleLine: fixedSingleLine
+        ) {
+            engine.setExpression(expr)
+        }
+    }
+
+    private func poseOptionChip(pose: PrincessPose, curPose: PrincessPose, fixedSingleLine: Bool) -> some View {
+        customizationOptionChip(
+            emoji: pose.emoji,
+            title: pose.name,
+            unlocked: engine.progress.isPoseUnlocked(pose),
+            unlockDesc: pose.unlockDesc,
+            selected: curPose.id == pose.id,
+            selectedBgHex: "#FEF3C7",
+            accentHex: "#F59E0B",
+            fixedSingleLine: fixedSingleLine
+        ) {
+            engine.setPose(pose)
+        }
+    }
+
+    private func customizationOptionChip(
+        emoji: String,
+        title: String,
+        unlocked: Bool,
+        unlockDesc: String,
+        selected: Bool,
+        selectedBgHex: String,
+        accentHex: String,
+        fixedSingleLine: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(emoji)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundColor(unlocked ? Color(hex: "#3B2E22") : .gray)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: fixedSingleLine, vertical: false)
+                    if !unlocked {
+                        Text("🔒 \(unlockDesc)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color(hex: "#B45309"))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: fixedSingleLine, vertical: false)
+                    }
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .frame(maxWidth: fixedSingleLine ? nil : .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 11)
+                    .fill(selected ? Color(hex: selectedBgHex) : Color(hex: "#FAF7F2"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11)
+                            .stroke(selected ? Color(hex: accentHex) : Color.black.opacity(0.08), lineWidth: selected ? 1.8 : 1.0)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 5 分类高定衣架网格
@@ -1286,6 +1319,7 @@ private struct PrincessRoyalPosterCardView: View {
             ZStack {
                 PrincessStageBackdropView(
                     stageThemeId: suitBonus.stageThemeId,
+                    animated: false,
                     gentleMotion: true
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -1569,7 +1603,8 @@ public struct FashionUpgradeBurstOverlay: View {
                 let radius: CGFloat = burstExpanded ? (gentleMotion ? 130 : 175) : 16
                 Circle()
                     .fill(i % 2 == 0 ? Color(hex: colorHex) : Color(hex: "#FFD166"))
-                    .frame(width: burstExpanded ? 8 : 14, height: burstExpanded ? 8 : 14)
+                    .frame(width: 14, height: 14)
+                    .scaleEffect(burstExpanded ? (8.0 / 14.0) : 1.0)
                     .offset(x: CGFloat(cos(angle)) * radius, y: CGFloat(sin(angle)) * radius)
                     .opacity(burstExpanded ? 0.0 : 0.95)
             }

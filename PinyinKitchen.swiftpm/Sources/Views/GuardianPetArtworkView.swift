@@ -29,60 +29,58 @@ public struct GuardianPetVectorView: View {
     }
 
     private var frameInterval: TimeInterval {
-        gentleMotion ? (1.0 / 14.0) : (1.0 / 30.0)
+        gentleMotion ? (1.0 / 8.0) : (size <= 64 ? (1.0 / 10.0) : (1.0 / 12.0))
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: frameInterval, paused: !animated)) { timeline in
-            let rawT = animated ? timeline.date.timeIntervalSinceReferenceDate : 0.0
-            let speedScale: Double = gentleMotion ? 0.38 : 1.0
-            let t = rawT * speedScale
-            let motionAmp: CGFloat = gentleMotion ? 0.45 : 1.0
-            let talentBoost: CGFloat = talentActive ? 1.08 : 1.0
-            let bobY: CGFloat = animated
-                ? CGFloat(sin(t * 2.5)) * (size * 0.036) * motionAmp * (talentActive ? 1.45 : 1.0)
-                : 0.0
-            let squashX: CGFloat = animated
-                ? 1.0 + CGFloat(cos(t * 2.5)) * 0.022 * motionAmp
-                : 1.0
-            let squashY: CGFloat = animated
-                ? 1.0 - CGFloat(cos(t * 2.5)) * 0.022 * motionAmp
-                : 1.0
-
-            ZStack {
-                Canvas { context, canvasSize in
-                    drawPetScene(
-                        context: &context,
-                        canvasSize: canvasSize,
-                        t: t,
-                        motionAmp: motionAmp,
-                        bobY: bobY,
-                        squashX: squashX,
-                        squashY: squashY
-                    )
+        let talentBoost: CGFloat = talentActive ? 1.08 : 1.0
+        Group {
+            if animated {
+                TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: 0), by: frameInterval)) { timeline in
+                    petCanvas(rawT: timeline.date.timeIntervalSinceReferenceDate)
                 }
-                .frame(width: size * 1.32, height: size * 1.32)
-                .scaleEffect(talentBoost)
-
-                if showHeartBurst {
-                    heartBurstOverlay(t: t, motionAmp: motionAmp)
-                }
+            } else {
+                petCanvas(rawT: 0.0)
             }
-            .frame(width: size, height: size)
         }
+        .scaleEffect(talentBoost)
+        .frame(width: size, height: size)
     }
 
-    @ViewBuilder
-    private func heartBurstOverlay(t: Double, motionAmp: CGFloat) -> some View {
-        let lift = animated ? CGFloat(abs(sin(t * 3.8))) * (size * 0.08) * motionAmp : 0
-        HStack(spacing: max(3, size * 0.06)) {
-            Text("💖")
-            Text("✨")
-            Text("🎵")
+    private func petCanvas(rawT: Double) -> some View {
+        let speedScale: Double = gentleMotion ? 0.38 : 1.0
+        let t = animated ? rawT * speedScale : 0.0
+        let motionAmp: CGFloat = gentleMotion ? 0.45 : 1.0
+        let bobY: CGFloat = animated
+            ? CGFloat(sin(t * 2.5)) * (size * 0.036) * motionAmp * (talentActive ? 1.45 : 1.0)
+            : 0.0
+        let squashX: CGFloat = animated
+            ? 1.0 + CGFloat(cos(t * 2.5)) * 0.022 * motionAmp
+            : 1.0
+        let squashY: CGFloat = animated
+            ? 1.0 - CGFloat(cos(t * 2.5)) * 0.022 * motionAmp
+            : 1.0
+
+        return Canvas { context, canvasSize in
+            drawPetScene(
+                context: &context,
+                canvasSize: canvasSize,
+                t: t,
+                motionAmp: motionAmp,
+                bobY: bobY,
+                squashX: squashX,
+                squashY: squashY
+            )
+
+            if showHeartBurst {
+                let lift = animated ? CGFloat(abs(sin(t * 3.8))) * (size * 0.08) * motionAmp : 0
+                context.draw(
+                    Text("💖 ✨ 🎵").font(.system(size: max(10, size * 0.23))),
+                    at: CGPoint(x: canvasSize.width * 0.5, y: canvasSize.height * 0.5 - size * 0.54 - lift)
+                )
+            }
         }
-        .font(.system(size: max(10, size * 0.23)))
-        .offset(y: -size * 0.54 - lift)
-        .transition(.scale.combined(with: .opacity))
+        .frame(width: size * 1.32, height: size * 1.32)
     }
 
     // MARK: - 主绘制管线（基于 132x132 坐标系，主体居中于 66, 68）
