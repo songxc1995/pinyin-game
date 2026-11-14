@@ -486,20 +486,26 @@ public struct KitchenGameView: View {
                     .shadow(color: Color.black.opacity(0.06), radius: 8, y: 4)
             )
 
-            // 2. j q x 去两点规则专属提示横幅
+            // 2. j q x 去两点规则专属提示横幅（位于出题/槽位卡下方、料理锅上方，不遮挡右侧字母卡）
             if let jqxBanner = engine.jqxRuleBanner {
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    Text("🪄")
+                        .font(.system(size: 15))
                     Text(jqxBanner)
                         .font(.system(size: 12.5, weight: .heavy))
-                        .foregroundColor(Color(hex: "#534AB7"))
+                        .foregroundColor(Color(hex: "#4C409E"))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color(hex: "#EFEFFD"))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#7A6EE6"), lineWidth: 1.5))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#7A6EE6"), lineWidth: 1.6))
+                        .shadow(color: Color(hex: "#7A6EE6").opacity(0.12), radius: 4, y: 2)
                 )
                 .transition(.scale.combined(with: .opacity))
             }

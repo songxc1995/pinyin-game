@@ -374,10 +374,18 @@ public struct CurriculumGameView: View {
                 // 题干展示区
                 if let q = q {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(q.prompt)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundColor(Color(hex: "#3B2E22"))
-                            .fixedSize(horizontal: false, vertical: true)
+                        Button {
+                            engine.speakCurrentCurriculumPrompt(slow: false)
+                        } label: {
+                            Text(q.prompt)
+                                .font(.system(size: q.prompt.count > 48 ? 17 : 18.5, weight: .black, design: .rounded))
+                                .foregroundColor(Color(hex: "#3B2E22"))
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
 
                         // 仅当英文音频不会直接泄露答案，或者已经判题完毕后，才展示英文原句条
                         if let eng = q.englishAudio, !eng.isEmpty, engine.currentSubject == .english, (!engine.promptAudioRevealsAnswer || engine.isCurrentQuestionJudged) {
@@ -403,8 +411,8 @@ public struct CurriculumGameView: View {
                             } label: {
                                 Label(
                                     engine.currentSubject == .english
-                                        ? ((!engine.promptAudioRevealsAnswer || engine.isCurrentQuestionJudged) ? "🇬🇧 听纯正发音" : "🔊 读题干要求")
-                                        : "🔊 读题干",
+                                        ? ((!engine.promptAudioRevealsAnswer || engine.isCurrentQuestionJudged) ? "🇬🇧 听纯正发音" : "读题干要求")
+                                        : "读题干",
                                     systemImage: "speaker.wave.2.fill"
                                 )
                                     .font(.system(size: 12.5, weight: .bold))
@@ -614,37 +622,45 @@ public struct CurriculumGameView: View {
                 }
             }
 
-            HStack(spacing: 6) {
+            Group {
                 if engine.sentencePickedIndices.isEmpty {
-                    Text("👉 请按顺序点击右侧的鲜果英文词块，拼出完整句子！")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                        .padding(.vertical, 8)
+                    HStack {
+                        Text("👉 请按顺序点击右侧的鲜果英文词块，拼出完整句子！")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                            .padding(.vertical, 8)
+                        Spacer()
+                    }
                 } else {
-                    ForEach(Array(engine.sentencePickedIndices.enumerated()), id: \.offset) { _, optIdx in
-                        if optIdx < q.options.count {
-                            let word = q.options[optIdx]
-                            Button {
-                                engine.toggleSentenceBlock(at: optIdx)
-                            } label: {
-                                Text(word)
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color(hex: "#2FB380"))
-                                    )
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(engine.sentencePickedIndices.enumerated()), id: \.offset) { _, optIdx in
+                                if optIdx < q.options.count {
+                                    let word = q.options[optIdx]
+                                    Button {
+                                        engine.toggleSentenceBlock(at: optIdx)
+                                    } label: {
+                                        Text(word)
+                                            .font(.system(size: 15, weight: .black, design: .rounded))
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .fill(Color(hex: "#2FB380"))
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.vertical, 2)
                     }
                 }
-                Spacer()
             }
             .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color(hex: "#F2FFF9"))
@@ -916,12 +932,13 @@ public struct CurriculumGameView: View {
                                     .font(.system(size: 26))
 
                                 Text(opt)
-                                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                                    .font(.system(size: opt.count > 16 ? 18 : 21, weight: .heavy, design: .rounded))
                                     .foregroundColor(
                                         showGood || showHintRight ? Color(hex: "#2B7F4A") :
                                             (showWrongPick ? Color(hex: "#E25247") : Color(hex: "#3B2E22"))
                                     )
                                     .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
 
                                 Spacer(minLength: 4)
                             }
@@ -932,14 +949,9 @@ public struct CurriculumGameView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // 独立同级发音试听小喇叭
+                        // 独立同级发音试听小喇叭（智能区分纯英文 / 纯中文 / 中英混杂文本）
                         Button {
-                            let hasLatin = opt.range(of: "[A-Za-z]", options: .regularExpression) != nil
-                            if hasLatin {
-                                engine.audio.speakEnglish(opt, slow: engine.progress.tts.slow)
-                            } else {
-                                engine.audio.speakText(opt, slow: engine.progress.tts.slow)
-                            }
+                            speakOptionSmart(opt)
                         } label: {
                             Image(systemName: "speaker.wave.2.fill")
                                 .font(.system(size: 15, weight: .bold))
@@ -972,6 +984,43 @@ public struct CurriculumGameView: View {
         }
     }
 
+    private func speakOptionSmart(_ text: String) {
+        let slow = engine.progress.tts.slow
+        let hasChinese = text.range(of: "[\\u{4E00}-\\u{9FFF}]", options: .regularExpression) != nil
+        let hasLatin = text.range(of: "[A-Za-z]", options: .regularExpression) != nil
+
+        if hasLatin && !hasChinese {
+            engine.audio.speakEnglish(text, slow: slow)
+        } else if !hasLatin {
+            engine.audio.speakText(text, slow: slow)
+        } else {
+            let engPattern = #"[A-Za-z]+(?:['’\-][A-Za-z]+)*"#
+            let englishParts = extractRegexMatches(pattern: engPattern, in: text).joined(separator: " ")
+            let chineseOnly = text
+                .replacingOccurrences(of: engPattern, with: " ", options: .regularExpression)
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if chineseOnly.isEmpty {
+                engine.audio.speakEnglish(text, slow: slow)
+            } else {
+                engine.audio.speakBilingual(
+                    english: englishParts.isEmpty ? nil : englishParts,
+                    chinese: chineseOnly,
+                    slow: slow
+                )
+            }
+        }
+    }
+
+    private func extractRegexMatches(pattern: String, in text: String) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: nsRange).compactMap { match in
+            guard let r = Range(match.range, in: text) else { return nil }
+            return String(text[r])
+        }
+    }
+
     // MARK: - 3. 英语鲜果句子积木拼接面板
     private func englishSentenceFruitBlocksPanel(_ q: CurriculumQuestion) -> some View {
         let fruitEmojis = ["🍓", "🍊", "🍑", "🍎", "🍋", "🍇", "🍍", "🥝"]
@@ -983,52 +1032,73 @@ public struct CurriculumGameView: View {
                     Text("🧱 鲜果句子积木台（点击单词块投入左侧料理杯）")
                         .font(.system(size: 16, weight: .heavy))
                         .foregroundColor(Color(hex: "#156947"))
-                    Text("点击每个英文单词都会朗读发音，把所有果粒按顺序放进料理杯即可自动榨汁判题！")
+                    Text("点右侧 🔊 小喇叭可先试听发音不入杯；点词块投入左侧料理杯，拼满即自动榨汁判题！")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#8A7765"))
                 }
                 Spacer()
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 175, maximum: 260), spacing: 12)], spacing: 12) {
                 ForEach(Array(order.enumerated()), id: \.offset) { displayIdx, optIdx in
                     let word = q.options[optIdx]
                     let isPicked = engine.sentencePickedIndices.contains(optIdx)
                     let orderNum = (engine.sentencePickedIndices.firstIndex(of: optIdx) ?? -1) + 1
 
-                    Button {
-                        engine.toggleSentenceBlock(at: optIdx)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Text(fruitEmojis[displayIdx % fruitEmojis.count])
-                                .font(.system(size: 26))
-                            Text(word)
-                                .font(.system(size: 20, weight: .black, design: .rounded))
-                                .foregroundColor(isPicked ? Color(hex: "#2FB380") : Color(hex: "#156947"))
-                            Spacer()
-                            if isPicked {
-                                Text("#\(orderNum)")
-                                    .font(.system(size: 13, weight: .black))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(Capsule().fill(Color(hex: "#2FB380")))
+                    // 卡片容器内同级并列两个 Button：左侧词块投入/撤回，右侧 🔊 仅试听词音、绝不误投判题
+                    HStack(spacing: 8) {
+                        Button {
+                            engine.toggleSentenceBlock(at: optIdx)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(fruitEmojis[displayIdx % fruitEmojis.count])
+                                    .font(.system(size: 24))
+                                Text(word)
+                                    .font(.system(size: 19, weight: .black, design: .rounded))
+                                    .foregroundColor(isPicked ? Color(hex: "#2FB380") : Color(hex: "#156947"))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                Spacer(minLength: 2)
+                                if isPicked {
+                                    Text("#\(orderNum)")
+                                        .font(.system(size: 12.5, weight: .black))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3)
+                                        .background(Capsule().fill(Color(hex: "#2FB380")))
+                                }
                             }
+                            .padding(.leading, 14)
+                            .padding(.vertical, 14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(isPicked ? Color(hex: "#E8FFF5").opacity(0.55) : Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .stroke(isPicked ? Color(hex: "#2FB380") : Color(hex: "#2FB380").opacity(0.45), lineWidth: isPicked ? 2.5 : 1.8)
-                                )
-                                .shadow(color: Color.black.opacity(isPicked ? 0.01 : 0.06), radius: 4, y: 3)
-                        )
-                        .opacity(isPicked ? 0.65 : 1.0)
+                        .buttonStyle(.plain)
+
+                        Button {
+                            speakOptionSmart(word)
+                        } label: {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(Color(hex: "#2FB380"))
+                                .padding(9)
+                                .background(Circle().fill(Color(hex: "#E8FFF5")))
+                                .overlay(Circle().stroke(Color(hex: "#2FB380").opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 12)
+                        .accessibilityLabel("试听单词 \(word)")
                     }
-                    .buttonStyle(.plain)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(isPicked ? Color(hex: "#E8FFF5").opacity(0.55) : Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(isPicked ? Color(hex: "#2FB380") : Color(hex: "#2FB380").opacity(0.45), lineWidth: isPicked ? 2.5 : 1.8)
+                            )
+                            .shadow(color: Color.black.opacity(isPicked ? 0.01 : 0.06), radius: 4, y: 3)
+                    )
+                    .opacity(isPicked ? 0.72 : 1.0)
                 }
             }
 

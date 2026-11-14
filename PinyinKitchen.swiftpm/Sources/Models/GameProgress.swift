@@ -70,19 +70,77 @@ public struct TTSPreference: Codable, Equatable, Sendable {
     }
 }
 
+public enum StageRewardTier: String, Codable, Equatable, Sendable {
+    case full = "full"       // 🎁 全额奖励
+    case reduced = "reduced" // 🌓 巩固半额（不掉扭蛋券/宝箱/华服盲盒）
+    case warmup = "warmup"   // 🌱 今日奖励已领满（仅暖心练手）
+}
+
+public struct StageRewardPreview: Equatable, Sendable {
+    public let tier: StageRewardTier
+    public let clearsToday: Int
+    public let isMasteredThreeStar: Bool
+    public let badgeText: String
+    public let detailText: String
+    public let coinFactor: Double
+
+    public init(
+        tier: StageRewardTier,
+        clearsToday: Int,
+        isMasteredThreeStar: Bool,
+        badgeText: String,
+        detailText: String,
+        coinFactor: Double
+    ) {
+        self.tier = tier
+        self.clearsToday = clearsToday
+        self.isMasteredThreeStar = isMasteredThreeStar
+        self.badgeText = badgeText
+        self.detailText = detailText
+        self.coinFactor = coinFactor
+    }
+}
+
 public struct DailyProgress: Codable, Equatable, Sendable {
     public var d: String
     public var rounds: Int
     public var maxCombo: Int
     public var words: Int
     public var claimed: [String: Int]
+    public var stageClears: [String: Int] = [:]
+    public var distinctStages: [String] = []
 
-    public init(d: String, rounds: Int, maxCombo: Int, words: Int, claimed: [String: Int]) {
+    public init(
+        d: String,
+        rounds: Int,
+        maxCombo: Int,
+        words: Int,
+        claimed: [String: Int],
+        stageClears: [String: Int] = [:],
+        distinctStages: [String] = []
+    ) {
         self.d = d
         self.rounds = rounds
         self.maxCombo = maxCombo
         self.words = words
         self.claimed = claimed
+        self.stageClears = stageClears
+        self.distinctStages = distinctStages
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case d, rounds, maxCombo, words, claimed, stageClears, distinctStages
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.d = (try? c.decodeIfPresent(String.self, forKey: .d)) ?? GameProgress.todayString()
+        self.rounds = max(0, (try? c.decodeIfPresent(Int.self, forKey: .rounds)) ?? 0)
+        self.maxCombo = max(0, (try? c.decodeIfPresent(Int.self, forKey: .maxCombo)) ?? 0)
+        self.words = max(0, (try? c.decodeIfPresent(Int.self, forKey: .words)) ?? 0)
+        self.claimed = (try? c.decodeIfPresent([String: Int].self, forKey: .claimed)) ?? [:]
+        self.stageClears = (try? c.decodeIfPresent([String: Int].self, forKey: .stageClears)) ?? [:]
+        self.distinctStages = (try? c.decodeIfPresent([String].self, forKey: .distinctStages)) ?? []
     }
 }
 
@@ -168,7 +226,7 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public var bestCombo: Int = 0
     public var migratedLegacyButterflies: Bool = true
     public var cleared: [String: Int] = [:]
-    public var tts: TTSPreference = TTSPreference(slow: false)
+    public var tts: TTSPreference = TTSPreference(slow: true)
     public var potSkin: String = "classic"
     public var blind: Bool = false
     public var seasoningMode: Bool = true
@@ -283,11 +341,11 @@ public struct GameProgress: Codable, Equatable, Sendable {
         self.streak = (try? c.decode(StreakState.self, forKey: .streak)) ?? StreakState(last: "", n: 0)
         self.bestCombo = (try? c.decode(Int.self, forKey: .bestCombo)) ?? 0
         self.cleared = (try? c.decode([String: Int].self, forKey: .cleared)) ?? [:]
-        self.tts = (try? c.decode(TTSPreference.self, forKey: .tts)) ?? TTSPreference(slow: false)
+        self.tts = (try? c.decodeIfPresent(TTSPreference.self, forKey: .tts)) ?? TTSPreference(slow: false)
         self.potSkin = (try? c.decode(String.self, forKey: .potSkin)) ?? "classic"
         self.blind = (try? c.decode(Bool.self, forKey: .blind)) ?? false
         self.seasoningMode = (try? c.decode(Bool.self, forKey: .seasoningMode)) ?? true
-        self.daily = (try? c.decode(DailyProgress.self, forKey: .daily))
+        self.daily = (try? c.decodeIfPresent(DailyProgress.self, forKey: .daily))
             ?? DailyProgress(d: Self.todayString(), rounds: 0, maxCombo: 0, words: 0, claimed: [:])
         self.eyeCare = (try? c.decode(EyeCareSettings.self, forKey: .eyeCare)) ?? EyeCareSettings()
         self.playSeconds = (try? c.decode([String: Int].self, forKey: .playSeconds)) ?? [:]
@@ -605,7 +663,15 @@ public struct GameProgress: Codable, Equatable, Sendable {
     public mutating func ensureDaily() {
         let t = Self.todayString()
         if daily.d != t {
-            daily = DailyProgress(d: t, rounds: 0, maxCombo: 0, words: 0, claimed: [:])
+            daily = DailyProgress(
+                d: t,
+                rounds: 0,
+                maxCombo: 0,
+                words: 0,
+                claimed: [:],
+                stageClears: [:],
+                distinctStages: []
+            )
         }
         if dailyPetPatDate != t {
             dailyPetPatDate = t
@@ -765,6 +831,14 @@ public struct GameProgress: Codable, Equatable, Sendable {
             if other.daily.words > daily.words { daily.words = other.daily.words; added += 1 }
             for (k, v) in other.daily.claimed where v > 0 && (daily.claimed[k] ?? 0) == 0 {
                 daily.claimed[k] = 1
+                added += 1
+            }
+            for (k, v) in other.daily.stageClears where v > (daily.stageClears[k] ?? 0) {
+                daily.stageClears[k] = v
+                added += 1
+            }
+            for k in other.daily.distinctStages where !daily.distinctStages.contains(k) {
+                daily.distinctStages.append(k)
                 added += 1
             }
         }

@@ -130,14 +130,19 @@ public enum FireDifficulty: String, CaseIterable, Codable, Sendable {
     }
 
     public var desc: String {
-        "\(questionCount) 道题 · \(retryAllowance) 次回锅"
+        switch self {
+        case .low, .mid:
+            return "\(questionCount) 道题 · \(retryAllowance) 次回锅"
+        case .high:
+            return "\(questionCount) 道题 · 高手挑战"
+        }
     }
 
     public var tip: String {
         switch self {
-        case .low:  return "第一次玩这一关，选它最稳"
-        case .mid:  return "大多数时候选这个，刚刚好"
-        case .high: return "👗 华服礼盒翻倍！高定衣饰更容易出"
+        case .low:  return "第一次玩这一关，基础题为主最稳（推荐）"
+        case .mid:  return "熟悉本关后再选它，难易均衡刚刚好"
+        case .high: return "\(retryAllowance) 次回锅机会，适合熟练后自我挑战（含双份华服惊喜）"
         }
     }
 }

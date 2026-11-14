@@ -634,9 +634,10 @@ public struct MainContainerView: View {
         )
     }
 
-    // MARK: - 今日小厨神目标栏（含 3/3 全清大礼状态 & 转盘快捷入口）
+    // MARK: - 今日小厨神目标栏（含全部目标全清大礼状态 & 转盘快捷入口）
     private var dailyQuestsBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        let questCount = engine.dailyQuests.count
+        return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 Text("📅 今日目标")
                     .font(.system(size: 12.5, weight: .heavy))
@@ -677,8 +678,8 @@ public struct MainContainerView: View {
                     .buttonStyle(.plain)
                 }
 
-                // 3/3 每日全清大礼盒进度提示
-                Text(engine.isDailyFullClearClaimed ? "🎊 3/3全清大礼已发放" : "🎁 3/3全清额外送大礼")
+                // 每日全清大礼盒进度提示
+                Text(engine.isDailyFullClearClaimed ? "🎊 \(questCount)/\(questCount)全清大礼已发放" : "🎁 \(questCount)/\(questCount)全清额外送大礼")
                     .font(.system(size: 11, weight: .heavy))
                     .foregroundColor(engine.isDailyFullClearClaimed ? Color(hex: "#2B7F4A") : Color(hex: "#9A3412"))
                     .padding(.horizontal, 9)
@@ -767,7 +768,7 @@ public struct MainContainerView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 选火候弹窗（适配语数英三科）
+    // MARK: - 选火候弹窗（适配语数英三科 + 今日奖励档位提示）
     private func firePickerOverlay(levelNumber: Int) -> some View {
         let stageInfo: (title: String, sub: String, wrongCount: Int) = {
             switch engine.currentSubject {
@@ -784,9 +785,13 @@ public struct MainContainerView: View {
                 let stg = HujiaoCurriculumRepository.englishStages[max(0, min(HujiaoCurriculumRepository.englishStages.count - 1, levelNumber - 1))]
                 let qs = HujiaoCurriculumRepository.questionsForEnglishStage(stg.id)
                 let wc = qs.filter { (engine.progress.wrong[$0.id] ?? 0) > 0 }.count
-                return ("🧃 " + stg.name, "\(stg.unitCode) · \(stg.subtitle)", wc)
+                return ("🧃 " + stg.name, "\(stg.semester.rawValue) · \(stg.unitCode) · \(stg.subtitle)", wc)
             }
         }()
+
+        let rewardPreview = engine.stageRewardPreview(subject: engine.currentSubject, stageId: levelNumber)
+        let recId = engine.computeRecommendedNextStageId(subject: engine.currentSubject, excluding: levelNumber)
+        let recPreview = recId.map { engine.stageRewardPreview(subject: engine.currentSubject, stageId: $0) }
 
         return ZStack {
             Color.black.opacity(0.38)
@@ -806,12 +811,12 @@ public struct MainContainerView: View {
                         .foregroundColor(Color(hex: "#8A7765"))
                         .multilineTextAlignment(.center)
 
-                    Text(stageInfo.wrongCount > 0 ? "🎯 这一关还有 \(stageInfo.wrongCount) 道以前错过的题，这次把它们全部拿下！" : "✨ 这一关熟门熟路啦，可以挑战「大火」拿双倍公主华服礼盒！")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundColor(Color(hex: "#B25614"))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color(hex: "#FFF3DC")))
+                    fireRewardTierCard(
+                        rewardPreview: rewardPreview,
+                        wrongCount: stageInfo.wrongCount,
+                        recId: recId,
+                        recPreview: recPreview
+                    )
 
                     // 拼音专属快捷开关
                     if engine.currentSubject == .pinyin {
@@ -857,6 +862,13 @@ public struct MainContainerView: View {
                     // 小火 / 中火 / 大火选项
                     VStack(spacing: 9) {
                         ForEach(FireDifficulty.allCases, id: \.self) { fire in
+                            let isGentleRecommended = (fire == .low && rewardPreview.tier == .full)
+                            let tipText: String = {
+                                if rewardPreview.tier != .full && fire == .high {
+                                    return "\(fire.retryAllowance) 次回锅机会，适合熟练后挑战长题节奏（本局不掉华服盲盒）"
+                                }
+                                return fire.tip
+                            }()
                             Button {
                                 engine.audio.sfxTap()
                                 engine.startSubjectStage(stageId: levelNumber, fire: fire)
@@ -866,12 +878,23 @@ public struct MainContainerView: View {
                                         .font(.system(size: 22))
                                         .frame(width: 36)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("\(fire.name) · \(fire.desc)")
-                                            .font(.system(size: 15, weight: .heavy))
-                                            .foregroundColor(Color(hex: "#3B2E22"))
-                                        Text(fire.tip)
+                                        HStack(spacing: 6) {
+                                            Text("\(fire.name) · \(fire.desc)")
+                                                .font(.system(size: 15, weight: .heavy))
+                                                .foregroundColor(Color(hex: "#3B2E22"))
+                                            if isGentleRecommended {
+                                                Text("温柔热身")
+                                                    .font(.system(size: 10, weight: .black))
+                                                    .foregroundColor(Color(hex: "#15803D"))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 1.5)
+                                                    .background(Capsule().fill(Color(hex: "#DCFCE7")))
+                                            }
+                                        }
+                                        Text(tipText)
                                             .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(fire == .high ? Color(hex: "#E25247") : Color(hex: "#8A7765"))
+                                            .foregroundColor(Color(hex: "#8A7765"))
+                                            .multilineTextAlignment(.leading)
                                     }
                                     Spacer()
                                     Text("开始 →")
@@ -881,10 +904,13 @@ public struct MainContainerView: View {
                                 .padding(13)
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(fire == .high ? Color(hex: "#FFF4F2") : Color.white)
+                                        .fill(isGentleRecommended ? Color(hex: "#F6FEF9") : Color.white)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 16)
-                                                .stroke(fire == .high ? Color(hex: "#E25247").opacity(0.45) : Color.black.opacity(0.12), lineWidth: 1.8)
+                                                .stroke(
+                                                    isGentleRecommended ? Color(hex: "#2FB380").opacity(0.5) : Color.black.opacity(0.12),
+                                                    lineWidth: 1.8
+                                                )
                                         )
                                 )
                             }
@@ -911,6 +937,90 @@ public struct MainContainerView: View {
             )
             .padding(20)
         }
+    }
+
+    @ViewBuilder
+    private func fireRewardTierCard(
+        rewardPreview: StageRewardPreview,
+        wrongCount: Int,
+        recId: Int?,
+        recPreview: StageRewardPreview?
+    ) -> some View {
+        let style: (fg: Color, bg: Color, border: Color) = {
+            switch rewardPreview.tier {
+            case .full:
+                return (Color(hex: "#15803D"), Color(hex: "#F0FDF4"), Color(hex: "#22C55E").opacity(0.45))
+            case .reduced:
+                return (Color(hex: "#B45309"), Color(hex: "#FFFBEB"), Color(hex: "#F59E0B").opacity(0.55))
+            case .warmup:
+                return (Color(hex: "#6B5B7B"), Color(hex: "#F5F2F8"), Color(hex: "#A594B8").opacity(0.5))
+            }
+        }()
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(rewardPreview.badgeText)
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundColor(style.fg)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(0.85)))
+                Text(rewardPreview.clearsToday == 0 ? "今日尚未通关" : "今日已通关 \(rewardPreview.clearsToday) 遍")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(style.fg)
+                Spacer()
+            }
+
+            if rewardPreview.tier == .full {
+                Text(wrongCount > 0
+                     ? "🎯 这一关还有 \(wrongCount) 道以前错过的题，用舒服的节奏慢慢把它们拿下吧！"
+                     : "🌱 \(rewardPreview.detailText)！可以先用「🔥 小火」轻松热身，也可以自选节奏哦。")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(Color(hex: "#3B2E22"))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(rewardPreview.tier == .reduced
+                     ? "🌓 本关今日已进入「巩固半额」：星币减半，且暂不掉落盲盒宝箱与华服礼盒（若刷新最高星级仍破格补发全额大礼！）。"
+                     : "🌱 本关今日奖励已领满：仅获得每题 0~1 枚练手币（本局封顶 3 枚），不掉盲盒宝箱且不计每日刷题。")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(style.fg)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if wrongCount > 0 {
+                    Text("🎯 小提示：本关还有 \(wrongCount) 道错题，现在顺便温习也很棒。")
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                }
+
+                if let nextId = recId, let nextPrev = recPreview,
+                   (nextPrev.tier == .full || (rewardPreview.tier == .warmup && nextPrev.tier == .reduced)) {
+                    Button {
+                        engine.audio.sfxTap()
+                        engine.firePickerLevel = nextId
+                    } label: {
+                        Text(nextPrev.tier == .full
+                             ? "👉 换去第 \(nextId) 关拿全额奖励"
+                             : "👉 换去第 \(nextId) 关（\(nextPrev.badgeText)）")
+                            .font(.system(size: 12.5, weight: .black))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(nextPrev.tier == .full ? Color(hex: "#2FB380") : themeColor)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(style.bg)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(style.border, lineWidth: 1.5))
+        )
     }
 
     private func dailyWheelResultFallbackOverlay(_ slice: DailyWheelSlice) -> some View {

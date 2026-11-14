@@ -33,8 +33,8 @@ public final class PinyinAudioEngine: ObservableObject {
     // MARK: - 无调韵母与整体认读母体标准本音映射
     public static let baseFinalCallouts: [String: String] = [
         "a": "阿", "o": "喔", "e": "鹅", "i": "衣", "u": "乌", "ü": "迂",
-        "ai": "哀", "ei": "杯", "ui": "威", "ao": "熬", "ou": "欧", "iu": "优",
-        "ie": "耶", "üe": "约", "ue": "约", "er": "儿",
+        "ai": "哀", "ei": "杯", "ui": "威", "ao": "凹", "ou": "欧", "iu": "优",
+        "ie": "椰", "üe": "约", "ue": "约", "er": "儿",
         "an": "安", "en": "恩", "in": "音", "un": "温", "ün": "晕",
         "ang": "肮", "eng": "哼", "ing": "英", "ong": "翁",
         // 整体认读母体
@@ -46,23 +46,24 @@ public final class PinyinAudioEngine: ObservableObject {
 
     // MARK: - 带调韵母四声精确同音字表（确保四声调料瓶点读 100% 准音）
     public static let tonedFinalCallouts: [String: String] = [
-        // 单韵母四声
-        "ā": "阿", "á": "啊", "ǎ": "啊", "à": "爸",
-        "ō": "喔", "ó": "哦", "ǒ": "我", "ò": "卧",
+        // 单韵母四声（避免同音字冲突与声母污染）
+        "ā": "阿", "á": "啊？", "ǎ": "啊", "à": "啊！",
+        "ō": "喔", "ó": "哦？", "ǒ": "我", "ò": "哦！",
         "ē": "婀", "é": "鹅", "ě": "噁", "è": "饿",
         "ī": "衣", "í": "姨", "ǐ": "椅", "ì": "意",
         "ū": "屋", "ú": "无", "ǔ": "五", "ù": "雾",
         "ǖ": "迂", "ǘ": "鱼", "ǚ": "雨", "ǜ": "玉",
         // 复韵母四声
-        "āi": "哀", "ái": "挨", "ǎi": "矮", "ài": "爱",
+        "āi": "哀", "ái": "皑", "ǎi": "矮", "ài": "爱",
         "ēi": "杯", "éi": "肥", "ěi": "美", "èi": "妹",
         "uī": "威", "uí": "围", "uǐ": "伟", "uì": "喂",
-        "āo": "熬", "áo": "敖", "ǎo": "袄", "ào": "傲",
-        "ōu": "欧", "óu": "鸥", "ǒu": "偶", "òu": "慪",
+        "āo": "凹", "áo": "敖", "ǎo": "袄", "ào": "傲",
+        "ōu": "欧", "óu": "猴", "ǒu": "偶", "òu": "怄",
         "iū": "优", "iú": "油", "iǔ": "友", "iù": "右",
-        "iē": "耶", "ié": "爷", "iě": "也", "iè": "叶",
+        "iē": "椰", "ié": "爷", "iě": "也", "iè": "叶",
         "üē": "约", "üé": "学", "üě": "雪", "üè": "月",
         "uē": "约", "ué": "学", "uě": "雪", "uè": "月",
+        "ēr": "儿", "ér": "儿", "ěr": "耳", "èr": "二",
         // 前鼻韵母四声
         "ān": "安", "án": "南", "ǎn": "俺", "àn": "暗",
         "ēn": "恩", "én": "人", "ěn": "忍", "èn": "认",
@@ -336,7 +337,7 @@ public final class PinyinAudioEngine: ObservableObject {
         }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = preferredEnglishVoice ?? AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = slow ? 0.36 : 0.45
+        utterance.rate = slow ? 0.39 : 0.45
         utterance.pitchMultiplier = 1.06
         utterance.volume = 1.0
         synthesizer.speak(utterance)
@@ -351,7 +352,7 @@ public final class PinyinAudioEngine: ObservableObject {
         if let en = english, !en.isEmpty {
             let u1 = AVSpeechUtterance(string: en)
             u1.voice = preferredEnglishVoice ?? AVSpeechSynthesisVoice(language: "en-US")
-            u1.rate = slow ? 0.36 : 0.45
+            u1.rate = slow ? 0.39 : 0.45
             u1.pitchMultiplier = 1.06
             u1.postUtteranceDelay = 0.18
             synthesizer.speak(u1)
@@ -359,7 +360,7 @@ public final class PinyinAudioEngine: ObservableObject {
         if !chinese.isEmpty {
             let u2 = AVSpeechUtterance(string: chinese)
             u2.voice = preferredVoice ?? AVSpeechSynthesisVoice(language: "zh-CN")
-            u2.rate = slow ? 0.38 : 0.47
+            u2.rate = slow ? 0.39 : 0.45
             u2.pitchMultiplier = 1.06
             synthesizer.speak(u2)
         }
@@ -391,7 +392,7 @@ public final class PinyinAudioEngine: ObservableObject {
         if let rateOverride = rateOverride {
             utterance.rate = rateOverride
         } else {
-            utterance.rate = slow ? 0.36 : 0.47
+            utterance.rate = slow ? 0.39 : 0.45
         }
         utterance.pitchMultiplier = 1.08
         utterance.volume = 1.0
@@ -401,7 +402,7 @@ public final class PinyinAudioEngine: ObservableObject {
     /// 点读声母本音（如点 b 读「玻」）
     public func speakInitial(_ initial: String, slow: Bool = false) {
         let callout = Self.initialCallouts[initial] ?? initial
-        speakText(callout, slow: slow, rateOverride: slow ? 0.42 : 0.52)
+        speakText(callout, slow: slow, rateOverride: slow ? 0.41 : 0.47)
     }
 
     /// 点读无调韵母母体本音（如点 ai 读「哀」；若跟在 j/q/x 后面，u/un 读作 ü/ün 的本音「迂/晕」）
@@ -416,7 +417,7 @@ public final class PinyinAudioEngine: ObservableObject {
             effectiveBase = baseFinal
         }
         let callout = Self.baseFinalCallouts[effectiveBase] ?? effectiveBase
-        speakText(callout, slow: slow, rateOverride: slow ? 0.40 : 0.49)
+        speakText(callout, slow: slow, rateOverride: slow ? 0.40 : 0.46)
     }
 
     /// 点读带调韵母或四声调料瓶（如点 á 读二声；若已选 j/q/x，则 ū/ú/ǔ/ù 按 ǖ/ǘ/ǚ/ǜ 读音）
@@ -464,7 +465,7 @@ public final class PinyinAudioEngine: ObservableObject {
 
             if word.mode == .whole {
                 onHighlightStep("w")
-                speakUtteranceImmediate(word.character, slow: slow, rateOverride: slow ? 0.40 : 0.48)
+                speakUtteranceImmediate(word.character, slow: slow, rateOverride: slow ? 0.40 : 0.46)
                 try? await Task.sleep(nanoseconds: stepDelay + 120_000_000)
                 guard !Task.isCancelled else { return }
                 onHighlightStep("char")
@@ -480,7 +481,7 @@ public final class PinyinAudioEngine: ObservableObject {
                 guard !Task.isCancelled else { return }
                 onHighlightStep("i")
                 let iniCallout = Self.initialCallouts[ini] ?? ini
-                speakUtteranceImmediate(iniCallout, slow: slow, rateOverride: slow ? 0.44 : 0.54)
+                speakUtteranceImmediate(iniCallout, slow: slow, rateOverride: slow ? 0.41 : 0.48)
                 try? await Task.sleep(nanoseconds: stepDelay)
                 guard !Task.isCancelled else { return }
             }
@@ -490,7 +491,7 @@ public final class PinyinAudioEngine: ObservableObject {
                 guard !Task.isCancelled else { return }
                 onHighlightStep("m")
                 let medCallout = Self.baseFinalCallouts[med] ?? med
-                speakUtteranceImmediate(medCallout, slow: slow, rateOverride: slow ? 0.44 : 0.54)
+                speakUtteranceImmediate(medCallout, slow: slow, rateOverride: slow ? 0.41 : 0.48)
                 try? await Task.sleep(nanoseconds: stepDelay)
                 guard !Task.isCancelled else { return }
             }
@@ -500,7 +501,7 @@ public final class PinyinAudioEngine: ObservableObject {
             onHighlightStep("f")
             let effectiveToned = Self.normalizeJQXFinalForSpeech(tonedFinal: word.tonedFinal, initial: word.initial)
             let finCallout = Self.tonedFinalCallouts[effectiveToned] ?? word.character
-            speakUtteranceImmediate(finCallout, slow: slow, rateOverride: slow ? 0.42 : 0.50)
+            speakUtteranceImmediate(finCallout, slow: slow, rateOverride: slow ? 0.40 : 0.46)
             try? await Task.sleep(nanoseconds: stepDelay + 70_000_000)
             guard !Task.isCancelled else { return }
 

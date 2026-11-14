@@ -53,6 +53,8 @@ public struct MathVisualAidView: View {
                 DotGroupsVisualView(total: total, groupSize: groupSize, showGroupCount: showHint)
             case .multiOp(let steps, let title):
                 MultiOpFlowVisualView(steps: steps, title: title, answer: showHint ? question.answer : nil)
+            case .tipCard(let title, let message):
+                MathTipCardVisualView(title: title, message: message)
             case .starCount(let filled, let empty):
                 StarCountVisualView(filled: filled, empty: empty, totalHint: showHint ? question.answer : nil)
             case .tenFrame(let first, let second, let isSub):
@@ -92,15 +94,17 @@ public struct MathVisualAidView: View {
         case placeValue(tens: Int, ones: Int, revealBreakdown: Bool, caption: String?)
         case dotGroups(total: Int, groupSize: Int)
         case multiOp(steps: [String], title: String)
+        case tipCard(title: String, message: String)
         case starCount(filled: Int, empty: Int)
         case tenFrame(first: Int, second: Int, isSub: Bool)
     }
 
     private func detectVisualKind() -> VisualKind {
         let p = question.prompt
+        let bodyPrompt = stripLeadingPrefixLabel(from: p)
         let tid = question.topicId
         let opts = question.options
-        let nums = extractNumbers(from: p)
+        let nums = extractNumbers(from: bodyPrompt)
 
         // 1. 钟表教具 (一下 U3 时间的初步认识)
         if tid.hasPrefix("hjm_g1b_u3_") || p.contains("钟面") || p.contains("时针") || p.contains("分针") || p.contains("时半") {
@@ -163,41 +167,41 @@ public struct MathVisualAidView: View {
         }
 
         // 9. 排队顺序 / 第几与前后人数教具
-        if p.contains("排队") || p.contains("从左数") || p.contains("从右数") || p.contains("一排小动物") || p.contains("一排") || p.contains("之间有几人") {
-            return detectQueueVisual(prompt: p, nums: nums)
+        if bodyPrompt.contains("排队") || bodyPrompt.contains("从左数") || bodyPrompt.contains("从右数") || bodyPrompt.contains("一排小动物") || bodyPrompt.contains("一排") || bodyPrompt.contains("之间有几人") || (bodyPrompt.contains("前面有") && bodyPrompt.contains("后面有") && bodyPrompt.contains("排第几")) {
+            return detectQueueVisual(prompt: bodyPrompt, nums: nums)
         }
 
         // 10. 排序与大小/长短比较教具（无 min(10, ...) 截断）
-        if let compVisual = detectComparisonVisual(prompt: p, topicId: tid, nums: nums) {
+        if let compVisual = detectComparisonVisual(prompt: bodyPrompt, topicId: tid, nums: nums) {
             return compVisual
         }
 
         // 11. 数列填空、相邻数、前后数与数轴教具
-        if let lineVisual = detectNumberLineVisual(prompt: p, nums: nums) {
+        if let lineVisual = detectNumberLineVisual(prompt: bodyPrompt, nums: nums) {
             return lineVisual
         }
 
         // 12. 星星数数题（保留实心/空心原样）
-        let filledStars = p.filter { $0 == "★" }.count
-        let emptyStars = p.filter { $0 == "☆" }.count
+        let filledStars = bodyPrompt.filter { $0 == "★" }.count
+        let emptyStars = bodyPrompt.filter { $0 == "☆" }.count
         if filledStars + emptyStars > 0 {
             return .starCount(filled: filledStars, empty: emptyStars)
         }
 
         // 13. 包含除/等分点数演示（如 “10 里面有几个 2？”）
-        if p.contains("里面有几个") && !p.contains("个十") && !p.contains("个一") && nums.count == 2 {
+        if bodyPrompt.contains("里面有几个") && !bodyPrompt.contains("个十") && !bodyPrompt.contains("个一") && nums.count == 2 {
             return .dotGroups(total: max(1, min(30, nums[0])), groupSize: max(1, min(10, nums[1])))
         }
 
         // 14. 加减法家族与分与合三角树
-        if p.contains("分成") || p.contains("合起来") || p.contains("好朋友") || p.contains("加减法算式家族") || p.contains("组一道") || p.contains("组成的加法算式") || p.contains("组成的另一道减法算式") {
-            return detectNumberBondVisual(prompt: p, nums: nums)
+        if bodyPrompt.contains("分成") || bodyPrompt.contains("合起来") || bodyPrompt.contains("好朋友") || bodyPrompt.contains("加减法算式家族") || bodyPrompt.contains("组一道") || bodyPrompt.contains("组成的加法算式") || bodyPrompt.contains("组成的另一道减法算式") || (bodyPrompt.contains("凑成") && !bodyPrompt.contains("十和")) {
+            return detectNumberBondVisual(prompt: bodyPrompt, nums: nums)
         }
 
         // 15. 显式算式解析（含 □ 缺项、0 加减、两位数、多步连算）
-        if !p.contains("已知") && !p.contains("先算") && !p.contains("加法表中") {
-            if let eq = extractEquationTokens(from: p) {
-                if eq.tokens.count == 2 && !p.contains("再") {
+        if !bodyPrompt.contains("已知") && !bodyPrompt.contains("先算") && !bodyPrompt.contains("加法表中") {
+            if let eq = extractEquationTokens(from: bodyPrompt) {
+                if eq.tokens.count == 2 && !bodyPrompt.contains("再") {
                     let firstTok = eq.tokens[0]
                     let secondSigned = eq.tokens[1]
                     let isSub = secondSigned.hasPrefix("-")
@@ -231,46 +235,37 @@ public struct MathVisualAidView: View {
         }
 
         // 16. 百以内数位值积木（修复 100 被截成 99 的问题，支持 10 个十 = 100）
-        if p.contains("10个十") || p.contains("10 个十") {
+        if bodyPrompt.contains("10个十") || bodyPrompt.contains("10 个十") {
             return .placeValue(tens: 10, ones: 0, revealBreakdown: false, caption: "数一数：10 根整十长条合起来是多少？")
         }
-        if p.contains("100") {
-            if let numBond100 = detectHundredBondOrSteps(prompt: p, nums: nums) {
+        if bodyPrompt.contains("100") {
+            if let numBond100 = detectHundredBondOrSteps(prompt: bodyPrompt, nums: nums) {
                 return numBond100
             }
         }
-        if (p.contains("个十") || p.contains("个一") || p.contains("十位") || p.contains("个位") || p.contains("里面有几个"))
-            && !p.contains("再") && !p.contains("比") && !p.contains("还剩") && !p.contains("加起来") && !p.contains("添上") && !p.contains("去掉") && !p.contains("减") {
-            if let pv = detectPlaceValueVisual(prompt: p, topicId: tid, nums: nums) {
+        if (bodyPrompt.contains("个十") || bodyPrompt.contains("个一") || bodyPrompt.contains("十位") || bodyPrompt.contains("个位") || bodyPrompt.contains("里面有几个"))
+            && !bodyPrompt.contains("再") && !bodyPrompt.contains("比") && !bodyPrompt.contains("还剩") && !bodyPrompt.contains("加起来") && !bodyPrompt.contains("添上") && !bodyPrompt.contains("去掉") && !bodyPrompt.contains("减") {
+            if let pv = detectPlaceValueVisual(prompt: bodyPrompt, topicId: tid, nums: nums) {
                 return pv
             }
         }
 
         // 17. 特殊趣味生活场景（两只手 / 吃完 / 全飞走）
-        if p.contains("两只手") && p.contains("手指") {
+        if bodyPrompt.contains("两只手") && bodyPrompt.contains("手指") {
             return .tenFrame(first: 5, second: 5, isSub: false)
         }
-        if (p.contains("吃完") || p.contains("全飞走")) && nums.count == 1, let single = nums.first, (1...20).contains(single) {
+        if (bodyPrompt.contains("吃完") || bodyPrompt.contains("全飞走")) && nums.count == 1, let single = nums.first, (1...20).contains(single) {
             return .tenFrame(first: single, second: single, isSub: true)
         }
 
-        // 18. 已知/先算/多步连加减/元角货币/两位数应用题 -> 步进步骤条
-        if nums.count >= 3 || p.contains("再") || p.contains("元") || p.contains("角") || p.contains("先算") || p.contains("已知") || p.contains("加法表中") || p.contains("厘米") || nums.contains(where: { $0 > 20 }) {
-            let steps = buildWordProblemSteps(from: p)
-            let title: String
-            if p.contains("元") || p.contains("角") {
-                title = "💰 元角购物步骤演示"
-            } else if p.contains("厘米") {
-                title = "📏 厘米长度分段计算"
-            } else {
-                title = "🧮 分步思路卡片"
-            }
-            return .multiOp(steps: steps, title: title)
+        // 18. 已知/先算/多步连加减/元角货币/两位数应用题 -> 优先基于 verify 与安全关键词拆步
+        if nums.count >= 3 || bodyPrompt.contains("再") || bodyPrompt.contains("元") || bodyPrompt.contains("角") || bodyPrompt.contains("先算") || bodyPrompt.contains("已知") || bodyPrompt.contains("加法表中") || bodyPrompt.contains("百数表") || bodyPrompt.contains("厘米") || nums.contains(where: { $0 > 20 }) {
+            return detectWordProblemVisual(prompt: bodyPrompt)
         }
 
         // 19. 两数加减法与 0 的运算（取消 min(10, ...) 截断，完整支持 0~20）
         let smallNums = nums.filter { $0 >= 0 && $0 <= 20 }
-        let isSub = p.contains("-") || p.contains("减") || p.contains("吃") || p.contains("拿走") || p.contains("飞走") || p.contains("走开") || p.contains("送给") || p.contains("送出") || p.contains("还剩") || p.contains("借出") || p.contains("打破") || p.contains("剪去") || p.contains("去掉") || p.contains("少")
+        let isSub = isSubtractionContext(bodyPrompt)
         if smallNums.count == 2 {
             return .tenFrame(first: smallNums[0], second: smallNums[1], isSub: isSub)
         }
@@ -278,7 +273,7 @@ public struct MathVisualAidView: View {
             return .tenFrame(first: single, second: 0, isSub: false)
         }
 
-        return .multiOp(steps: [p], title: "🧁 数学思路小贴士")
+        return .tipCard(title: "🧁 数学思路小贴士", message: "认真读一读题目里的关键数字与问题，想想是要合起来、去掉还是比大小！")
     }
 
     // MARK: - 分类识别子助手
@@ -445,8 +440,18 @@ public struct MathVisualAidView: View {
         } else {
             unit = "一拃（张开大拇指到中指）"
         }
-        let steps = buildWordProblemSteps(from: p)
-        let formula = steps.isEmpty ? p : steps.joined(separator: "  ·  ")
+        let formula: String
+        if let verifySteps = extractPureAddSubVerifySteps(from: question.verify, answer: question.answer) {
+            formula = verifySteps.joined(separator: " ") + " = ？"
+        } else if p.contains("拃") && p.contains("厘米") {
+            formula = "先看 1 拃大约多少厘米，再数一共有几拃"
+        } else if p.contains("步") {
+            formula = "一步是从后脚尖到前脚尖的距离，注意步数与长度关系"
+        } else if p.contains("庹") {
+            formula = "两臂平伸时两手指尖之间约 1 庹，用来量较长的物体"
+        } else {
+            formula = "比较长度时要注意每个人的身体尺长短可能不同哦"
+        }
         return .bodyRuler(unitName: unit, formulaText: formula)
     }
 
@@ -467,20 +472,37 @@ public struct MathVisualAidView: View {
     }
 
     private func detectQueueVisual(prompt p: String, nums: [Int]) -> VisualKind {
-        let total = (p.contains("一排 10") || p.contains("一排10")) ? 10 : nil
+        let explicitTotal = firstCapturedInt(
+            pattern: #"(\d+)\s*(?:人|位|个小朋友|名同学|只小动物|个|只|名)\s*(?:排队|站成一排|排成一队|排成一排|排一排)"#,
+            in: p
+        ) ?? firstCapturedInt(
+            pattern: #"(?:^|[，。；：\s])(?:这一排|一排|全排|全队|一共有|共有)\s*(?:有\s*)?(\d+)\s*(?:人|位|个|只|名)"#,
+            in: p
+        )
+        let asksTotal = p.contains("一共有几") || p.contains("一共有多少") || p.contains("一共几") || p.contains("共有几") || p.contains("共有多少") || p.contains("一共多少")
+        let isUnknownTotal = (explicitTotal == nil && asksTotal)
+        let resolvedTotal: Int
+        if let t = explicitTotal {
+            resolvedTotal = max(1, t)
+        } else if nums.count >= 2 && p.contains("前面") && p.contains("后面") {
+            resolvedTotal = max(5, nums[0] + nums[1] + 1)
+        } else {
+            resolvedTotal = max(5, nums.max() ?? 8)
+        }
+
         let targetHint: String
         if p.contains("前面有几") {
             targetHint = "排第 \(nums.first ?? 2)，数一数它前面站了几位"
         } else if p.contains("之间有几") {
             targetHint = "两端都去掉自己，只数中间夹着的小伙伴"
-        } else if p.contains("一共有几") {
-            targetHint = "别忘了把主角自己也算进去哦！"
-        } else if let t = total {
-            targetHint = "全排共有 \(t) 个位置，注意不要重复也别漏数"
+        } else if asksTotal {
+            targetHint = "别忘了把主角自己算进去（或去掉重复算的那一次）哦！"
+        } else if let t = explicitTotal {
+            targetHint = "全排共有 \(t) 个位置，看清左/右方向再找第几位"
         } else {
             targetHint = "画一排小圆点排一排位置，一眼看清前后顺序"
         }
-        return .queue(QueueSpec(totalCount: total ?? 8, labelNumbers: nums, note: targetHint))
+        return .queue(QueueSpec(totalCount: resolvedTotal, labelNumbers: nums, note: targetHint, isUnknownTotal: isUnknownTotal))
     }
 
     private func detectComparisonVisual(prompt p: String, topicId tid: String, nums: [Int]) -> VisualKind? {
@@ -494,15 +516,17 @@ public struct MathVisualAidView: View {
                 .filter { !$0.isEmpty && !$0.contains("谁") && !$0.contains("什么") && !$0.contains("排") }
             return .comparison(.wordClues(clues: clues, promptTitle: "📏 按线索排出长短关系"))
         }
-        let asksDiffOrWinner = p.contains("谁大") || p.contains("哪个大")
-            || p.contains("大几") || p.contains("多几") || p.contains("小几") || p.contains("少几")
-        if asksDiffOrWinner && nums.count == 2
+        let asksWinner = p.contains("谁大") || p.contains("哪个大") || p.contains("哪个数大")
+            || p.contains("谁小") || p.contains("哪个小") || p.contains("哪个数小")
+        let asksDiff = p.contains("大几") || p.contains("多几") || p.contains("小几") || p.contains("少几")
+            || p.contains("多多少") || p.contains("少多少") || p.contains("相差") || p.contains("差多少") || p.contains("差几")
+        if (asksWinner || asksDiff) && nums.count == 2
             && !p.contains("再") && !p.contains("十位") && !p.contains("个位")
             && !p.contains("两位数") && !p.contains("加起来") && !p.contains("一共") && !p.contains("吃了") {
             return .comparison(.numericPair(
                 left: nums[0],
                 right: nums[1],
-                askText: (p.contains("谁大") || p.contains("哪个大")) ? "比一比哪个数更大" : "比一比两数相差多少"
+                askText: asksWinner ? "比一比哪个数更\(p.contains("小") ? "小" : "大")" : "比一比两数相差多少"
             ))
         }
         return nil
@@ -527,15 +551,65 @@ public struct MathVisualAidView: View {
             let hint = p.contains("最小的数") ? "在数轴上越靠左越小" : "观察相邻两数之间的变化规律"
             return .numberLine(.sequence(tokens: tokens, hint: hint))
         }
-        if p.contains("相邻") || p.contains("后面一个数") || p.contains("后面的一个数") || p.contains("前面一个数") || p.contains("前面的一个数") || p.contains("中间的数") || p.contains("往后数") || p.contains("往前数") || p.contains("倒着数") || p.contains("隔一个数") || p.contains("每次多数") || p.contains("每次少") || p.contains("在几十和几十之间") || (p.contains("之间") && !p.contains("还剩")) || p.contains("离") || p.contains("数轴") || p.contains("后面第") || p.contains("前面第") {
-            if !p.contains("还剩") && !p.contains("一共") && !p.contains("加法表") {
-                if let center = nums.first {
-                    let lo = max(0, center - 4)
-                    let hi = max(lo + 8, (nums.max() ?? center) + 2)
-                    let spanLo = (hi - lo > 16) ? max(0, center - 5) : lo
-                    let spanHi = (hi - spanLo > 16) ? spanLo + 12 : hi
-                    return .numberLine(.rangeTrack(start: spanLo, end: spanHi, highlights: nums, note: "沿着数轴一格一格往左或往右数"))
+        let asksNumberLine = p.contains("相邻") || p.contains("后面一个数") || p.contains("后面的一个数")
+            || p.contains("前面一个数") || p.contains("前面的一个数") || p.contains("中间的数")
+            || p.contains("往后数") || p.contains("往前数") || p.contains("倒着数")
+            || p.contains("隔一个数") || p.contains("每次多数") || p.contains("每次少")
+            || p.contains("在几十和几十之间") || (p.contains("之间") && !p.contains("还剩"))
+            || p.contains("离") || p.contains("数轴") || p.contains("后面第") || p.contains("前面第")
+            || (p.contains("前面是") && p.contains("后面是")) || p.contains("最接近")
+        if asksNumberLine && !p.contains("还剩") && !p.contains("一共") && !p.contains("加法表") {
+            if let center = nums.first {
+                // 仅高亮题干中的已知坐标锚点，绝不把算出来的目标答案放进 highlights，同时剔除"第4个/数3个/小1"这类步数词
+                var highlights: [Int] = [center]
+                for val in nums.dropFirst() {
+                    if !isOffsetModifierNumber(val, in: p) && !highlights.contains(val) {
+                        highlights.append(val)
+                    }
                 }
+
+                // 结合题干方向与答案中的整数（仅扩范围、不高亮）确保目标答案必落入可见数轴
+                let asksCountOnly = p.contains("差几") || p.contains("隔几个") || p.contains("中间有几个") || p.contains("之间有几个") || p.contains("有几个数") || p.contains("跳几格") || p.contains("数几次")
+                let answerNums = asksCountOnly ? [] : extractNumbers(from: question.answer).filter { (0...200).contains($0) }
+                let allCoords = highlights + answerNums
+                let minReq = allCoords.min() ?? center
+                let maxReq = allCoords.max() ?? center
+
+                let step: Int
+                let lo: Int
+                let hi: Int
+                if answerNums.isEmpty {
+                    let isBackward = p.contains("往前") || p.contains("倒着") || p.contains("前面一个") || p.contains("前面的一个") || p.contains("小 1") || p.contains("小1")
+                    let isForward = p.contains("往后") || p.contains("后面一个") || p.contains("后面的一个") || p.contains("大 1") || p.contains("大1")
+                    let leftExpand = isBackward ? 7 : (isForward ? 2 : 4)
+                    let rightExpand = isForward ? 7 : (isBackward ? 2 : 4)
+                    let rawSpan = maxReq - minReq
+                    step = rawSpan > 20 ? 10 : (rawSpan > 11 ? 2 : 1)
+                    lo = max(0, minReq - leftExpand)
+                    hi = max(lo + 6 * step, maxReq + rightExpand)
+                } else {
+                    step = chooseNumberLineStep(minReq: minReq, maxReq: maxReq, coords: allCoords, prompt: p)
+                    if step == 1 {
+                        let span = maxReq - minReq
+                        let padBudget = max(0, 11 - span)
+                        let leftPad = min(2, padBudget / 2)
+                        let rightPad = min(2, padBudget - leftPad)
+                        lo = max(0, minReq - leftPad)
+                        hi = max(lo + 6, maxReq + rightPad)
+                    } else {
+                        let alignedMin = (minReq / step) * step
+                        let alignedMax = ((maxReq + step - 1) / step) * step
+                        let ticksWithPads = (alignedMax - alignedMin) / step + 3
+                        if ticksWithPads <= 11 {
+                            lo = max(0, alignedMin - step)
+                            hi = (maxReq <= 100 && alignedMax == 100) ? 100 : (alignedMax + step)
+                        } else {
+                            lo = alignedMin
+                            hi = alignedMax
+                        }
+                    }
+                }
+                return .numberLine(.rangeTrack(start: lo, end: hi, step: step, highlights: highlights, note: "沿着数轴往左（变小）或往右（变大）数"))
             }
         }
         return nil
@@ -565,17 +639,19 @@ public struct MathVisualAidView: View {
         if p.contains("里面有几个十") {
             return .placeValue(tens: 10, ones: 0, revealBreakdown: false, caption: "数一数 100 里一共有多少根整十长条")
         }
-        if p.contains("添上") || p.contains("加上1就变成100") {
-            let part = nums.first(where: { $0 < 100 }) ?? 90
-            if p.contains("加上1") {
+        let compactPrompt = p.replacingOccurrences(of: " ", with: "")
+        if p.contains("添上") || compactPrompt.contains("加上1就变成100") {
+            if compactPrompt.contains("加上1") {
                 return .numberBond(total: 100, left: 99, right: 1, hidePart: "left")
             }
-            return .numberBond(total: 100, left: part, right: 100 - part, hidePart: "right")
+            let rawPart = nums.first(where: { $0 < 100 }) ?? 90
+            let part = (p.contains("个十") && rawPart <= 10) ? (rawPart * 10) : rawPart
+            return .numberBond(total: 100, left: part, right: max(0, 100 - part), hidePart: "right")
         }
-        if p.contains("100根小棒") {
+        if compactPrompt.contains("100根小棒") {
             return .placeValue(tens: 10, ones: 0, revealBreakdown: false, caption: "一共 10 捆（100 根），捆走 7 捆后还剩几捆？")
         }
-        return .multiOp(steps: buildWordProblemSteps(from: p), title: "💯 100 以内分步计算")
+        return detectWordProblemVisual(prompt: p)
     }
 
     private func detectPlaceValueVisual(prompt p: String, topicId tid: String, nums: [Int]) -> VisualKind? {
@@ -590,6 +666,18 @@ public struct MathVisualAidView: View {
                         caption: "\(nums[0]) 根十位长条 + \(nums[1]) 块个位小方块"
                     )
                 }
+            }
+            if p.contains("十位") && p.contains("个位") && nums.count == 2 && nums[0] <= 9 && nums[1] <= 9 {
+                let tensIdx = p.range(of: "十位")?.lowerBound ?? p.startIndex
+                let onesIdx = p.range(of: "个位")?.lowerBound ?? p.endIndex
+                let tens = (tensIdx <= onesIdx) ? nums[0] : nums[1]
+                let ones = (tensIdx <= onesIdx) ? nums[1] : nums[0]
+                return .placeValue(
+                    tens: tens,
+                    ones: ones,
+                    revealBreakdown: false,
+                    caption: "看一看十位 \(tens) 根长条和个位 \(ones) 块方块合起来是多少"
+                )
             }
             if let target = nums.first(where: { (10...100).contains($0) }) {
                 let clamped = max(10, min(100, target))
@@ -609,33 +697,152 @@ public struct MathVisualAidView: View {
         let pattern = #"((?:\d+|□)(?:\s*[+\-]\s*(?:\d+|□))+)\s*=\s*(?:？|\?|\d+|□)"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard let match = regex.firstMatch(in: text, range: nsRange),
-              let fullRange = Range(match.range, in: text) else { return nil }
-        let compact = String(text[fullRange]).replacingOccurrences(of: " ", with: "")
-        let halves = compact.components(separatedBy: "=")
-        guard halves.count == 2 else { return nil }
+        let matches = regex.matches(in: text, range: nsRange)
+        guard !matches.isEmpty else { return nil }
 
-        let tokPattern = #"[+\-]?(?:\d+|□)"#
-        guard let tokRegex = try? NSRegularExpression(pattern: tokPattern) else { return nil }
+        // 优先选择等号右侧含未知占位符（？/?/□）的算式，避免“根据 6+7=13 算 7+6=？”误取已知条件
+        let parsedCandidates: [(tokens: [String], rhs: String)] = matches.compactMap { match in
+            guard let fullRange = Range(match.range, in: text) else { return nil }
+            let compact = String(text[fullRange]).replacingOccurrences(of: " ", with: "")
+            let halves = compact.components(separatedBy: "=")
+            guard halves.count == 2 else { return nil }
+            let tokPattern = #"[+\-]?(?:\d+|□)"#
+            guard let tokRegex = try? NSRegularExpression(pattern: tokPattern) else { return nil }
+            let lhs = halves[0]
+            let lhsRange = NSRange(lhs.startIndex..<lhs.endIndex, in: lhs)
+            let tokens = tokRegex.matches(in: lhs, range: lhsRange).compactMap { m -> String? in
+                guard let r = Range(m.range, in: lhs) else { return nil }
+                return String(lhs[r])
+            }
+            guard tokens.count >= 2 else { return nil }
+            return (tokens, halves[1])
+        }
+        return parsedCandidates.last(where: { $0.rhs == "？" || $0.rhs == "?" || $0.rhs == "□" })
+            ?? parsedCandidates.last
+    }
+
+    private static let stepNegKeywords: [String] = [
+        "吃", "飞走", "拿走", "送出", "送给", "分给", "给弟弟", "给妹妹", "给朋友", "给同学",
+        "花了", "花掉", "花去", "花 ", "用了", "用掉", "用去", "借出", "借走", "借给",
+        "打破", "碎了", "破了", "坏了", "丢了", "丢失", "弄丢", "擦掉", "游走", "输掉",
+        "卖掉", "卖出", "走开", "下车", "离开", "开走", "剪去", "剪掉", "去掉", "拆掉",
+        "倒掉", "拔掉", "减少", "减去", "减 ", "拼掉", "少了", "枯"
+    ]
+
+    private func isSubtractionContext(_ text: String) -> Bool {
+        let clean = text.replacingOccurrences(of: "多少", with: "")
+        if clean.contains("-") || clean.contains("减") || clean.contains("还剩") {
+            return true
+        }
+        if Self.stepNegKeywords.contains(where: { clean.contains($0) }) || clean.contains("少") {
+            return true
+        }
+        return clean.contains("比") && clean.contains("小")
+    }
+
+    private func stripLeadingPrefixLabel(from text: String) -> String {
+        guard let colonIdx = text.firstIndex(where: { $0 == "：" || $0 == ":" }) else {
+            return text
+        }
+        let prefix = String(text[..<colonIdx]).trimmingCharacters(in: .whitespaces)
+        let rest = String(text[text.index(after: colonIdx)...]).trimmingCharacters(in: .whitespaces)
+        guard !prefix.isEmpty, !rest.isEmpty, prefix.count <= 20 else {
+            return text
+        }
+        let hasSentencePunct = prefix.range(of: "[，。？?=!+\\-、]", options: .regularExpression) != nil
+        let protectedTerms = ["元", "角", "分", "个", "只", "支", "颗", "条", "朵", "人", "辆", "本", "块", "厘米", "米", "时", "捆", "页", "棵", "张", "盒", "袋", "斤", "瓶", "号", "层", "排", "行", "组", "步", "原有", "一共", "还剩", "钟"]
+        let hasProtectedTerm = protectedTerms.contains(where: { prefix.contains($0) })
+        return (!hasSentencePunct && !hasProtectedTerm) ? rest : text
+    }
+
+    private func extractPureAddSubVerifySteps(from verify: String?, answer: String) -> [String]? {
+        guard let rawVerify = verify?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawVerify.isEmpty else {
+            return nil
+        }
+        if answer.contains("+") || answer.contains("-") || answer.contains("=") {
+            return nil
+        }
+        let compact = rawVerify.replacingOccurrences(of: " ", with: "")
+        let halves = compact.components(separatedBy: "=")
+        guard halves.count <= 2 else { return nil }
         let lhs = halves[0]
+        if halves.count == 2 {
+            let rhs = halves[1]
+            guard !rhs.isEmpty,
+                  rhs.allSatisfy(\.isNumber) || rhs == "?" || rhs == "？" || rhs == "□" else {
+                return nil
+            }
+        }
+        guard lhs.range(of: #"^\d+(?:[+\-]\d+)+$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        let tokPattern = #"[+\-]?\d+"#
+        guard let tokRegex = try? NSRegularExpression(pattern: tokPattern) else { return nil }
         let lhsRange = NSRange(lhs.startIndex..<lhs.endIndex, in: lhs)
         let tokens = tokRegex.matches(in: lhs, range: lhsRange).compactMap { m -> String? in
             guard let r = Range(m.range, in: lhs) else { return nil }
             return String(lhs[r])
         }
-        guard tokens.count >= 2 else { return nil }
-        return (tokens, halves[1])
+        return tokens.count >= 2 ? tokens : nil
     }
 
-    private func buildWordProblemSteps(from p: String) -> [String] {
+    private func detectWordProblemVisual(prompt rawPrompt: String) -> VisualKind {
+        let p = stripLeadingPrefixLabel(from: rawPrompt)
+        let title: String
+        if p.contains("元") || p.contains("角") {
+            title = "💰 元角购物步骤演示"
+        } else if p.contains("厘米") {
+            title = "📏 厘米长度分段计算"
+        } else if p.contains("100") {
+            title = "💯 100 以内分步计算"
+        } else {
+            title = "🧮 分步思路卡片"
+        }
+
+        if let verifySteps = extractPureAddSubVerifySteps(from: question.verify, answer: question.answer) {
+            return .multiOp(steps: verifySteps, title: title)
+        }
+
+        if p.contains("百数表") || (p.contains("行") && p.contains("列")) {
+            return .tipCard(title: "🗺️ 百数表规律提示", message: "同一行左小右大每次相差 1；同一列上小下大每次相差 10。")
+        }
+        if p.contains("加法表") {
+            return .tipCard(title: "🔍 加法表规律提示", message: "横着看、竖着看、斜着看，留意加数与和每次增加或减少 1 的规律。")
+        }
+        if p.contains("出现了几次") || p.contains("写了多少个") || p.contains("一共写了几个") {
+            return .tipCard(title: "🔎 逐个枚举小提示", message: "把个位和十位分开按顺序数一数，别漏掉 11、22 这样出现两次的数哦！")
+        }
+        let nonSeqMarkers = ["大还是小", "哪个大", "哪个数大", "哪个小", "哪个数小", "反过来", "倒过来", "谁更", "最接近", "大约", "可能", "至少", "最多", "分别"]
+        let isCompareChoice = nonSeqMarkers.contains(where: { p.contains($0) })
+            || (p.contains("还是") && (p.contains("大") || p.contains("小") || p.contains("多") || p.contains("少") || p.contains("贵") || p.contains("便宜")))
+        if isCompareChoice && !p.contains("合起来") && !p.contains("还剩") && !p.contains("一共多少") {
+            return .tipCard(title: "⚖️ 比较与推理小提示", message: "先找准两边给出的数字或条件，对齐十位和个位再比一比！")
+        }
+
+        let steps = buildWordProblemSteps(from: p)
+        if steps.count <= 1 {
+            return .tipCard(title: "🧁 数学思路小贴士", message: "结合题干里的关键数字和问题，先判断要用加法还是减法再算。")
+        }
+        return .multiOp(steps: steps, title: title)
+    }
+
+    private func buildWordProblemSteps(from rawPrompt: String) -> [String] {
+        if let verifySteps = extractPureAddSubVerifySteps(from: question.verify, answer: question.answer) {
+            return verifySteps
+        }
+        let p = stripLeadingPrefixLabel(from: rawPrompt)
         let pattern = #"\d+"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [p] }
         let nsRange = NSRange(p.startIndex..<p.endIndex, in: p)
         let matches = regex.matches(in: p, range: nsRange)
         if matches.isEmpty { return [p] }
 
-        let negKeys = ["吃", "飞走", "拿走", "送出", "送给", "分给", "花了", "花 ", "用了", "用去", "借出", "打破", "走开", "下车", "开走", "剪去", "去掉", "拆掉", "枯", "减去", "减 ", "少", "拼掉"]
-        let posOverrideKeys = ["又买来", "又开来", "又来了", "飞来", "放进", "接上", "上车", "添上", "多拍", "再蒸", "再来", "一共"]
+        let posOverrideKeys = [
+            "又买来", "又开来", "又来了", "飞来", "放进", "接上", "上车",
+            "添上", "多拍", "再蒸", "再来", "又长出", "又摘", "又送来", "又领来",
+            "又得到", "又给他", "又给她", "又给我"
+        ]
         var steps: [String] = []
         let nsStr = p as NSString
 
@@ -661,13 +868,62 @@ public struct MathVisualAidView: View {
             if idx == 0 {
                 steps.append("\(numStr)\(unit)")
             } else {
-                let hasNeg = negKeys.contains(where: { clause.contains($0) })
+                let clauseNoDuoshao = clause.replacingOccurrences(of: "多少", with: "")
+                let hasNeg = Self.stepNegKeywords.contains(where: { clauseNoDuoshao.contains($0) }) || clauseNoDuoshao.contains("少")
                 let hasPosOverride = posOverrideKeys.contains(where: { clause.contains($0) })
                 let prefix = (hasNeg && !hasPosOverride) ? "-" : "+"
                 steps.append("\(prefix)\(numStr)\(unit)")
             }
         }
         return steps
+    }
+
+    private func firstCapturedInt(pattern: String, in text: String) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: nsRange),
+              match.numberOfRanges > 1,
+              let range = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return Int(text[range])
+    }
+
+    private func isOffsetModifierNumber(_ val: Int, in p: String) -> Bool {
+        if p.contains("之间") || p.contains("和 \(val)") || p.contains("\(val) 和") || p.contains("和\(val)") || p.contains("\(val)和") {
+            return false
+        }
+        let pattern = "(?:第|多|少|大|小|往[前后]数|倒着数|隔)\\s*\(val)(?!\\d)|(?<!\\d)\(val)\\s*(?:个|次|步|格)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
+        let range = NSRange(p.startIndex..<p.endIndex, in: p)
+        return regex.firstMatch(in: p, range: range) != nil
+    }
+
+    private func chooseNumberLineStep(minReq: Int, maxReq: Int, coords: [Int], prompt p: String) -> Int {
+        let span = maxReq - minReq
+        if (p.contains("十个十个") || p.contains("个十")) && coords.allSatisfy({ $0 % 10 == 0 }) {
+            return 10
+        }
+        if (p.contains("五个五个") || p.contains("5个5个")) && coords.allSatisfy({ $0 % 5 == 0 }) {
+            return 5
+        }
+        if (p.contains("两个两个") || p.contains("2个2个")) && coords.allSatisfy({ $0 % 2 == 0 }) {
+            return 2
+        }
+        if span <= 11 {
+            return 1
+        }
+        for candidate in [2, 5, 10] {
+            if span / candidate <= 11 && coords.allSatisfy({ $0 % candidate == 0 }) {
+                return candidate
+            }
+        }
+        for candidate in [2, 5, 10] {
+            if span / candidate <= 11 {
+                return candidate
+            }
+        }
+        return 10
     }
 
     private func extractNumbers(from text: String) -> [Int] {
@@ -706,6 +962,24 @@ public struct TenFrameVisualView: View {
         self.isSubtraction = isSubtraction
     }
 
+    private var safeFirst: Int { max(0, firstCount) }
+    private var safeSecond: Int { max(0, secondCount) }
+    private var isOverSubtract: Bool { isSubtraction && safeSecond > safeFirst }
+    private var effectiveCrossed: Int { isSubtraction ? min(safeFirst, safeSecond) : 0 }
+    private var totalShown: Int { isSubtraction ? safeFirst : (safeFirst + safeSecond) }
+
+    // 超过 40 颗时，把整十捆拆到上方“整十条”中，仅将余下（1~20）放入 1~2 个十格阵，避免格子拥挤或溢出截断
+    private var overflowTenGroups: Int {
+        guard totalShown > 40 else { return 0 }
+        let rem = totalShown % 10
+        let frameDots = rem == 0 ? 10 : rem
+        return max(0, (totalShown - frameDots) / 10)
+    }
+
+    private var frameDotLimit: Int {
+        totalShown - overflowTenGroups * 10
+    }
+
     public var body: some View {
         VStack(spacing: 5) {
             HStack {
@@ -714,11 +988,13 @@ public struct TenFrameVisualView: View {
                     .foregroundColor(Color(hex: "#B8336A"))
                 Spacer()
                 if isSubtraction {
-                    Text("原有 \(firstCount) 颗，拿走/划掉 \(secondCount) 颗")
+                    Text(isOverSubtract
+                         ? "原有 \(safeFirst) 颗，最多划掉 \(safeFirst) 颗"
+                         : "原有 \(safeFirst) 颗，拿走/划掉 \(safeSecond) 颗")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A7765"))
-                } else if secondCount > 0 || (firstCount == 0 && secondCount == 0) {
-                    Text("红果 \(firstCount) 颗 + 蓝莓 \(secondCount) 颗")
+                } else if safeSecond > 0 || (safeFirst == 0 && safeSecond == 0) {
+                    Text("红果 \(safeFirst) 颗 + 蓝莓 \(safeSecond) 颗")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A7765"))
                 } else {
@@ -728,8 +1004,22 @@ public struct TenFrameVisualView: View {
                 }
             }
 
-            let totalShown = isSubtraction ? firstCount : (firstCount + secondCount)
-            let frameCount = max(1, min(4, (totalShown + 9) / 10))
+            if overflowTenGroups > 0 {
+                HStack(spacing: 6) {
+                    Text("已合并 \(overflowTenGroups) 组整十（\(overflowTenGroups * 10) 颗）")
+                        .font(.system(size: 10.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#534AB7"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color(hex: "#EFEFFD")))
+                    Text("+ 余下 \(frameDotLimit) 颗：")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                    Spacer()
+                }
+            }
+
+            let frameCount = max(1, min(4, (frameDotLimit + 9) / 10))
             if frameCount <= 2 {
                 HStack(spacing: 10) {
                     singleTenFrame(frameIndex: 0)
@@ -748,7 +1038,7 @@ public struct TenFrameVisualView: View {
     }
 
     private func singleTenFrame(frameIndex: Int) -> some View {
-        let baseIndex = frameIndex * 10
+        let baseIndex = overflowTenGroups * 10 + frameIndex * 10
         return VStack(spacing: 3) {
             ForEach(0..<2, id: \.self) { row in
                 HStack(spacing: 3) {
@@ -774,8 +1064,8 @@ public struct TenFrameVisualView: View {
                 .frame(width: 22, height: 22)
 
             if isSubtraction {
-                if idx < firstCount {
-                    let isCrossed = idx >= max(0, firstCount - secondCount)
+                if idx < safeFirst {
+                    let isCrossed = idx >= max(0, safeFirst - effectiveCrossed)
                     Circle()
                         .fill(isCrossed ? Color(hex: "#FF6B8B").opacity(0.35) : Color(hex: "#E03E6D"))
                         .frame(width: 15, height: 15)
@@ -786,11 +1076,11 @@ public struct TenFrameVisualView: View {
                     }
                 }
             } else {
-                if idx < firstCount {
+                if idx < safeFirst {
                     Circle()
                         .fill(Color(hex: "#E03E6D"))
                         .frame(width: 15, height: 15)
-                } else if idx < firstCount + secondCount {
+                } else if idx < safeFirst + safeSecond {
                     Circle()
                         .fill(Color(hex: "#3685D6"))
                         .frame(width: 15, height: 15)
@@ -1849,6 +2139,7 @@ private struct QueueSpec {
     let totalCount: Int
     let labelNumbers: [Int]
     let note: String
+    let isUnknownTotal: Bool
 }
 
 private struct QueueVisualView: View {
@@ -1856,6 +2147,7 @@ private struct QueueVisualView: View {
     let showHint: Bool
 
     var body: some View {
+        let total = max(1, spec.totalCount)
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text("🐥 排队位置示意图")
@@ -1866,26 +2158,103 @@ private struct QueueVisualView: View {
                     .font(.system(size: 10.5, weight: .bold))
                     .foregroundColor(Color(hex: "#8A7765"))
             }
-            HStack(spacing: 4) {
-                Text("左")
-                    .font(.system(size: 9.5, weight: .heavy))
-                    .foregroundColor(Color(hex: "#3685D6"))
-                ForEach(1...min(10, max(5, spec.totalCount)), id: \.self) { idx in
-                    Circle()
-                        .fill(Color(hex: "#FFE4EE"))
-                        .frame(width: 18, height: 18)
-                        .overlay(Circle().stroke(Color(hex: "#E05385").opacity(0.6), lineWidth: 1.2))
-                        .overlay(
-                            Text("\(idx)")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(Color(hex: "#5A4634"))
-                        )
+
+            if spec.isUnknownTotal {
+                HStack(spacing: 5) {
+                    directionTag("左", color: "#3685D6")
+                    ForEach(1...3, id: \.self) { _ in
+                        blankQueueCircle()
+                    }
+                    Text("··· 主角 ···")
+                        .font(.system(size: 10.5, weight: .heavy))
+                        .foregroundColor(Color(hex: "#B8336A"))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color(hex: "#FFE4EE")))
+                    ForEach(1...3, id: \.self) { _ in
+                        blankQueueCircle()
+                    }
+                    directionTag("右", color: "#3EA865")
+                    Spacer()
+                    Text("全排共 ？ 位")
+                        .font(.system(size: 10.5, weight: .black))
+                        .foregroundColor(Color(hex: "#D96B00"))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color(hex: "#FFF0B8")))
                 }
-                Text("右")
-                    .font(.system(size: 9.5, weight: .heavy))
-                    .foregroundColor(Color(hex: "#3EA865"))
+            } else if total <= 12 {
+                HStack(spacing: 4) {
+                    directionTag("左", color: "#3685D6")
+                    ForEach(1...total, id: \.self) { idx in
+                        queueCircle(idx: idx)
+                    }
+                    directionTag("右", color: "#3EA865")
+                }
+            } else if total <= 24 {
+                let firstRowEnd = (total + 1) / 2
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        directionTag("左", color: "#3685D6")
+                        ForEach(1...firstRowEnd, id: \.self) { idx in
+                            queueCircle(idx: idx)
+                        }
+                    }
+                    HStack(spacing: 4) {
+                        ForEach((firstRowEnd + 1)...total, id: \.self) { idx in
+                            queueCircle(idx: idx)
+                        }
+                        directionTag("右", color: "#3EA865")
+                        Text("共 \(total) 位")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(Color(hex: "#B8336A"))
+                            .padding(.leading, 4)
+                    }
+                }
+            } else {
+                HStack(spacing: 4) {
+                    directionTag("左", color: "#3685D6")
+                    ForEach(1...5, id: \.self) { idx in
+                        queueCircle(idx: idx)
+                    }
+                    Text("··· 共 \(total) 位 ···")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color(hex: "#FFF3F7")))
+                    ForEach((total - 4)...total, id: \.self) { idx in
+                        queueCircle(idx: idx)
+                    }
+                    directionTag("右", color: "#3EA865")
+                }
             }
         }
+    }
+
+    private func directionTag(_ text: String, color: String) -> some View {
+        Text(text)
+            .font(.system(size: 9.5, weight: .heavy))
+            .foregroundColor(Color(hex: color))
+    }
+
+    private func queueCircle(idx: Int) -> some View {
+        Circle()
+            .fill(Color(hex: "#FFE4EE"))
+            .frame(width: 19, height: 19)
+            .overlay(Circle().stroke(Color(hex: "#E05385").opacity(0.6), lineWidth: 1.2))
+            .overlay(
+                Text("\(idx)")
+                    .font(.system(size: idx >= 10 ? 8.5 : 9, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "#5A4634"))
+            )
+    }
+
+    private func blankQueueCircle() -> some View {
+        Circle()
+            .fill(Color.white)
+            .frame(width: 17, height: 17)
+            .overlay(Circle().stroke(Color(hex: "#E05385").opacity(0.45), style: StrokeStyle(lineWidth: 1.2, dash: [3, 2])))
     }
 }
 
@@ -2040,7 +2409,7 @@ private struct NumericPairComparisonRow: View {
 // MARK: - 教具 13：数列格子与数轴定位教具
 private enum NumberLineSpec {
     case sequence(tokens: [String], hint: String)
-    case rangeTrack(start: Int, end: Int, highlights: [Int], note: String)
+    case rangeTrack(start: Int, end: Int, step: Int, highlights: [Int], note: String)
 }
 
 private struct NumberLineVisualView: View {
@@ -2051,8 +2420,8 @@ private struct NumberLineVisualView: View {
         switch spec {
         case .sequence(let tokens, let hint):
             NumberSequenceRow(tokens: tokens, hint: hint, revealAnswer: revealAnswer)
-        case .rangeTrack(let start, let end, let highlights, let note):
-            NumberTrackRow(start: start, end: end, highlights: highlights, note: note)
+        case .rangeTrack(let start, let end, let step, let highlights, let note):
+            NumberTrackRow(start: start, end: end, step: step, highlights: highlights, note: note)
         }
     }
 }
@@ -2098,21 +2467,45 @@ private struct NumberSequenceRow: View {
 }
 
 private struct NumberTrackRow: View {
+    private enum TrackToken: Identifiable {
+        case number(Int)
+        case ellipsis
+
+        var id: String {
+            switch self {
+            case .number(let v): return "n_\(v)"
+            case .ellipsis: return "ellipsis"
+            }
+        }
+    }
+
     let start: Int
     let end: Int
+    let step: Int
     let highlights: [Int]
     let note: String
 
+    private var safeStep: Int { max(1, step) }
+
     private var ticks: [Int] {
-        let safeEnd = max(start + 1, end)
-        let strideStep = (safeEnd - start > 14) ? 2 : 1
-        return Array(stride(from: start, through: safeEnd, by: strideStep))
+        let safeEnd = max(start + safeStep, end)
+        return Array(stride(from: start, through: safeEnd, by: safeStep))
+    }
+
+    private var displayTokens: [TrackToken] {
+        let raw = ticks
+        guard raw.count > 13 else {
+            return raw.map { .number($0) }
+        }
+        let head = raw.prefix(5).map { TrackToken.number($0) }
+        let tail = raw.suffix(5).map { TrackToken.number($0) }
+        return head + [.ellipsis] + tail
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("🧭 数轴小路（左小 → 右大）")
+                Text(safeStep > 1 ? "🧭 数轴小路（每格 +\(safeStep)）" : "🧭 数轴小路（左小 → 右大）")
                     .font(.system(size: 11.5, weight: .heavy))
                     .foregroundColor(Color(hex: "#B8336A"))
                 Spacer()
@@ -2121,8 +2514,16 @@ private struct NumberTrackRow: View {
                     .foregroundColor(Color(hex: "#8A7765"))
             }
             HStack(spacing: 3) {
-                ForEach(ticks, id: \.self) { val in
-                    trackTick(val)
+                ForEach(displayTokens) { tok in
+                    switch tok {
+                    case .number(let val):
+                        trackTick(val)
+                    case .ellipsis:
+                        Text("···")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(Color(hex: "#8A7765"))
+                            .padding(.horizontal, 4)
+                    }
                 }
             }
         }
@@ -2181,6 +2582,14 @@ private struct MultiOpFlowVisualView: View {
     let title: String
     let answer: String?
 
+    private var shouldAppendResultBox: Bool {
+        if steps.last?.hasPrefix("=") ?? false { return false }
+        if steps.count == 1, let only = steps.first, Int(only) == nil {
+            return false
+        }
+        return !steps.isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
@@ -2207,7 +2616,7 @@ private struct MultiOpFlowVisualView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "#E05385").opacity(0.35), lineWidth: 1.2))
                             )
                     }
-                    if !(steps.last?.hasPrefix("=") ?? false) {
+                    if shouldAppendResultBox {
                         Text("=")
                             .font(.system(size: 12, weight: .black))
                             .foregroundColor(Color(hex: "#8A7765"))
@@ -2221,6 +2630,31 @@ private struct MultiOpFlowVisualView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct MathTipCardVisualView: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundColor(Color(hex: "#B8336A"))
+            Text(message)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundColor(Color(hex: "#5A4634"))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.white)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#E05385").opacity(0.28), lineWidth: 1.2))
+                )
         }
     }
 }

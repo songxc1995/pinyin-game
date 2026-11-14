@@ -65,8 +65,14 @@ public final class GameEngine: ObservableObject {
     // MARK: - 局内闯关通用状态
     @Published public var currentLevelNumber: Int = 1
     @Published public var currentMode: LevelMode = .split
-    @Published public var currentFire: FireDifficulty = .mid
+    @Published public var currentFire: FireDifficulty = .low
     @Published public var specialMode: SpecialModeType? = nil
+    @Published public var activeRoundRewardTier: StageRewardTier = .full
+    @Published public var roundAntiFarmMessage: String? = nil
+    @Published public var recommendedNextStageId: Int? = nil
+    @Published public var focusedInitials: [String] = []
+    private var activeRoundWarmupCoins: Int = 0
+    private var activeRoundStageKey: String = ""
     @Published public var questionQueue: [PinyinWord] = []
     @Published public var curriculumQueue: [CurriculumQuestion] = []
     @Published public var questionIndex: Int = 0
@@ -167,7 +173,7 @@ public final class GameEngine: ObservableObject {
     public static let mascotTips: [String] = [
         "小熊团团：欢迎来到《满满的奇妙料理城》，语数英三大工坊随心切换！",
         "小熊团团：闯关收集星币与华服礼盒，为满满公主换上皇冠、宝石项链和神翼吧！",
-        "小熊团团：挑战「大火」模式，通关高定变装礼盒翻倍，还能培养 5 阶至尊神兽！",
+        "小熊团团：第一次玩新关卡先选「小火」最稳，每天多逛不同关卡还能拿探索礼盒哦！",
         "小熊团团：在 Mac 上可直接按数字和字母答题，iPad 上小手点一点超丝滑！",
         "小熊团团：三科全部严格同步上海沪教版一年级上/下册教材哦！",
         "小熊团团：眼睛离屏幕要有一臂远（约 50 厘米），坐直身体再闯关！",
@@ -420,7 +426,13 @@ public final class GameEngine: ObservableObject {
             newFoodsInRound = []
             newDessertsInRound = []
             newFlashcardsInRound = []
+            focusedInitials = []
         }
+        activeRoundRewardTier = .full
+        roundAntiFarmMessage = nil
+        recommendedNextStageId = nil
+        activeRoundWarmupCoins = 0
+        activeRoundStageKey = ""
         rewardedFashionInRound = []
         floatingCoinGainText = nil
         floatingCoinBurst = 0
@@ -505,7 +517,9 @@ public final class GameEngine: ObservableObject {
             rounds: progress.daily.rounds,
             maxCombo: progress.daily.maxCombo,
             words: progress.daily.words,
-            claimed: [:]
+            claimed: [:],
+            stageClears: [:],
+            distinctStages: []
         )
 
         // 清零全部经济/衣橱/神兽/游乐园/里程碑奖励
@@ -608,6 +622,13 @@ public final class GameEngine: ObservableObject {
                 goal: 6,
                 current: min(6, progress.daily.words),
                 claimed: (progress.daily.claimed["q_words"] ?? 0) > 0
+            ),
+            DailyQuestItem(
+                id: "q_explore",
+                title: "🧭 今日探索 2 个不同关卡",
+                goal: 2,
+                current: min(2, progress.daily.distinctStages.count),
+                claimed: (progress.daily.claimed["q_explore"] ?? 0) > 0
             )
         ]
     }
@@ -625,12 +646,15 @@ public final class GameEngine: ObservableObject {
         }
         progress.daily.claimed[questId] = 1
         progress.coins += 35
-        if questId == "q_words" {
+        let grantsTicket = (questId == "q_words" || questId == "q_explore")
+        if grantsTicket {
             progress.gachaTickets += 1
         }
-        let allThreeDone = ["q_round", "q_combo", "q_words"].allSatisfy { (progress.daily.claimed[$0] ?? 0) > 0 }
+        let allQuestsDone = ["q_round", "q_combo", "q_words", "q_explore"].allSatisfy {
+            (progress.daily.claimed[$0] ?? 0) > 0
+        }
         var grantedFullClear = false
-        if allThreeDone && (progress.daily.claimed["q_full_bonus"] ?? 0) == 0 {
+        if allQuestsDone && (progress.daily.claimed["q_full_bonus"] ?? 0) == 0 {
             progress.daily.claimed["q_full_bonus"] = 1
             progress.gachaTickets += 1
             progress.starThread += 1
@@ -653,7 +677,7 @@ public final class GameEngine: ObservableObject {
         saveProgress()
         audio.sfxChestOpen()
 
-        let baseTitle = questId == "q_words"
+        let baseTitle = grantsTicket
             ? "🎁 每日目标达成！+35星币 · +1扭蛋券 · 获赠【\(item.name)】！"
             : "🎁 每日目标达成！+35星币 · 获赠【\(item.name)】！"
         let fullTitle = grantedFullClear
@@ -672,6 +696,204 @@ public final class GameEngine: ObservableObject {
                 customTitle: fullTitle
             )
         )
+    }
+
+    // MARK: - 🛡️ 单关防刷与跨关探索激励（只读预览 + 推荐下一关）
+
+    private func stageCount(for subject: SubjectKind) -> Int {
+        switch subject {
+        case .pinyin:  return LevelRepository.levels.count
+        case .math:    return HujiaoCurriculumRepository.mathStages.count
+        case .english: return HujiaoCurriculumRepository.englishStages.count
+        }
+    }
+
+    private func isExtensionStage(subject: SubjectKind, stageId: Int) -> Bool {
+        switch subject {
+        case .pinyin:
+            return false
+        case .math:
+            return HujiaoCurriculumRepository.mathStages.first(where: { $0.id == stageId })?.semester == .extensionChallenge
+        case .english:
+            return HujiaoCurriculumRepository.englishStages.first(where: { $0.id == stageId })?.semester == .extensionChallenge
+        }
+    }
+
+    private func hasWrongQuestions(for subject: SubjectKind) -> Bool {
+        switch subject {
+        case .pinyin:
+            return LevelRepository.levels.flatMap(\.words).contains { (progress.wrong[$0.id] ?? 0) > 0 }
+        case .math:
+            return HujiaoCurriculumRepository.allQuestions.contains {
+                $0.id.hasPrefix("hjm_") && (progress.wrong[$0.id] ?? 0) > 0
+            }
+        case .english:
+            return HujiaoCurriculumRepository.allQuestions.contains {
+                $0.id.hasPrefix("hje_") && (progress.wrong[$0.id] ?? 0) > 0
+            }
+        }
+    }
+
+    /// 只读查询任意学科关卡当前的防刷奖励档位（严格校验日历跨天，不修改存档）
+    public func stageRewardPreview(subject: SubjectKind, stageId: Int) -> StageRewardPreview {
+        let isToday = (progress.daily.d == GameProgress.todayString())
+        let key = "\(subject.rawValue)_\(stageId)"
+        let clearsToday = isToday ? (progress.daily.stageClears[key] ?? 0) : 0
+        let existingStars = progress.starsForLevel(stageId, subject: subject)
+        let isMasteredThreeStar = existingStars >= 3
+
+        if isMasteredThreeStar {
+            switch clearsToday {
+            case 0:
+                return StageRewardPreview(
+                    tier: .full,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: true,
+                    badgeText: "🎁 全额奖励",
+                    detailText: "今日第 1 遍全额奖励",
+                    coinFactor: 1.0
+                )
+            case 1:
+                return StageRewardPreview(
+                    tier: .reduced,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: true,
+                    badgeText: "🌓 巩固半额",
+                    detailText: "已三星今日第 2 遍：50% 星币，不掉华服盲盒/宝箱/扭蛋券",
+                    coinFactor: 0.5
+                )
+            default:
+                return StageRewardPreview(
+                    tier: .warmup,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: true,
+                    badgeText: "🌱 暖心练手",
+                    detailText: "今日奖励已领满：每题 0~1 鼓励币（本局封顶 3 枚），换新关恢复全额",
+                    coinFactor: 0.0
+                )
+            }
+        } else {
+            if clearsToday < 2 {
+                return StageRewardPreview(
+                    tier: .full,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: false,
+                    badgeText: "🎁 全额奖励",
+                    detailText: clearsToday == 0 ? "未满 3★ · 今日第 1 遍全额奖励" : "未满 3★ · 今日第 2 遍全额冲星奖励",
+                    coinFactor: 1.0
+                )
+            } else if clearsToday == 2 {
+                return StageRewardPreview(
+                    tier: .reduced,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: false,
+                    badgeText: "🌓 巩固半额",
+                    detailText: "今日第 3 遍：50% 星币巩固；刷新最高星级仍破格补发全额礼盒！",
+                    coinFactor: 0.5
+                )
+            } else {
+                return StageRewardPreview(
+                    tier: .warmup,
+                    clearsToday: clearsToday,
+                    isMasteredThreeStar: false,
+                    badgeText: "🌱 暖心练手",
+                    detailText: "今日第 \(clearsToday + 1) 遍暖心练手（封顶 3 枚）；刷新最高星级仍保留破纪录奖励！",
+                    coinFactor: 0.0
+                )
+            }
+        }
+    }
+
+    /// 只读查询特训模式（错题消消乐 / 全明星挑战）今日奖励档位
+    public func specialModeRewardPreview(type: SpecialModeType, subject: SubjectKind? = nil) -> StageRewardPreview {
+        let subj = subject ?? currentSubject
+        let isToday = (progress.daily.d == GameProgress.todayString())
+        let key = "special_\(type.rawValue)_\(subj.rawValue)"
+        let clearsToday = isToday ? (progress.daily.stageClears[key] ?? 0) : 0
+
+        let tier: StageRewardTier
+        let detailText: String
+        if type == .wrong && !hasWrongQuestions(for: subj) {
+            if clearsToday == 0 {
+                tier = .full
+                detailText = "错题本已清空 · 今日第 1 遍练手仍享全额奖励"
+            } else if clearsToday == 1 {
+                tier = .reduced
+                detailText = "错题本已空今日第 2 遍：巩固半额（50% 星币，不掉宝箱/华服）"
+            } else {
+                tier = .warmup
+                detailText = "错题本已空今日第 \(clearsToday + 1) 遍：仅暖心练手（封顶 3 枚鼓励币）"
+            }
+        } else {
+            if clearsToday < 3 {
+                tier = .full
+                detailText = "特训今日第 \(clearsToday + 1)/3 遍全额奖励"
+            } else if clearsToday == 3 {
+                tier = .reduced
+                detailText = "特训今日第 4 遍：巩固半额（50% 星币，不掉宝箱/华服）"
+            } else {
+                tier = .warmup
+                detailText = "特训今日奖励已领满：仅暖心练手（封顶 3 枚鼓励币）"
+            }
+        }
+
+        let badgeText: String
+        let factor: Double
+        switch tier {
+        case .full:    badgeText = "🎁 全额奖励"; factor = 1.0
+        case .reduced: badgeText = "🌓 巩固半额"; factor = 0.5
+        case .warmup:  badgeText = "🌱 暖心练手"; factor = 0.0
+        }
+        return StageRewardPreview(
+            tier: tier,
+            clearsToday: clearsToday,
+            isMasteredThreeStar: false,
+            badgeText: badgeText,
+            detailText: detailText,
+            coinFactor: factor
+        )
+    }
+
+    /// 推荐同一学科的下一关（优先未满 3★ 且今日全额奖励关；全满则找今日未玩过关）
+    public func computeRecommendedNextStageId(subject: SubjectKind, excluding currentStageId: Int? = nil) -> Int? {
+        let total = stageCount(for: subject)
+        guard total > 0 else { return nil }
+        let start = currentStageId ?? 0
+        var cyclic: [Int] = []
+        for offset in 1...total {
+            let candidate = ((start + offset - 1) % total) + 1
+            if let excluded = currentStageId, candidate == excluded { continue }
+            if !progress.isStageLocked(candidate, subject: subject) {
+                cyclic.append(candidate)
+            }
+        }
+        guard !cyclic.isEmpty else { return nil }
+        let coreCandidates = cyclic.filter { !isExtensionStage(subject: subject, stageId: $0) }
+        let extCandidates = cyclic.filter { isExtensionStage(subject: subject, stageId: $0) }
+        let ordered = coreCandidates + extCandidates
+
+        if let unmasteredFull = ordered.first(where: { id in
+            progress.starsForLevel(id, subject: subject) < 3
+                && stageRewardPreview(subject: subject, stageId: id).tier == .full
+        }) {
+            return unmasteredFull
+        }
+        if let freshToday = ordered.first(where: { id in
+            stageRewardPreview(subject: subject, stageId: id).clearsToday == 0
+        }) {
+            return freshToday
+        }
+        if let anyFull = ordered.first(where: { id in
+            stageRewardPreview(subject: subject, stageId: id).tier == .full
+        }) {
+            return anyFull
+        }
+        if let anyReduced = ordered.first(where: { id in
+            stageRewardPreview(subject: subject, stageId: id).tier == .reduced
+        }) {
+            return anyReduced
+        }
+        return ordered.first
     }
 
     // MARK: - 🎰 皇家扭蛋机孵化（单抽 / 五连 / 10抽神话保底 / Lv.5溢出转化）、👗 满满公主高定变装、🏆 里程碑 & 🏰 游乐园建造
@@ -1518,8 +1740,26 @@ public final class GameEngine: ObservableObject {
         petFeedToast = "🎉 成功建造「\(item.name)」！已激活永久增益：\(item.perkDesc)！"
     }
 
-    /// 局内每答对 1 题发放星币、彩虹能量槽与 12 大守护萌宠专属技能 + Fever 狂热连击倍率
+    /// 局内每答对 1 题发放星币、彩虹能量槽与 12 大守护萌宠专属技能 + Fever 狂热连击倍率（严格应用防刷倍率与上限）
     public func grantQuestionCorrectReward(wasWrongMastered: Bool) {
+        if activeRoundRewardTier == .warmup {
+            isFeverMode = false
+            let remainingCap = max(0, 3 - activeRoundWarmupCoins)
+            let gain = min(1, remainingCap)
+            if gain > 0 {
+                activeRoundWarmupCoins += gain
+                progress.coins += gain
+                roundCoinsEarned += gain
+                floatingCoinBurst += 1
+                floatingCoinGainText = "+\(gain) 🪙（暖心练手）"
+            } else {
+                floatingCoinGainText = "🌱 暖心练手 +0 🪙"
+            }
+            rainbowChestBurstMessage = nil
+            audio.sfxCoin()
+            return
+        }
+
         let baseCoin: Int
         switch currentFire {
         case .low:  baseCoin = 5
@@ -1598,6 +1838,10 @@ public final class GameEngine: ObservableObject {
             }
         }
 
+        if activeRoundRewardTier == .reduced {
+            gain = max(1, gain / 2)
+        }
+
         progress.coins += gain
         roundCoinsEarned += gain
         rainbowCharge += 1 + unicornExtraCharge
@@ -1616,21 +1860,31 @@ public final class GameEngine: ObservableObject {
             if equippedPet.kind == .unicorn {
                 chestCoins += 10 * mult
             }
-            progress.coins += chestCoins
-            roundCoinsEarned += chestCoins
-            if currentFire == .high || comboCount >= 6 {
-                progress.gachaTickets += 1
-                floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙 +1🎟️"
-                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！爆出 +\(chestCoins) 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+
+            if activeRoundRewardTier == .reduced {
+                chestCoins = max(1, chestCoins / 2)
+                progress.coins += chestCoins
+                roundCoinsEarned += chestCoins
+                floatingCoinGainText = "🌓 彩虹宝箱 +\(chestCoins)🪙"
+                rainbowChestBurstMessage = "🌓 巩固半额集满 8 格彩虹能量！爆出 +\(chestCoins) 🪙 星币（换一关挑战可恢复全额与扭蛋券掉落哦）"
             } else {
-                floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙"
-                rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！惊喜爆出 +\(chestCoins) 🪙 料理星币！（挑战大火或 6 连击还能掉扭蛋券哦）"
+                progress.coins += chestCoins
+                roundCoinsEarned += chestCoins
+                if currentFire == .high || comboCount >= 6 {
+                    progress.gachaTickets += 1
+                    floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙 +1🎟️"
+                    rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！爆出 +\(chestCoins) 🪙 星币 & 1 张皇家扭蛋券 🎟️！"
+                } else {
+                    floatingCoinGainText = "🌈 彩虹宝箱 +\(chestCoins)🪙"
+                    rainbowChestBurstMessage = "🌈 集满 8 格彩虹能量！惊喜爆出 +\(chestCoins) 🪙 料理星币！（挑战大火或 6 连击还能掉扭蛋券哦）"
+                }
             }
             audio.sfxChestOpen()
         } else {
             let feverTag = isFeverMode ? " 🔥1.5x" : ""
             let suffix = skillTag.map { " · \($0)" } ?? ""
-            floatingCoinGainText = "+\(gain) 🪙\(feverTag)\(suffix)"
+            let tierTag = activeRoundRewardTier == .reduced ? " · 巩固半额" : ""
+            floatingCoinGainText = "+\(gain) 🪙\(feverTag)\(suffix)\(tierTag)"
             rainbowChestBurstMessage = nil
         }
     }
@@ -1815,8 +2069,59 @@ public final class GameEngine: ObservableObject {
     public var availableInitials: [String] {
         let lv = currentLevelDef
         guard lv.mode != .whole else { return [] }
+        if screenState == .playing && !focusedInitials.isEmpty {
+            return focusedInitials
+        }
         let set = Set(lv.words.compactMap(\.initial))
         return set.sorted {
+            (PinyinHelper.initialOrder.firstIndex(of: $0) ?? 99) < (PinyinHelper.initialOrder.firstIndex(of: $1) ?? 99)
+        }
+    }
+
+    private static let confusableInitialsMap: [String: [String]] = [
+        "b": ["p", "d", "m", "f"],
+        "p": ["b", "q", "m", "f"],
+        "d": ["b", "t", "n", "l"],
+        "t": ["d", "n", "l"],
+        "n": ["l", "m", "d"],
+        "l": ["n", "r", "t"],
+        "g": ["k", "h"],
+        "k": ["g", "h"],
+        "h": ["g", "k", "f"],
+        "j": ["q", "x", "z"],
+        "q": ["j", "x", "p", "c"],
+        "x": ["j", "q", "s", "sh"],
+        "z": ["zh", "c", "s", "j"],
+        "c": ["ch", "z", "s", "q"],
+        "s": ["sh", "z", "c", "x"],
+        "zh": ["z", "ch", "sh", "r"],
+        "ch": ["c", "zh", "sh"],
+        "sh": ["s", "zh", "ch", "x"],
+        "r": ["l", "zh", "y"],
+        "y": ["w", "r", "j"],
+        "w": ["y", "f", "m"]
+    ]
+
+    /// 当关卡声母超过 12 个时，聚焦保留当前字声母与至多 10 个易混/邻近声母，降低小屏按键拥挤度
+    private static func computeFocusedInitials(for word: PinyinWord, levelDef: LevelDefinition) -> [String] {
+        guard levelDef.mode != .whole else { return [] }
+        let orderedAll = Set(levelDef.words.compactMap(\.initial)).sorted {
+            (PinyinHelper.initialOrder.firstIndex(of: $0) ?? 99) < (PinyinHelper.initialOrder.firstIndex(of: $1) ?? 99)
+        }
+        guard orderedAll.count > 12, let target = word.initial else {
+            return orderedAll
+        }
+        var picked = Set<String>([target])
+        for conf in confusableInitialsMap[target] ?? [] {
+            if orderedAll.contains(conf) && picked.count < 11 {
+                picked.insert(conf)
+            }
+        }
+        for ini in orderedAll.filter({ !picked.contains($0) }).shuffled() {
+            if picked.count >= 11 { break }
+            picked.insert(ini)
+        }
+        return picked.sorted {
             (PinyinHelper.initialOrder.firstIndex(of: $0) ?? 99) < (PinyinHelper.initialOrder.firstIndex(of: $1) ?? 99)
         }
     }
@@ -1870,9 +2175,153 @@ public final class GameEngine: ObservableObject {
         }
     }
 
+    private func beginRoundSession(
+        retryAllowance: Int,
+        rewardPreview: StageRewardPreview,
+        stageKey: String
+    ) {
+        questionIndex = 0
+        rightCount = 0
+        comboCount = 0
+        isFeverMode = false
+        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
+        retryLeft = retryAllowance
+        retriedCurrent = false
+        masteredCount = 0
+        newFoodsInRound = []
+        newDessertsInRound = []
+        newFlashcardsInRound = []
+        rewardedFashionInRound = []
+        roundCoinsEarned = 0
+        floatingCoinGainText = nil
+        rainbowChestBurstMessage = nil
+        mysteryChests = []
+        openedChestIndex = nil
+        firePickerLevel = nil
+        focusedInitials = []
+        activeRoundRewardTier = rewardPreview.tier
+        activeRoundStageKey = stageKey
+        activeRoundWarmupCoins = 0
+        roundAntiFarmMessage = nil
+        recommendedNextStageId = nil
+        screenState = .playing
+        setupCurrentQuestion()
+    }
+
+    /// 数学/英语按火候难度分层抽题：.low 60/35/5（基础前置），.mid 35/45/20，.high 15/40/45
+    private static func buildStratifiedCurriculumQueue(
+        from rawPool: [CurriculumQuestion],
+        fire: FireDifficulty,
+        wrongCounts: [String: Int]
+    ) -> [CurriculumQuestion] {
+        guard !rawPool.isEmpty else { return [] }
+        let targetCount = fire.questionCount
+
+        func prioritizeWrong(_ items: [CurriculumQuestion]) -> [CurriculumQuestion] {
+            let shuffled = items.shuffled()
+            return shuffled.filter { (wrongCounts[$0.id] ?? 0) > 0 }
+                + shuffled.filter { (wrongCounts[$0.id] ?? 0) <= 0 }
+        }
+
+        var basicPool = prioritizeWrong(rawPool.filter { $0.difficulty == "basic" })
+        var hardPool = prioritizeWrong(rawPool.filter { $0.difficulty == "hard" })
+        var medPool = prioritizeWrong(rawPool.filter { $0.difficulty != "basic" && $0.difficulty != "hard" })
+
+        let (bTarget, mTarget, hTarget): (Int, Int, Int) = {
+            switch fire {
+            case .low:
+                if targetCount == 8 {
+                    let r = Double.random(in: 0..<1)
+                    if r < 0.60 { return (5, 3, 0) }
+                    if r < 0.80 { return (5, 2, 1) }
+                    return (4, 3, 1)
+                }
+                let b = Int((Double(targetCount) * 0.60).rounded())
+                let m = Int((Double(targetCount) * 0.35).rounded())
+                return (b, m, max(0, targetCount - b - m))
+            case .mid:
+                if targetCount == 10 {
+                    return Bool.random() ? (3, 5, 2) : (4, 4, 2)
+                }
+                let b = Int((Double(targetCount) * 0.35).rounded())
+                let m = Int((Double(targetCount) * 0.45).rounded())
+                return (b, m, max(0, targetCount - b - m))
+            case .high:
+                if targetCount == 12 {
+                    let r = Double.random(in: 0..<1)
+                    if r < 0.60 { return (2, 5, 5) }
+                    if r < 0.80 { return (2, 4, 6) }
+                    return (1, 5, 6)
+                }
+                let b = Int((Double(targetCount) * 0.15).rounded())
+                let m = Int((Double(targetCount) * 0.40).rounded())
+                return (b, m, max(0, targetCount - b - m))
+            }
+        }()
+
+        func take(_ count: Int, from pool: inout [CurriculumQuestion]) -> [CurriculumQuestion] {
+            let n = min(count, pool.count)
+            guard n > 0 else { return [] }
+            let slice = Array(pool.prefix(n))
+            pool.removeFirst(n)
+            return slice
+        }
+
+        var pickedBasic = take(bTarget, from: &basicPool)
+        var pickedMed = take(mTarget, from: &medPool)
+        var pickedHard = take(hTarget, from: &hardPool)
+
+        var remainingNeed = targetCount - (pickedBasic.count + pickedMed.count + pickedHard.count)
+        if remainingNeed > 0 {
+            switch fire {
+            case .low:
+                let bExtra = take(remainingNeed, from: &basicPool)
+                pickedBasic.append(contentsOf: bExtra)
+                remainingNeed -= bExtra.count
+                let mExtra = take(remainingNeed, from: &medPool)
+                pickedMed.append(contentsOf: mExtra)
+                remainingNeed -= mExtra.count
+                pickedHard.append(contentsOf: take(remainingNeed, from: &hardPool))
+            case .mid:
+                let mExtra = take(remainingNeed, from: &medPool)
+                pickedMed.append(contentsOf: mExtra)
+                remainingNeed -= mExtra.count
+                let bExtra = take(remainingNeed, from: &basicPool)
+                pickedBasic.append(contentsOf: bExtra)
+                remainingNeed -= bExtra.count
+                pickedHard.append(contentsOf: take(remainingNeed, from: &hardPool))
+            case .high:
+                let hExtra = take(remainingNeed, from: &hardPool)
+                pickedHard.append(contentsOf: hExtra)
+                remainingNeed -= hExtra.count
+                let mExtra = take(remainingNeed, from: &medPool)
+                pickedMed.append(contentsOf: mExtra)
+                remainingNeed -= mExtra.count
+                pickedBasic.append(contentsOf: take(remainingNeed, from: &basicPool))
+            }
+        }
+
+        var queue: [CurriculumQuestion]
+        switch fire {
+        case .low, .mid:
+            queue = pickedBasic + pickedMed + pickedHard
+        case .high:
+            let warmup = Array(pickedBasic.prefix(1))
+            let rest = (Array(pickedBasic.dropFirst()) + pickedMed + pickedHard).shuffled()
+            queue = warmup + rest
+        }
+
+        while queue.count < targetCount {
+            let extra = rawPool.shuffled()
+            queue.append(contentsOf: extra)
+        }
+        return Array(queue.prefix(targetCount))
+    }
+
     public func startLevel(levelNumber: Int, fire: FireDifficulty) {
         roundGeneration += 1
         currentSubject = .pinyin
+        progress.ensureDaily()
         progress.touchStreak()
         saveProgress()
         let lv = LevelRepository.levels[max(0, min(LevelRepository.levels.count - 1, levelNumber - 1))]
@@ -1899,31 +2348,19 @@ public final class GameEngine: ObservableObject {
         specialMode = nil
         questionQueue = queue
         curriculumQueue = []
-        questionIndex = 0
-        rightCount = 0
-        comboCount = 0
-        isFeverMode = false
-        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
-        retryLeft = fire.retryAllowance
-        retriedCurrent = false
-        masteredCount = 0
-        newFoodsInRound = []
-        newDessertsInRound = []
-        newFlashcardsInRound = []
-        rewardedFashionInRound = []
-        roundCoinsEarned = 0
-        floatingCoinGainText = nil
-        rainbowChestBurstMessage = nil
-        mysteryChests = []
-        openedChestIndex = nil
-        firePickerLevel = nil
-        screenState = .playing
-        setupCurrentQuestion()
+
+        let preview = stageRewardPreview(subject: .pinyin, stageId: levelNumber)
+        beginRoundSession(
+            retryAllowance: fire.retryAllowance,
+            rewardPreview: preview,
+            stageKey: "pinyin_\(levelNumber)"
+        )
     }
 
     public func startCurriculumStage(subject: SubjectKind, stageId: Int, fire: FireDifficulty) {
         roundGeneration += 1
         currentSubject = subject
+        progress.ensureDaily()
         progress.touchStreak()
         saveProgress()
 
@@ -1931,66 +2368,29 @@ public final class GameEngine: ObservableObject {
             ? HujiaoCurriculumRepository.questionsForMathStage(stageId)
             : HujiaoCurriculumRepository.questionsForEnglishStage(stageId)
 
-        var shuffled = rawPool.shuffled()
-        // 根据火候难度智能倾向题目难度，但保持多样化
-        if fire == .low {
-            shuffled.sort { a, b in
-                let rankA = a.difficulty == "basic" ? 0 : (a.difficulty == "medium" ? 1 : 2)
-                let rankB = b.difficulty == "basic" ? 0 : (b.difficulty == "medium" ? 1 : 2)
-                return rankA < rankB
-            }
-        } else if fire == .high {
-            shuffled.sort { a, b in
-                let rankA = a.difficulty == "hard" ? 0 : (a.difficulty == "medium" ? 1 : 2)
-                let rankB = b.difficulty == "hard" ? 0 : (b.difficulty == "medium" ? 1 : 2)
-                return rankA < rankB
-            }
-        }
-
-        var wrongItems: [CurriculumQuestion] = []
-        var normalItems: [CurriculumQuestion] = []
-        for q in shuffled {
-            if (progress.wrong[q.id] ?? 0) > 0 {
-                wrongItems.append(q)
-            } else {
-                normalItems.append(q)
-            }
-        }
-        var queue = wrongItems + normalItems
-        while queue.count < fire.questionCount && !rawPool.isEmpty {
-            queue.append(contentsOf: rawPool.shuffled())
-        }
-        queue = Array(queue.prefix(fire.questionCount))
+        let queue = Self.buildStratifiedCurriculumQueue(
+            from: rawPool,
+            fire: fire,
+            wrongCounts: progress.wrong
+        )
 
         currentLevelNumber = stageId
         currentFire = fire
         specialMode = nil
         questionQueue = []
         curriculumQueue = queue
-        questionIndex = 0
-        rightCount = 0
-        comboCount = 0
-        isFeverMode = false
-        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
-        retryLeft = fire.retryAllowance
-        retriedCurrent = false
-        masteredCount = 0
-        newFoodsInRound = []
-        newDessertsInRound = []
-        newFlashcardsInRound = []
-        rewardedFashionInRound = []
-        roundCoinsEarned = 0
-        floatingCoinGainText = nil
-        rainbowChestBurstMessage = nil
-        mysteryChests = []
-        openedChestIndex = nil
-        firePickerLevel = nil
-        screenState = .playing
-        setupCurrentQuestion()
+
+        let preview = stageRewardPreview(subject: subject, stageId: stageId)
+        beginRoundSession(
+            retryAllowance: fire.retryAllowance,
+            rewardPreview: preview,
+            stageKey: "\(subject.rawValue)_\(stageId)"
+        )
     }
 
     public func startSpecialMode(_ type: SpecialModeType) {
         roundGeneration += 1
+        progress.ensureDaily()
         progress.touchStreak()
         saveProgress()
 
@@ -2022,20 +2422,35 @@ public final class GameEngine: ObservableObject {
         } else {
             let prefix = currentSubject == .math ? "hjm_" : "hje_"
             let allSubjQuestions = HujiaoCurriculumRepository.allQuestions.filter { $0.id.hasPrefix(prefix) }
+            let stageList: [(id: Int, semester: CurriculumSemester)] = currentSubject == .math
+                ? HujiaoCurriculumRepository.mathStages.map { ($0.id, $0.semester) }
+                : HujiaoCurriculumRepository.englishStages.map { ($0.id, $0.semester) }
             let maxStage = currentSubject == .math
-                ? (progress.freeUnlockAll ? HujiaoCurriculumRepository.mathStages.count : max(1, min(progress.mathUnlocked, HujiaoCurriculumRepository.mathStages.count)))
-                : (progress.freeUnlockAll ? HujiaoCurriculumRepository.englishStages.count : max(1, min(progress.englishUnlocked, HujiaoCurriculumRepository.englishStages.count)))
-            let unlockedPool: [CurriculumQuestion] = (1...maxStage).flatMap { stId in
-                currentSubject == .math
-                    ? HujiaoCurriculumRepository.questionsForMathStage(stId)
-                    : HujiaoCurriculumRepository.questionsForEnglishStage(stId)
+                ? (progress.freeUnlockAll ? stageList.count : max(1, min(progress.mathUnlocked, stageList.count)))
+                : (progress.freeUnlockAll ? stageList.count : max(1, min(progress.englishUnlocked, stageList.count)))
+
+            // 全明星挑战与无错题兜底默认排除趣味拓展（extensionChallenge），并优先贴合当前学期
+            let regularStages = stageList.filter { $0.semester != .extensionChallenge }
+            let unlockedRegular = regularStages.filter { $0.id <= maxStage }
+            let grade1BIds = Set(regularStages.filter { $0.semester == .grade1B }.map(\.id))
+            let hasEnteredGrade1B = grade1BIds.contains { progress.starsForLevel($0, subject: currentSubject) > 0 }
+                || (!progress.freeUnlockAll && maxStage >= (grade1BIds.min() ?? Int.max))
+            let allstarStages = unlockedRegular.filter { st in
+                st.semester == .grade1A || (st.semester == .grade1B && hasEnteredGrade1B)
             }
+            let effectiveStages = allstarStages.isEmpty ? regularStages : allstarStages
+            let unlockedRegularPool: [CurriculumQuestion] = effectiveStages.flatMap { st in
+                currentSubject == .math
+                    ? HujiaoCurriculumRepository.questionsForMathStage(st.id)
+                    : HujiaoCurriculumRepository.questionsForEnglishStage(st.id)
+            }
+
             var pool: [CurriculumQuestion] = []
             if type == .wrong {
                 pool = allSubjQuestions.filter { (progress.wrong[$0.id] ?? 0) > 0 }
             }
             if pool.isEmpty {
-                pool = unlockedPool.isEmpty ? allSubjQuestions : unlockedPool
+                pool = unlockedRegularPool.isEmpty ? allSubjQuestions : unlockedRegularPool
             }
             pool.shuffle()
             let picked = Array(pool.prefix(8))
@@ -2048,25 +2463,12 @@ public final class GameEngine: ObservableObject {
             curriculumQueue = picked
         }
 
-        questionIndex = 0
-        rightCount = 0
-        comboCount = 0
-        isFeverMode = false
-        phoenixShieldsRemaining = (equippedPet.kind == .phoenix) ? (equippedPetStage >= 4 ? 2 : 1) : 0
-        retryLeft = 2
-        retriedCurrent = false
-        masteredCount = 0
-        newFoodsInRound = []
-        newDessertsInRound = []
-        newFlashcardsInRound = []
-        rewardedFashionInRound = []
-        roundCoinsEarned = 0
-        floatingCoinGainText = nil
-        rainbowChestBurstMessage = nil
-        mysteryChests = []
-        openedChestIndex = nil
-        screenState = .playing
-        setupCurrentQuestion()
+        let preview = specialModeRewardPreview(type: type, subject: currentSubject)
+        beginRoundSession(
+            retryAllowance: 2,
+            rewardPreview: preview,
+            stageKey: "special_\(type.rawValue)_\(currentSubject.rawValue)"
+        )
     }
 
     public func goHome() {
@@ -2117,6 +2519,10 @@ public final class GameEngine: ObservableObject {
             }
             currentLevelNumber = word.levelNumber
             currentMode = word.mode
+            focusedInitials = Self.computeFocusedInitials(for: word, levelDef: currentLevelDef)
+            if word.triggersJQXRule && !progress.blind {
+                jqxRuleBanner = "🕶️ 小熊摘墨镜提示：j q x 遇到 ü 要去掉两点写成 u，但读音还是 ü 哦！"
+            }
             pickedInitial = nil
             pickedMedial = nil
             pickedBaseFinal = nil
@@ -2163,7 +2569,7 @@ public final class GameEngine: ObservableObject {
 
             if currentSubject == .math {
                 if q.type == "numeric" {
-                    numericSmartOptions = Self.buildSmartNumericOptions(correctAnswer: q.answer)
+                    numericSmartOptions = Self.buildSmartNumericOptions(for: q, stageId: currentLevelNumber)
                     chefBubble = comboCount >= 3 ? "🔥 连击 \(comboCount) 连！数学烘焙大师！" : "可以直接点甜点答案卡，也可以按数字盘输入哦！"
                 } else {
                     chefBubble = "看清题目和教具演示，点选正确的甜点配方吧！"
@@ -2185,26 +2591,43 @@ public final class GameEngine: ObservableObject {
         }
     }
 
-    private static func buildSmartNumericOptions(correctAnswer: String) -> [String] {
-        guard let ans = Int(correctAnswer) else {
-            return [correctAnswer]
+    private static func buildSmartNumericOptions(for q: CurriculumQuestion, stageId: Int) -> [String] {
+        guard let ans = Int(q.answer) else {
+            return [q.answer]
         }
+        let stageSem = HujiaoCurriculumRepository.mathStages.first(where: { $0.id == stageId })?.semester
+        let isG1A = q.topicId.hasPrefix("hjm_g1a_")
+            || q.id.hasPrefix("hjm_g1a_")
+            || (!q.topicId.hasPrefix("hjm_g1b_") && !q.id.hasPrefix("hjm_g1b_") && stageSem == .grade1A)
+        let upper = isG1A ? max(20, ans) : max(100, ans)
+
         var set = Set<Int>([ans])
-        let upper = max(120, ans + 30)
-        let offsets = [-2, -1, 1, 2, 10, -10, 20, -20, 3, -3]
-        for off in offsets.shuffled() {
+        // 至多保留 1 个 ±1 相邻陷阱，其余采用常见心算偏差（±2/±3/±5/±10/±20），杜绝负数
+        let adjacentCandidates = [-1, 1].shuffled()
+        for off in adjacentCandidates {
+            let cand = ans + off
+            if cand >= 0 && cand <= upper {
+                set.insert(cand)
+                break
+            }
+        }
+        let mentalOffsets = [-2, 2, -5, 5, -10, 10, -3, 3, -20, 20].shuffled()
+        for off in mentalOffsets {
+            if set.count >= 4 { break }
             let cand = ans + off
             if cand >= 0 && cand <= upper {
                 set.insert(cand)
             }
-            if set.count >= 4 { break }
         }
-        var fallback = max(0, ans + 1)
-        while set.count < 4 {
-            if !set.contains(fallback) {
-                set.insert(fallback)
+        var step = 1
+        while set.count < 4 && (ans + step <= upper || ans - step >= 0) {
+            if ans + step <= upper {
+                set.insert(ans + step)
             }
-            fallback += 1
+            if set.count < 4 && ans - step >= 0 {
+                set.insert(ans - step)
+            }
+            step += 1
         }
         return Array(set).sorted().map(String.init)
     }
@@ -2325,11 +2748,43 @@ public final class GameEngine: ObservableObject {
         sentencePickedIndices.removeAll()
     }
 
+    private static func normalizeEnglishText(_ text: String) -> String {
+        let folded = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "’", with: "'")
+        let stripped = folded.unicodeScalars.filter { scalar in
+            !CharacterSet.punctuationCharacters.contains(scalar)
+        }
+        return String(String.UnicodeScalarView(stripped))
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    private static let englishSynonymGroups: [Set<String>] = [
+        ["hello", "hi"],
+        ["goodbye", "bye", "bye bye"],
+        ["whos on duty", "who is on duty", "whos on duty today", "who is on duty today"],
+        ["whats your name", "what is your name"]
+    ]
+
+    private static func isCurriculumAnswerMatch(submitted: String, answer: String, subject: SubjectKind) -> Bool {
+        let normSubmitted = submitted.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normSubmitted == normAnswer { return true }
+        guard subject == .english else { return false }
+
+        let engSubmitted = normalizeEnglishText(normSubmitted)
+        let engAnswer = normalizeEnglishText(normAnswer)
+        if !engSubmitted.isEmpty && engSubmitted == engAnswer {
+            return true
+        }
+        return englishSynonymGroups.contains { $0.contains(engSubmitted) && $0.contains(engAnswer) }
+    }
+
     private func judgeCurriculumAnswer(submitted: String) {
         guard let q = currentCurriculumQuestion else { return }
-        let normSubmitted = submitted.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normAnswer = q.answer.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isCorrect = (normSubmitted == normAnswer)
+        let isCorrect = Self.isCurriculumAnswerMatch(submitted: submitted, answer: q.answer, subject: currentSubject)
 
         if isCorrect {
             rightCount += 1
@@ -2338,9 +2793,11 @@ public final class GameEngine: ObservableObject {
             customerMood = .happy
 
             progress.ensureDaily()
-            progress.daily.words += 1
-            if comboCount > progress.daily.maxCombo {
-                progress.daily.maxCombo = comboCount
+            if activeRoundRewardTier != .warmup {
+                progress.daily.words += 1
+                if comboCount > progress.daily.maxCombo {
+                    progress.daily.maxCombo = comboCount
+                }
             }
             if comboCount > progress.bestCombo {
                 progress.bestCombo = comboCount
@@ -2450,7 +2907,7 @@ public final class GameEngine: ObservableObject {
                     comboCount = 0
                 }
                 isFeverMode = (comboCount >= 5)
-                rainbowCharge = max(0, rainbowCharge - 2)
+                rainbowCharge = max(0, rainbowCharge - 1)
                 isLocked = false
                 customerMood = .burnt
                 pickedChoiceOption = nil
@@ -2473,9 +2930,9 @@ public final class GameEngine: ObservableObject {
                 comboCount = 0
             }
             isFeverMode = (comboCount >= 5)
-            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -4 惩罚
+            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -2 惩罚
             if !retriedCurrent {
-                rainbowCharge = max(0, rainbowCharge - 2)
+                rainbowCharge = max(0, rainbowCharge - 1)
             }
             judgeState = "bad"
             customerMood = .burnt
@@ -2578,6 +3035,9 @@ public final class GameEngine: ObservableObject {
             pickedTone = nil
             pickedTonedFinal = nil
             audio.speakBaseFinal(base, initial: pickedInitial, slow: progress.tts.slow)
+            if let word = currentWord, word.triggersJQXRule, ["j", "q", "x"].contains(pickedInitial ?? ""), base != word.baseFinal {
+                jqxRuleBanner = "🕶️ 小熊摘墨镜提醒：\(word.initial ?? "j/q/x") 遇到 ü 要去掉两点写成 u，但读音还是 ü 哦！"
+            }
             tipMessage = "🧂 请点击下方「四声调料瓶」（或按键盘 1~4）给 \(base) 加上声调！"
             tipStyle = "note"
             chefBubble = "最后一步：撒上第几声调料呢？"
@@ -2855,9 +3315,11 @@ public final class GameEngine: ObservableObject {
             customerMood = .happy
 
             progress.ensureDaily()
-            progress.daily.words += 1
-            if comboCount > progress.daily.maxCombo {
-                progress.daily.maxCombo = comboCount
+            if activeRoundRewardTier != .warmup {
+                progress.daily.words += 1
+                if comboCount > progress.daily.maxCombo {
+                    progress.daily.maxCombo = comboCount
+                }
             }
             if comboCount > progress.bestCombo {
                 progress.bestCombo = comboCount
@@ -2941,6 +3403,9 @@ public final class GameEngine: ObservableObject {
                 self.setupCurrentQuestion()
             }
         } else {
+            if word.triggersJQXRule {
+                jqxRuleBanner = "🕶️ 小熊摘墨镜提醒：\(word.initial ?? "j/q/x") 遇到 ü 要去掉两点写成 u，但读音还是 ü 哦！"
+            }
             if retryLeft > 0 && !retriedCurrent {
                 retryLeft -= 1
                 retriedCurrent = true
@@ -2952,7 +3417,7 @@ public final class GameEngine: ObservableObject {
                     comboCount = 0
                 }
                 isFeverMode = (comboCount >= 5)
-                rainbowCharge = max(0, rainbowCharge - 2)
+                rainbowCharge = max(0, rainbowCharge - 1)
                 isLocked = false
                 customerMood = .burnt
                 audio.sfxBad()
@@ -2985,9 +3450,9 @@ public final class GameEngine: ObservableObject {
                 comboCount = 0
             }
             isFeverMode = (comboCount >= 5)
-            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -4 惩罚
+            // 单题只扣减 1 次彩虹能量，防止回锅再错双重 -2 惩罚
             if !retriedCurrent {
-                rainbowCharge = max(0, rainbowCharge - 2)
+                rainbowCharge = max(0, rainbowCharge - 1)
             }
             judgeState = "bad"
             customerMood = .burnt
@@ -3030,9 +3495,30 @@ public final class GameEngine: ObservableObject {
         let stars = ratio >= 0.85 ? 3 : (ratio >= 0.62 ? 2 : (ratio >= 0.50 ? 1 : 0))
         roundStars = stars
 
+        let previousStars = (specialMode == nil)
+            ? progress.starsForLevel(currentLevelNumber, subject: currentSubject)
+            : 0
+        let brokeStarRecord = (specialMode == nil && stars >= 1 && stars > previousStars && previousStars < 3)
+        let wasDemoted = (activeRoundRewardTier != .full)
+        let effectiveTier: StageRewardTier = brokeStarRecord ? .full : activeRoundRewardTier
+        if brokeStarRecord && wasDemoted {
+            activeRoundRewardTier = .full
+            milestoneToast = "🌟 刷新历史最高 \(stars)★ 纪录！破格补发全额华服礼盒与神秘宝箱！"
+        }
+
+        let stageKey = !activeRoundStageKey.isEmpty
+            ? activeRoundStageKey
+            : (specialMode.map { "special_\($0.rawValue)_\(currentSubject.rawValue)" } ?? "\(currentSubject.rawValue)_\(currentLevelNumber)")
+
         progress.ensureDaily()
         if stars >= 1 {
-            progress.daily.rounds += 1
+            if effectiveTier != .warmup {
+                progress.daily.rounds += 1
+            }
+            progress.daily.stageClears[stageKey] = (progress.daily.stageClears[stageKey] ?? 0) + 1
+            if !progress.daily.distinctStages.contains(stageKey) {
+                progress.daily.distinctStages.append(stageKey)
+            }
         }
 
         if specialMode == nil {
@@ -3093,110 +3579,140 @@ public final class GameEngine: ObservableObject {
             if specialMode == nil {
                 progress.cleared[clearKey] = 1
             }
-            for _ in 0..<currentFire.fashionRolls {
-                gifts.append(rollFashionReward(stars: stars, fire: currentFire))
-            }
-            if isFirstClear {
-                gifts.append(rollFashionReward(stars: stars, fire: currentFire))
-            }
 
-            var stageBefore: [String: Int] = [:]
-            var countBefore: [String: Int] = [:]
-            for g in gifts where stageBefore[g.id] == nil {
-                stageBefore[g.id] = progress.fashionStage(for: g.id)
-                countBefore[g.id] = progress.fashionCount(for: g.id)
-            }
-            for g in gifts {
-                progress.wardrobe[g.id] = (progress.wardrobe[g.id] ?? 0) + 1
-                // 仅当掉落服饰严格高于当前已穿戴品阶且为首次解锁时自动换上，绝不覆盖更高阶穿搭
-                let currentItem = progress.equippedItem(for: g.category)
-                if g.tier > currentItem.tier && (countBefore[g.id] ?? 0) == 0 {
-                    progress.equippedOutfit[g.category.rawValue] = g.id
+            let nextStage = computeRecommendedNextStageId(
+                subject: currentSubject,
+                excluding: specialMode == nil ? currentLevelNumber : nil
+            )
+            recommendedNextStageId = nextStage
+
+            if effectiveTier == .full {
+                roundAntiFarmMessage = nil
+                for _ in 0..<currentFire.fashionRolls {
+                    gifts.append(rollFashionReward(stars: stars, fire: currentFire))
                 }
-            }
-
-            var checked = Set<String>()
-            for g in gifts where !checked.contains(g.id) {
-                checked.insert(g.id)
-                let c0 = countBefore[g.id] ?? 0
-                let b0 = max(1, stageBefore[g.id] ?? 1)
-                let b1 = progress.fashionStage(for: g.id)
-                if c0 == 0 {
-                    upgrades.append(
-                        FashionUpgradeEvent(
-                            item: g,
-                            isNewUnlock: true,
-                            fromStage: 0,
-                            toStage: 1,
-                            totalCount: progress.fashionCount(for: g.id),
-                            customTitle: "👗 通关解锁新装 · \(g.name)！"
-                        )
-                    )
-                } else if b1 > b0 {
-                    upgrades.append(
-                        FashionUpgradeEvent(
-                            item: g,
-                            isNewUnlock: false,
-                            fromStage: b0,
-                            toStage: b1,
-                            totalCount: progress.fashionCount(for: g.id),
-                            customTitle: nil
-                        )
-                    )
+                if isFirstClear {
+                    gifts.append(rollFashionReward(stars: stars, fire: currentFire))
                 }
-            }
 
-            // 通关额外星币奖励 + 萌宠/游乐园结算增益 + 局末「三选一神秘宝箱」
-            let mult = equippedPetStage >= 4 ? 2 : 1
-            var clearBonus = isFirstClear ? 35 : (stars * 8)
-            if equippedPet.kind == .corgiPilot {
-                clearBonus += 15 * mult
-            }
-            if (progress.castleUnlocked["air_balloon"] ?? 0) > 0 {
-                clearBonus += 8
-            }
-            if stars == 3 && (progress.castleUnlocked["fireworks"] ?? 0) > 0 {
-                clearBonus += 20
-                audio.sfxFirework()
-            }
-            progress.coins += clearBonus
-            roundCoinsEarned += clearBonus
+                var stageBefore: [String: Int] = [:]
+                var countBefore: [String: Int] = [:]
+                for g in gifts where stageBefore[g.id] == nil {
+                    stageBefore[g.id] = progress.fashionStage(for: g.id)
+                    countBefore[g.id] = progress.fashionCount(for: g.id)
+                }
+                for g in gifts {
+                    progress.wardrobe[g.id] = (progress.wardrobe[g.id] ?? 0) + 1
+                    // 仅当掉落服饰严格高于当前已穿戴品阶且为首次解锁时自动换上，绝不覆盖更高阶穿搭
+                    let currentItem = progress.equippedItem(for: g.category)
+                    if g.tier > currentItem.tier && (countBefore[g.id] ?? 0) == 0 {
+                        progress.equippedOutfit[g.category.rawValue] = g.id
+                    }
+                }
 
-            let ticketTemplate = MysteryChestItem(id: 0, title: "皇家扭蛋券 ×1 + 15星币", subtitle: "可免费孵化 1 只五阶守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385")
-            let fashionTemplate = MysteryChestItem(id: 1, title: "高定华服变装盲盒", subtitle: "立刻获得 1 件公主礼服或皇冠首饰", emoji: "👗", rewardType: "fashion", amount: 1, accentHex: "#7A6EE6")
-            let optionalPool: [MysteryChestItem] = [
-                MysteryChestItem(id: 2, title: "58 枚星光币福袋", subtitle: "金光闪闪的裁缝星光币", emoji: "💰", rewardType: "coins", amount: 58, accentHex: "#F5A623"),
-                MysteryChestItem(id: 3, title: "星光锦缎 ×1 + 15星币", subtitle: "直接为任意公主华服 +1 升阶经验", emoji: "🧵", rewardType: "thread", amount: 1, accentHex: "#9B6EF3"),
-                MysteryChestItem(id: 4, title: "神兽糖果 ×1 + 15星币", subtitle: "可口高甜魔法糖果，直接 +3 成长值", emoji: "🌟", rewardType: "candy", amount: 1, accentHex: "#3A86FF"),
-                MysteryChestItem(id: 5, title: "38 枚星光币礼盒", subtitle: "可升级高定礼服或投喂神兽", emoji: "🪙", rewardType: "coins", amount: 38, accentHex: "#3EA865")
-            ].shuffled()
-
-            let pickedTemplates: [MysteryChestItem]
-            if stars == 3 && currentFire == .high {
-                pickedTemplates = ([ticketTemplate, fashionTemplate] + Array(optionalPool.prefix(1))).shuffled()
+                var checked = Set<String>()
+                for g in gifts where !checked.contains(g.id) {
+                    checked.insert(g.id)
+                    let c0 = countBefore[g.id] ?? 0
+                    let b0 = max(1, stageBefore[g.id] ?? 1)
+                    let b1 = progress.fashionStage(for: g.id)
+                    if c0 == 0 {
+                        upgrades.append(
+                            FashionUpgradeEvent(
+                                item: g,
+                                isNewUnlock: true,
+                                fromStage: 0,
+                                toStage: 1,
+                                totalCount: progress.fashionCount(for: g.id),
+                                customTitle: "👗 通关解锁新装 · \(g.name)！"
+                            )
+                        )
+                    } else if b1 > b0 {
+                        upgrades.append(
+                            FashionUpgradeEvent(
+                                item: g,
+                                isNewUnlock: false,
+                                fromStage: b0,
+                                toStage: b1,
+                                totalCount: progress.fashionCount(for: g.id),
+                                customTitle: nil
+                            )
+                        )
+                    }
+                }
+            } else if effectiveTier == .reduced {
+                roundAntiFarmMessage = nextStage.map {
+                    "🌓 本关进入「巩固半额」：星币减半，且暂不掉落盲盒、宝箱或扭蛋券。去挑战第 \($0) 关可恢复🎁全额大礼！"
+                } ?? "🌓 本关进入「巩固半额」：星币减半，且暂不掉落盲盒、宝箱或扭蛋券。换个新关卡玩即可恢复🎁全额大礼！"
             } else {
-                pickedTemplates = Array(([ticketTemplate, fashionTemplate] + optionalPool).shuffled().prefix(3))
+                roundAntiFarmMessage = nextStage.map {
+                    "🌱 本关今日奖励已领满，进入「暖心练手」模式（星币封顶 3 枚，不计每日刷题）。快去第 \($0) 关探险拿🎁全额礼盒吧！"
+                } ?? "🌱 本关今日奖励已领满，进入「暖心练手」模式（星币封顶 3 枚，不计每日刷题）。换其他关卡探险即可恢复🎁全额礼盒！"
             }
 
-            let canPeek = progress.totalGlamourScore >= 500 || progress.suitBonusInfo().isHalfResonance
-            let peekIdx = canPeek ? Int.random(in: 0..<3) : -1
-            mysteryChests = pickedTemplates.enumerated().map { idx, item in
-                MysteryChestItem(
-                    id: idx,
-                    title: item.title,
-                    subtitle: item.subtitle,
-                    emoji: item.emoji,
-                    rewardType: item.rewardType,
-                    amount: item.amount,
-                    accentHex: item.accentHex,
-                    fashionItemId: item.fashionItemId,
-                    isPeeked: idx == peekIdx
-                )
+            if effectiveTier != .warmup {
+                // 通关额外星币奖励 + 萌宠/游乐园结算增益
+                let mult = equippedPetStage >= 4 ? 2 : 1
+                var clearBonus = isFirstClear ? 35 : (stars * 8)
+                if equippedPet.kind == .corgiPilot {
+                    clearBonus += 15 * mult
+                }
+                if (progress.castleUnlocked["air_balloon"] ?? 0) > 0 {
+                    clearBonus += 8
+                }
+                if stars == 3 && (progress.castleUnlocked["fireworks"] ?? 0) > 0 {
+                    clearBonus += 20
+                    audio.sfxFirework()
+                }
+                if effectiveTier == .reduced {
+                    clearBonus = max(1, clearBonus / 2)
+                }
+                progress.coins += clearBonus
+                roundCoinsEarned += clearBonus
             }
-            openedChestIndex = nil
+
+            if effectiveTier == .full {
+                let ticketTemplate = MysteryChestItem(id: 0, title: "皇家扭蛋券 ×1 + 15星币", subtitle: "可免费孵化 1 只五阶守护神兽", emoji: "🎟️", rewardType: "ticket", amount: 1, accentHex: "#E05385")
+                let fashionTemplate = MysteryChestItem(id: 1, title: "高定华服变装盲盒", subtitle: "立刻获得 1 件公主礼服或皇冠首饰", emoji: "👗", rewardType: "fashion", amount: 1, accentHex: "#7A6EE6")
+                let optionalPool: [MysteryChestItem] = [
+                    MysteryChestItem(id: 2, title: "58 枚星光币福袋", subtitle: "金光闪闪的裁缝星光币", emoji: "💰", rewardType: "coins", amount: 58, accentHex: "#F5A623"),
+                    MysteryChestItem(id: 3, title: "星光锦缎 ×1 + 15星币", subtitle: "直接为任意公主华服 +1 升阶经验", emoji: "🧵", rewardType: "thread", amount: 1, accentHex: "#9B6EF3"),
+                    MysteryChestItem(id: 4, title: "神兽糖果 ×1 + 15星币", subtitle: "可口高甜魔法糖果，直接 +3 成长值", emoji: "🌟", rewardType: "candy", amount: 1, accentHex: "#3A86FF"),
+                    MysteryChestItem(id: 5, title: "38 枚星光币礼盒", subtitle: "可升级高定礼服或投喂神兽", emoji: "🪙", rewardType: "coins", amount: 38, accentHex: "#3EA865")
+                ].shuffled()
+
+                let pickedTemplates: [MysteryChestItem]
+                if stars == 3 && currentFire == .high {
+                    pickedTemplates = ([ticketTemplate, fashionTemplate] + Array(optionalPool.prefix(1))).shuffled()
+                } else {
+                    pickedTemplates = Array(([ticketTemplate, fashionTemplate] + optionalPool).shuffled().prefix(3))
+                }
+
+                let canPeek = progress.totalGlamourScore >= 500 || progress.suitBonusInfo().isHalfResonance
+                let peekIdx = canPeek ? Int.random(in: 0..<3) : -1
+                mysteryChests = pickedTemplates.enumerated().map { idx, item in
+                    MysteryChestItem(
+                        id: idx,
+                        title: item.title,
+                        subtitle: item.subtitle,
+                        emoji: item.emoji,
+                        rewardType: item.rewardType,
+                        amount: item.amount,
+                        accentHex: item.accentHex,
+                        fashionItemId: item.fashionItemId,
+                        isPeeked: idx == peekIdx
+                    )
+                }
+                openedChestIndex = nil
+            } else {
+                mysteryChests = []
+                openedChestIndex = nil
+            }
         } else {
             mysteryChests = []
             openedChestIndex = nil
+            roundAntiFarmMessage = nil
+            recommendedNextStageId = nil
         }
 
         rewardedFashionInRound = gifts

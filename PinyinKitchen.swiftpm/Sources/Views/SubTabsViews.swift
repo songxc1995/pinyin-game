@@ -1,9 +1,64 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - 1. 闯关地图视图 (LevelMapView - 支持语数英三科切换)
+// MARK: - 1. 闯关地图视图 (LevelMapView - 支持语数英三科切换 + 学期筛选 + 防刷奖励状态提示)
 public struct LevelMapView: View {
     @ObservedObject public var engine: GameEngine
+    @State private var mathSemesterFilter: MathSemesterFilter = .all
+    @State private var englishSemesterFilter: EnglishSemesterFilter = .all
+    @State private var pinyinStageFilter: PinyinStageFilter = .all
+
+    private enum MathSemesterFilter: String, CaseIterable, Identifiable {
+        case all = "全部"
+        case grade1A = "一年级上册"
+        case grade1B = "一年级下册"
+        case ext = "趣味拓展"
+
+        var id: String { rawValue }
+
+        var semester: CurriculumSemester? {
+            switch self {
+            case .all:     return nil
+            case .grade1A: return .grade1A
+            case .grade1B: return .grade1B
+            case .ext:     return .extensionChallenge
+            }
+        }
+    }
+
+    private enum EnglishSemesterFilter: String, CaseIterable, Identifiable {
+        case all = "全部"
+        case grade1A = "1A 一上"
+        case grade1B = "1B 一下"
+
+        var id: String { rawValue }
+
+        var semester: CurriculumSemester? {
+            switch self {
+            case .all:     return nil
+            case .grade1A: return .grade1A
+            case .grade1B: return .grade1B
+            }
+        }
+    }
+
+    private enum PinyinStageFilter: String, CaseIterable, Identifiable {
+        case all = "全部"
+        case split = "两拼声韵"
+        case whole = "整体认读"
+        case tri = "三拼音节"
+
+        var id: String { rawValue }
+
+        var mode: LevelMode? {
+            switch self {
+            case .all:   return nil
+            case .split: return .split
+            case .whole: return .whole
+            case .tri:   return .tri
+            }
+        }
+    }
 
     public init(engine: GameEngine) {
         self.engine = engine
@@ -11,6 +66,27 @@ public struct LevelMapView: View {
 
     private var themeColor: Color {
         Color(hex: engine.currentSubject.themeHex)
+    }
+
+    private var filteredPinyinLevels: [LevelDefinition] {
+        guard let mode = pinyinStageFilter.mode else {
+            return LevelRepository.levels
+        }
+        return LevelRepository.levels.filter { $0.mode == mode }
+    }
+
+    private var filteredMathStages: [MathStageDefinition] {
+        guard let sem = mathSemesterFilter.semester else {
+            return HujiaoCurriculumRepository.mathStages
+        }
+        return HujiaoCurriculumRepository.mathStages.filter { $0.semester == sem }
+    }
+
+    private var filteredEnglishStages: [EnglishStageDefinition] {
+        guard let sem = englishSemesterFilter.semester else {
+            return HujiaoCurriculumRepository.englishStages
+        }
+        return HujiaoCurriculumRepository.englishStages.filter { $0.semester == sem }
     }
 
     public var body: some View {
@@ -57,75 +133,50 @@ public struct LevelMapView: View {
                         .overlay(RoundedRectangle(cornerRadius: 18).stroke(themeColor.opacity(0.25), lineWidth: 1.5))
                 )
 
-                // 顶部两大特训营
-                HStack(spacing: 12) {
+                // 顶部两大特训营（含今日防刷奖励档位徽章）
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 310), spacing: 12)], spacing: 12) {
                     let wrongCount = currentSubjectWrongCount
-                    Button {
-                        engine.audio.sfxTap()
-                        engine.startSpecialMode(.wrong)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text("🛠️")
-                                .font(.system(size: 30))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("\(engine.currentSubject.shortTitle) · 错题特训营")
-                                    .font(.system(size: 15, weight: .heavy))
-                                    .foregroundColor(Color(hex: "#7A2E1D"))
-                                Text(wrongCount > 0 ? "当前学科有 \(wrongCount) 道错题待攻克，点我专项突破！" : "目前 0 错题欠账！点我随机温习巩固")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(Color(hex: "#9E543E"))
-                            }
-                            Spacer()
-                        }
-                        .padding(14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(LinearGradient(colors: [Color(hex: "#FFF3EE"), Color(hex: "#FFE4D9")], startPoint: .top, endPoint: .bottom))
-                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(hex: "#E25247").opacity(0.35), lineWidth: 1.5))
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    specialModeCard(
+                        type: .wrong,
+                        icon: "🛠️",
+                        title: "\(engine.currentSubject.shortTitle) · 错题特训营",
+                        subtitle: wrongCount > 0 ? "当前学科有 \(wrongCount) 道错题待攻克，点我专项突破！" : "目前 0 错题欠账！点我随机温习巩固",
+                        titleColor: Color(hex: "#7A2E1D"),
+                        subtitleColor: Color(hex: "#9E543E"),
+                        gradientColors: [Color(hex: "#FFF3EE"), Color(hex: "#FFE4D9")],
+                        borderColor: Color(hex: "#E25247").opacity(0.35),
+                        preview: engine.specialModeRewardPreview(type: .wrong, subject: engine.currentSubject)
+                    )
 
-                    Button {
-                        engine.audio.sfxTap()
-                        engine.startSpecialMode(.allstar)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text("⚡")
-                                .font(.system(size: 30))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("\(engine.currentSubject.shortTitle) · 名厨随机全明星挑战")
-                                    .font(.system(size: 15, weight: .heavy))
-                                    .foregroundColor(Color(hex: "#4A358E"))
-                                Text("全册知识点混合随机抽题 · 赢取高定华服与星币！")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(Color(hex: "#6B57B0"))
-                            }
-                            Spacer()
-                        }
-                        .padding(14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(LinearGradient(colors: [Color(hex: "#F5F2FF"), Color(hex: "#E6E0FF")], startPoint: .top, endPoint: .bottom))
-                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(hex: "#7A6EE6").opacity(0.35), lineWidth: 1.5))
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    specialModeCard(
+                        type: .allstar,
+                        icon: "⚡",
+                        title: "\(engine.currentSubject.shortTitle) · 名厨随机全明星挑战",
+                        subtitle: "同步当前学期重点随机抽题 · 赢取高定华服与星币！",
+                        titleColor: Color(hex: "#4A358E"),
+                        subtitleColor: Color(hex: "#6B57B0"),
+                        gradientColors: [Color(hex: "#F5F2FF"), Color(hex: "#E6E0FF")],
+                        borderColor: Color(hex: "#7A6EE6").opacity(0.35),
+                        preview: engine.specialModeRewardPreview(type: .allstar, subject: engine.currentSubject)
+                    )
                 }
+
+                // 学科分册/类型筛选条 + 今日奖励图例
+                stageFilterBar
 
                 // 学科关卡网格（Mac/iPad 横屏自适应）
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 295, maximum: 450), spacing: 12)], spacing: 12) {
                     switch engine.currentSubject {
                     case .pinyin:
-                        ForEach(LevelRepository.levels) { lv in
+                        ForEach(filteredPinyinLevels) { lv in
                             pinyinLevelCard(lv)
                         }
                     case .math:
-                        ForEach(HujiaoCurriculumRepository.mathStages) { stg in
+                        ForEach(filteredMathStages) { stg in
                             mathStageCard(stg)
                         }
                     case .english:
-                        ForEach(HujiaoCurriculumRepository.englishStages) { stg in
+                        ForEach(filteredEnglishStages) { stg in
                             englishStageCard(stg)
                         }
                     }
@@ -156,6 +207,218 @@ public struct LevelMapView: View {
         }
     }
 
+    @ViewBuilder
+    private var stageFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                switch engine.currentSubject {
+                case .pinyin:
+                    ForEach(PinyinStageFilter.allCases) { item in
+                        let count = item.mode == nil
+                            ? LevelRepository.levels.count
+                            : LevelRepository.levels.filter { $0.mode == item.mode }.count
+                        filterPillButton(
+                            title: item.rawValue,
+                            count: count,
+                            isSelected: pinyinStageFilter == item,
+                            accent: themeColor
+                        ) {
+                            pinyinStageFilter = item
+                        }
+                    }
+                    Text("✨ 共 \(LevelRepository.levels.count) 关，第 10 关专注后鼻音强化")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                        .padding(.leading, 4)
+
+                case .math:
+                    ForEach(MathSemesterFilter.allCases) { item in
+                        let count = item.semester == nil
+                            ? HujiaoCurriculumRepository.mathStages.count
+                            : HujiaoCurriculumRepository.mathStages.filter { $0.semester == item.semester }.count
+                        let pillAccent: Color = {
+                            switch item {
+                            case .all:     return themeColor
+                            case .grade1A: return Color(hex: "#E05385")
+                            case .grade1B: return Color(hex: "#3A86FF")
+                            case .ext:     return Color(hex: "#7A6EE6")
+                            }
+                        }()
+                        filterPillButton(
+                            title: item.rawValue,
+                            count: count,
+                            isSelected: mathSemesterFilter == item,
+                            accent: pillAccent
+                        ) {
+                            mathSemesterFilter = item
+                        }
+                    }
+                    Text("💡 上册新手推荐先选「一年级上册」")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                        .padding(.leading, 4)
+
+                case .english:
+                    ForEach(EnglishSemesterFilter.allCases) { item in
+                        let count = item.semester == nil
+                            ? HujiaoCurriculumRepository.englishStages.count
+                            : HujiaoCurriculumRepository.englishStages.filter { $0.semester == item.semester }.count
+                        let pillAccent: Color = item == .grade1B ? Color(hex: "#7A6EE6") : themeColor
+                        filterPillButton(
+                            title: item.rawValue,
+                            count: count,
+                            isSelected: englishSemesterFilter == item,
+                            accent: pillAccent
+                        ) {
+                            englishSemesterFilter = item
+                        }
+                    }
+                    Text("💡 入门推荐先选「1A 一上」")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(Color(hex: "#8A7765"))
+                        .padding(.leading, 4)
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func filterPillButton(
+        title: String,
+        count: Int,
+        isSelected: Bool,
+        accent: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            engine.audio.sfxTap()
+            withAnimation(.easeInOut(duration: 0.16)) {
+                action()
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .heavy))
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .padding(.horizontal, 5.5)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(isSelected ? Color.white.opacity(0.24) : accent.opacity(0.14))
+                    )
+            }
+            .foregroundColor(isSelected ? .white : Color(hex: "#4A3520"))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(isSelected ? accent : Color.white)
+                    .overlay(
+                        Capsule().stroke(isSelected ? accent : accent.opacity(0.28), lineWidth: 1.4)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func specialModeCard(
+        type: SpecialModeType,
+        icon: String,
+        title: String,
+        subtitle: String,
+        titleColor: Color,
+        subtitleColor: Color,
+        gradientColors: [Color],
+        borderColor: Color,
+        preview: StageRewardPreview
+    ) -> some View {
+        Button {
+            engine.audio.sfxTap()
+            engine.startSpecialMode(type)
+        } label: {
+            HStack(spacing: 12) {
+                Text(icon)
+                    .font(.system(size: 30))
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundColor(titleColor)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        rewardStatusPill(preview)
+                    }
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(subtitleColor)
+                        .lineLimit(1)
+                    Text(preview.detailText)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(rewardPreviewStyle(for: preview.tier).fg)
+                        .lineLimit(1)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(LinearGradient(colors: gradientColors, startPoint: .top, endPoint: .bottom))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(borderColor, lineWidth: 1.5))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func rewardPreviewStyle(for tier: StageRewardTier) -> (fg: Color, bg: Color, border: Color) {
+        switch tier {
+        case .full:
+            return (Color(hex: "#15803D"), Color(hex: "#DCFCE7"), Color(hex: "#22C55E").opacity(0.45))
+        case .reduced:
+            return (Color(hex: "#B45309"), Color(hex: "#FEF3C7"), Color(hex: "#F59E0B").opacity(0.55))
+        case .warmup:
+            return (Color(hex: "#6B5B7B"), Color(hex: "#F1EEF5"), Color(hex: "#A594B8").opacity(0.45))
+        }
+    }
+
+    private func rewardBadgeLabel(for preview: StageRewardPreview) -> String {
+        switch preview.tier {
+        case .full:
+            return preview.badgeText
+        case .reduced:
+            return preview.badgeText
+        case .warmup:
+            return preview.isMasteredThreeStar ? "🌱 明日再来" : preview.badgeText
+        }
+    }
+
+    private func rewardStatusPill(_ preview: StageRewardPreview) -> some View {
+        let style = rewardPreviewStyle(for: preview.tier)
+        return Text(rewardBadgeLabel(for: preview))
+            .font(.system(size: 10.5, weight: .heavy))
+            .foregroundColor(style.fg)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2.5)
+            .background(
+                Capsule()
+                    .fill(style.bg)
+                    .overlay(Capsule().stroke(style.border, lineWidth: 1))
+            )
+    }
+
+    private func semesterBadgeColor(for semester: CurriculumSemester, subject: SubjectKind) -> Color {
+        switch semester {
+        case .grade1A:
+            return subject == .english ? Color(hex: "#2FB380") : Color(hex: "#E05385")
+        case .grade1B:
+            return Color(hex: "#3A86FF")
+        case .extensionChallenge:
+            return Color(hex: "#7A6EE6")
+        }
+    }
+
     private var currentSubjectWrongCount: Int {
         switch engine.currentSubject {
         case .pinyin:
@@ -178,68 +441,92 @@ public struct LevelMapView: View {
         }
     }
 
-    // MARK: - 语文拼音关卡卡片
-    private func pinyinLevelCard(_ lv: LevelDefinition) -> some View {
-        let locked = !engine.progress.freeUnlockAll && (lv.id > engine.progress.unlocked)
-        let stars = engine.progress.starsForLevel(lv.id)
-        let gotWords = lv.words.filter { (engine.progress.food[$0.character] ?? 0) > 0 }.count
-        let pct = lv.words.isEmpty ? 0.0 : Double(gotWords) / Double(lv.words.count)
+    private func stageProgressBar(pct: Double, color: Color) -> some View {
+        let clamped = CGFloat(max(0.0, min(1.0, pct)))
+        return ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.black.opacity(0.08))
+                .frame(width: 78, height: 6)
+            Capsule()
+                .fill(color)
+                .frame(width: 78 * clamped, height: 6)
+        }
+        .frame(width: 78, height: 6)
+    }
 
-        let badgeColor: Color = lv.mode == .whole
-            ? Color(hex: "#7A6EE6")
-            : (lv.mode == .tri ? Color(hex: "#3EA865") : Color(hex: "#F07D2E"))
-
-        return Button {
+    private func stageCardView(
+        stageId: Int,
+        locked: Bool,
+        stars: Int,
+        iconText: String,
+        iconFontSize: CGFloat,
+        accentColor: Color,
+        progressColor: Color,
+        title: String,
+        tagText: String,
+        subtitle: String,
+        tipText: String?,
+        tipColor: Color,
+        statText: String,
+        progressPct: Double,
+        rewardPreview: StageRewardPreview
+    ) -> some View {
+        Button {
             guard !locked else { return }
             engine.audio.sfxTap()
-            engine.firePickerLevel = lv.id
+            engine.firePickerLevel = stageId
         } label: {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(locked ? Color.gray.opacity(0.18) : badgeColor.opacity(0.16))
+                        .fill(locked ? Color.gray.opacity(0.18) : accentColor.opacity(0.15))
                         .frame(width: 48, height: 48)
-                    Text(locked ? "🔒" : "\(lv.id)")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundColor(locked ? .gray : badgeColor)
+                    Text(locked ? "🔒" : iconText)
+                        .font(.system(size: locked ? 20 : iconFontSize, weight: .black, design: .rounded))
+                        .foregroundColor(locked ? .gray : accentColor)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(lv.shortName)
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundColor(Color(hex: "#3B2E22"))
-                    Text(lv.subtitle)
+                    HStack(spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 15.5, weight: .heavy))
+                            .foregroundColor(Color(hex: "#3B2E22"))
+                            .lineLimit(1)
+                        Text(tagText)
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1.5)
+                            .background(Capsule().fill(accentColor))
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    Text(subtitle)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#8A7765"))
                         .lineLimit(1)
-                    if let tip = lv.tip {
-                        Text("💡 \(tip)")
+                    if let tipText {
+                        Text(tipText)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(hex: "#B25614"))
+                            .foregroundColor(tipColor)
                             .lineLimit(1)
                     }
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 5) {
+                VStack(alignment: .trailing, spacing: 4) {
                     if !locked {
+                        rewardStatusPill(rewardPreview)
                         Text(String(repeating: "★", count: stars) + String(repeating: "☆", count: 3 - stars))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 14.5, weight: .bold))
                             .foregroundColor(Color(hex: "#F5A623"))
                     }
-                    Text(locked ? "先过上一关" : "已收 \(gotWords)/\(lv.words.count) 字")
-                        .font(.system(size: 11.5, weight: .bold))
+                    Text(statText)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "#8A7765"))
 
                     if !locked {
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.black.opacity(0.08))
-                                Capsule().fill(badgeColor).frame(width: g.size.width * pct)
-                            }
-                        }
-                        .frame(width: 78, height: 6)
+                        stageProgressBar(pct: progressPct, color: progressColor)
                     }
                 }
             }
@@ -249,13 +536,47 @@ public struct LevelMapView: View {
                     .fill(Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(locked ? Color.black.opacity(0.08) : badgeColor.opacity(0.32), lineWidth: 1.8)
+                            .stroke(locked ? Color.black.opacity(0.08) : accentColor.opacity(0.32), lineWidth: 1.8)
                     )
                     .shadow(color: Color.black.opacity(locked ? 0.02 : 0.06), radius: 5, y: 3)
             )
-            .opacity(locked ? 0.58 : 1.0)
+            .opacity(locked ? 0.58 : (rewardPreview.tier == .warmup ? 0.88 : 1.0))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - 语文拼音关卡卡片
+    private func pinyinLevelCard(_ lv: LevelDefinition) -> some View {
+        let locked = !engine.progress.freeUnlockAll && (lv.id > engine.progress.unlocked)
+        let stars = engine.progress.starsForLevel(lv.id)
+        let gotWords = lv.words.filter { (engine.progress.food[$0.character] ?? 0) > 0 }.count
+        let pct = lv.words.isEmpty ? 0.0 : Double(gotWords) / Double(lv.words.count)
+        let rewardPreview = engine.stageRewardPreview(subject: .pinyin, stageId: lv.id)
+
+        let badgeColor: Color = lv.mode == .whole
+            ? Color(hex: "#7A6EE6")
+            : (lv.mode == .tri ? Color(hex: "#3EA865") : Color(hex: "#F07D2E"))
+        let modeTag: String = lv.id == 10
+            ? "后鼻音"
+            : (lv.mode == .whole ? "整体认读" : (lv.mode == .tri ? "三拼" : "两拼"))
+
+        return stageCardView(
+            stageId: lv.id,
+            locked: locked,
+            stars: stars,
+            iconText: "\(lv.id)",
+            iconFontSize: 20,
+            accentColor: badgeColor,
+            progressColor: badgeColor,
+            title: lv.shortName,
+            tagText: modeTag,
+            subtitle: lv.subtitle,
+            tipText: lv.tip.map { "💡 \($0)" },
+            tipColor: Color(hex: "#B25614"),
+            statText: locked ? "先过上一关" : "已收 \(gotWords)/\(lv.words.count) 字",
+            progressPct: pct,
+            rewardPreview: rewardPreview
+        )
     }
 
     // MARK: - 沪教数学关卡卡片
@@ -265,82 +586,27 @@ public struct LevelMapView: View {
         let stageQuestions = HujiaoCurriculumRepository.questionsForMathStage(stg.id)
         let gotDesserts = stg.dessertIds.filter { (engine.progress.desserts[$0] ?? 0) > 0 }.count
         let pct = stg.dessertIds.isEmpty ? 0.0 : Double(gotDesserts) / Double(stg.dessertIds.count)
-        let badgeColor = Color(hex: "#E05385")
+        let semColor = semesterBadgeColor(for: stg.semester, subject: .math)
+        let rewardPreview = engine.stageRewardPreview(subject: .math, stageId: stg.id)
+        let shortTitle = stg.name.replacingOccurrences(of: #"^第 \d+ 关 · "#, with: "", options: .regularExpression)
 
-        return Button {
-            guard !locked else { return }
-            engine.audio.sfxTap()
-            engine.firePickerLevel = stg.id
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(locked ? Color.gray.opacity(0.18) : badgeColor.opacity(0.15))
-                        .frame(width: 48, height: 48)
-                    Text(locked ? "🔒" : "🧁\(stg.id)")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundColor(locked ? .gray : badgeColor)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(stg.name)
-                            .font(.system(size: 15.5, weight: .heavy))
-                            .foregroundColor(Color(hex: "#3B2E22"))
-                            .lineLimit(1)
-                        Text(stg.semesterTag)
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1.5)
-                            .background(Capsule().fill(badgeColor))
-                    }
-                    Text(stg.subtitle)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                        .lineLimit(1)
-                    Text("💡 \(stg.tip)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "#B8336A"))
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 5) {
-                    if !locked {
-                        Text(String(repeating: "★", count: stars) + String(repeating: "☆", count: 3 - stars))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(Color(hex: "#F5A623"))
-                    }
-                    Text("题库 \(stageQuestions.count) 题 · 甜点 \(gotDesserts)/\(stg.dessertIds.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "#8A7765"))
-
-                    if !locked {
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.black.opacity(0.08))
-                                Capsule().fill(badgeColor).frame(width: g.size.width * pct)
-                            }
-                        }
-                        .frame(width: 78, height: 6)
-                    }
-                }
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(locked ? Color.black.opacity(0.08) : badgeColor.opacity(0.32), lineWidth: 1.8)
-                    )
-                    .shadow(color: Color.black.opacity(locked ? 0.02 : 0.06), radius: 5, y: 3)
-            )
-            .opacity(locked ? 0.58 : 1.0)
-        }
-        .buttonStyle(.plain)
+        return stageCardView(
+            stageId: stg.id,
+            locked: locked,
+            stars: stars,
+            iconText: "🧁\(stg.id)",
+            iconFontSize: 17,
+            accentColor: semColor,
+            progressColor: Color(hex: "#E05385"),
+            title: shortTitle,
+            tagText: stg.semesterTag,
+            subtitle: stg.subtitle,
+            tipText: "💡 \(stg.tip)",
+            tipColor: Color(hex: "#B8336A"),
+            statText: "题库 \(stageQuestions.count) 题 · 甜点 \(gotDesserts)/\(stg.dessertIds.count)",
+            progressPct: pct,
+            rewardPreview: rewardPreview
+        )
     }
 
     // MARK: - 牛津英语关卡卡片
@@ -351,82 +617,27 @@ public struct LevelMapView: View {
         let stageFlashcards = HujiaoCurriculumRepository.flashcards(forEnglishStage: stg.id)
         let gotCards = stageFlashcards.filter { (engine.progress.englishCards[$0.word] ?? 0) > 0 }.count
         let pct = stageFlashcards.isEmpty ? 0.0 : Double(gotCards) / Double(stageFlashcards.count)
-        let badgeColor = Color(hex: "#2FB380")
+        let semColor = semesterBadgeColor(for: stg.semester, subject: .english)
+        let rewardPreview = engine.stageRewardPreview(subject: .english, stageId: stg.id)
+        let shortTitle = stg.name.replacingOccurrences(of: #"^第 \d+ 关 · "#, with: "", options: .regularExpression)
 
-        return Button {
-            guard !locked else { return }
-            engine.audio.sfxTap()
-            engine.firePickerLevel = stg.id
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(locked ? Color.gray.opacity(0.18) : badgeColor.opacity(0.15))
-                        .frame(width: 48, height: 48)
-                    Text(locked ? "🔒" : "🧃\(stg.id)")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundColor(locked ? .gray : badgeColor)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(stg.name)
-                            .font(.system(size: 15.5, weight: .heavy))
-                            .foregroundColor(Color(hex: "#3B2E22"))
-                            .lineLimit(1)
-                        Text(stg.unitCode)
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1.5)
-                            .background(Capsule().fill(badgeColor))
-                    }
-                    Text(stg.subtitle)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#8A7765"))
-                        .lineLimit(1)
-                    Text("🗣️ 句型：\(stg.keySentences.first ?? "")")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "#156947"))
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 5) {
-                    if !locked {
-                        Text(String(repeating: "★", count: stars) + String(repeating: "☆", count: 3 - stars))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(Color(hex: "#F5A623"))
-                    }
-                    Text("题库 \(stageQuestions.count) 题 · 闪卡 \(gotCards)/\(stageFlashcards.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "#8A7765"))
-
-                    if !locked {
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.black.opacity(0.08))
-                                Capsule().fill(badgeColor).frame(width: g.size.width * pct)
-                            }
-                        }
-                        .frame(width: 78, height: 6)
-                    }
-                }
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(locked ? Color.black.opacity(0.08) : badgeColor.opacity(0.32), lineWidth: 1.8)
-                    )
-                    .shadow(color: Color.black.opacity(locked ? 0.02 : 0.06), radius: 5, y: 3)
-            )
-            .opacity(locked ? 0.58 : 1.0)
-        }
-        .buttonStyle(.plain)
+        return stageCardView(
+            stageId: stg.id,
+            locked: locked,
+            stars: stars,
+            iconText: "🧃\(stg.id)",
+            iconFontSize: 17,
+            accentColor: semColor,
+            progressColor: Color(hex: "#2FB380"),
+            title: shortTitle,
+            tagText: "\(stg.semester.rawValue) · \(stg.unitCode)",
+            subtitle: stg.subtitle,
+            tipText: "🗣️ 句型：\(stg.keySentences.first ?? "")",
+            tipColor: Color(hex: "#156947"),
+            statText: "题库 \(stageQuestions.count) 题 · 闪卡 \(gotCards)/\(stageFlashcards.count)",
+            progressPct: pct,
+            rewardPreview: rewardPreview
+        )
     }
 }
 
@@ -718,12 +929,12 @@ public struct RecipeBookView: View {
         .background(RoundedRectangle(cornerRadius: 22).fill(Color.white.opacity(0.92)))
     }
 
-    // MARK: - 2B. 沪教数学梦幻甜点柜（含 30 条一年级算理口诀）
+    // MARK: - 2B. 沪教数学梦幻甜点柜（含一年级算理口诀）
     private var mathDessertCabinetContent: some View {
         let allDesserts = HujiaoCurriculumRepository.bakeryDesserts
         return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("🍰 梦幻数学甜点柜（30款甜点 + 沪教一年级算理口诀）")
+                Text("🍰 梦幻数学甜点柜（\(allDesserts.count)款甜点 + 沪教一年级算理口诀）")
                     .font(.system(size: 18, weight: .heavy))
                     .foregroundColor(Color(hex: "#3B2E22"))
                 Text("点击任意甜点即可听小熊烘焙师朗读它背后的数学算理秘籍！")
@@ -1715,6 +1926,9 @@ public struct RoundResultView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
                     resultHeaderSection(stars: stars, right: right, total: total)
+                    if let antiFarmMsg = engine.roundAntiFarmMessage {
+                        antiFarmNoticeBanner(message: antiFarmMsg)
+                    }
                     resultPromptRow
                     if !engine.mysteryChests.isEmpty {
                         RoundResultMysteryChestSection(
@@ -1862,57 +2076,144 @@ public struct RoundResultView: View {
         }
     }
 
-    private func resultActionButtonsSection(themeColor: Color) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10) {
-            Button {
-                engine.audio.sfxTap()
-                if let sp = engine.specialMode {
-                    engine.startSpecialMode(sp)
-                } else {
-                    engine.startSubjectStage(stageId: engine.currentLevelNumber, fire: engine.currentFire)
-                }
-            } label: {
-                resultActionButtonLabel("🔄 再来一局", foreground: .white, fill: themeColor)
-            }
-            .buttonStyle(.plain)
+    private func antiFarmNoticeBanner(message: String) -> some View {
+        let isWarmup = (engine.activeRoundRewardTier == .warmup)
+        let fg = isWarmup ? Color(hex: "#58486B") : Color(hex: "#92400E")
+        let bg = isWarmup ? Color(hex: "#F4F1F8") : Color(hex: "#FFF8E1")
+        let border = isWarmup ? Color(hex: "#A594B8").opacity(0.6) : Color(hex: "#F59E0B").opacity(0.6)
+        let heading = isWarmup
+            ? "🌱 暖心练手护航提示"
+            : "🌓 巩固半额护航提示"
+        let formattedMessage = message
+            .replacingOccurrences(of: #"^[🌓🌱]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "恢复🎁全额", with: "恢复 🎁 全额")
+            .replacingOccurrences(of: "拿🎁全额", with: "拿 🎁 全额")
 
-            if engine.specialMode == nil && engine.currentLevelNumber < engine.currentMaxStageCount {
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(heading)
+                .font(.system(size: 13.5, weight: .black))
+                .foregroundColor(fg)
+
+            Text(formattedMessage)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundColor(fg)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if engine.specialMode != nil, let nextId = engine.recommendedNextStageId {
+                let nextPreview = engine.stageRewardPreview(subject: engine.currentSubject, stageId: nextId)
                 Button {
                     engine.audio.sfxTap()
-                    let nextLv = min(engine.currentMaxStageCount, engine.currentLevelNumber + 1)
                     engine.goHome()
-                    engine.firePickerLevel = nextLv
+                    engine.firePickerLevel = nextId
                 } label: {
-                    resultActionButtonLabel("下一关 →", foreground: .white, fill: Color(hex: "#3EA865"))
+                    Text(nextPreview.tier == .full
+                         ? "🚀 挑战推荐第 \(nextId) 关（🎁 全额奖励）"
+                         : "🚀 前往推荐第 \(nextId) 关（\(nextPreview.badgeText)）")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Color(hex: "#2FB380")))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(bg)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(border, lineWidth: 1.5))
+        )
+    }
+
+    private func resultActionButtonsSection(themeColor: Color) -> some View {
+        VStack(spacing: 10) {
+            if engine.specialMode == nil, let nextId = engine.recommendedNextStageId {
+                let nextPreview = engine.stageRewardPreview(subject: engine.currentSubject, stageId: nextId)
+                let ctaTitle = nextPreview.tier == .full
+                    ? "🚀 挑战推荐第 \(nextId) 关（🎁 全额奖励）"
+                    : "🚀 前往推荐第 \(nextId) 关（\(nextPreview.badgeText)）"
+                Button {
+                    engine.audio.sfxTap()
+                    engine.goHome()
+                    engine.firePickerLevel = nextId
+                } label: {
+                    Text(ctaTitle)
+                        .font(.system(size: 15.5, weight: .black))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    LinearGradient(
+                                        colors: nextPreview.tier == .full
+                                            ? [Color(hex: "#2FB380"), Color(hex: "#1E9666")]
+                                            : [themeColor, themeColor.opacity(0.85)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        )
                 }
                 .buttonStyle(.plain)
             }
 
-            Button {
-                engine.audio.sfxTap()
-                engine.activeTab = .garden
-                engine.goHome()
-            } label: {
-                resultActionButtonLabel("👗 去公主换装", foreground: .white, fill: Color(hex: "#E05385"))
-            }
-            .buttonStyle(.plain)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10) {
+                Button {
+                    engine.audio.sfxTap()
+                    if let sp = engine.specialMode {
+                        engine.startSpecialMode(sp)
+                    } else {
+                        engine.startSubjectStage(stageId: engine.currentLevelNumber, fire: engine.currentFire)
+                    }
+                } label: {
+                    resultActionButtonLabel("🔄 再来一局", foreground: .white, fill: themeColor)
+                }
+                .buttonStyle(.plain)
 
-            Button {
-                engine.audio.sfxTap()
-                engine.activeTab = .paradise
-                engine.goHome()
-            } label: {
-                resultActionButtonLabel("🎰 去扭蛋抽神兽", foreground: .white, fill: Color(hex: "#E63946"))
-            }
-            .buttonStyle(.plain)
+                if engine.specialMode == nil && engine.recommendedNextStageId == nil && engine.currentLevelNumber < engine.currentMaxStageCount {
+                    let nextLv = min(engine.currentMaxStageCount, engine.currentLevelNumber + 1)
+                    if !engine.progress.isStageLocked(nextLv, subject: engine.currentSubject) {
+                        Button {
+                            engine.audio.sfxTap()
+                            engine.goHome()
+                            engine.firePickerLevel = nextLv
+                        } label: {
+                            resultActionButtonLabel("下一关 →", foreground: .white, fill: Color(hex: "#3EA865"))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
 
-            Button {
-                engine.audio.sfxTap()
-                engine.goHome()
-            } label: {
-                resultActionButtonLabel("🏠 返回选关", foreground: Color(hex: "#3B2E22"), fill: .white, stroke: Color.black.opacity(0.15))
+                Button {
+                    engine.audio.sfxTap()
+                    engine.activeTab = .garden
+                    engine.goHome()
+                } label: {
+                    resultActionButtonLabel("👗 去公主换装", foreground: .white, fill: Color(hex: "#E05385"))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    engine.audio.sfxTap()
+                    engine.activeTab = .paradise
+                    engine.goHome()
+                } label: {
+                    resultActionButtonLabel("🎰 去扭蛋抽神兽", foreground: .white, fill: Color(hex: "#E63946"))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    engine.audio.sfxTap()
+                    engine.goHome()
+                } label: {
+                    resultActionButtonLabel("🏠 返回选关", foreground: Color(hex: "#3B2E22"), fill: .white, stroke: Color.black.opacity(0.15))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.top, 4)
     }
@@ -1941,9 +2242,22 @@ public struct RoundResultView: View {
 
     private func resultTitleCluster(st: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(st > 0 ? "🎉 香喷喷出炉通关啦！" : "💪 差一点点，再试一次吧！")
-                .font(.system(size: 23, weight: .black))
-                .foregroundColor(Color(hex: "#5E340B"))
+            HStack(spacing: 8) {
+                Text(st > 0 ? "🎉 香喷喷出炉通关啦！" : "💪 差一点点，再试一次吧！")
+                    .font(.system(size: 23, weight: .black))
+                    .foregroundColor(Color(hex: "#5E340B"))
+                if st >= 1 && engine.activeRoundRewardTier != .full {
+                    let isWarmup = (engine.activeRoundRewardTier == .warmup)
+                    Text(isWarmup ? "🌱 暖心练手" : "🌓 巩固半额")
+                        .font(.system(size: 11.5, weight: .heavy))
+                        .foregroundColor(isWarmup ? Color(hex: "#6B5B7B") : Color(hex: "#B45309"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(isWarmup ? Color(hex: "#F1EEF5") : Color(hex: "#FEF3C7"))
+                        )
+                }
+            }
             Text("🪙 +\(engine.roundCoinsEarned) 枚星币 · 🎟️ \(engine.progress.gachaTickets) · 🧵 \(engine.progress.starThread) · 🌟 \(engine.progress.petCandy)")
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundColor(Color(hex: "#D97706"))
@@ -1955,11 +2269,20 @@ public struct RoundResultView: View {
         if engine.masteredCount > 0 {
             s += "，成功消灭了 \(engine.masteredCount) 道以前错过的题！"
         }
-        if right >= 4 {
+        if !engine.rewardedFashionInRound.isEmpty {
             let count = engine.rewardedFashionInRound.count
-            s += count > 1 ? "，太棒了，获得了 \(count) 件高定公主华服与首饰锦缎！" : "，获得了一件漂亮的公主华服礼盒！"
+            s += count > 1
+                ? "，太棒了，获得了 \(count) 件高定公主华服与首饰锦缎！"
+                : "，获得了一件漂亮的公主华服礼盒！"
+        } else if engine.roundStars >= 1 && engine.activeRoundRewardTier != .full {
+            let modeLabel = engine.activeRoundRewardTier == .reduced ? "巩固半额" : "暖心练手"
+            if engine.roundAntiFarmMessage != nil {
+                s += "，本局为「\(modeLabel)」温习模式，未重复发放华服礼盒。"
+            } else {
+                s += "，本局为「\(modeLabel)」温习模式，未重复发放华服礼盒，换新关挑战可立即恢复 🎁 全额礼盒哦！"
+            }
         } else {
-            s += "，答对 4 道题就有公主华服礼盒送给你哦！"
+            s += "，再加把劲达到 1★ 就能赢取公主华服礼盒哦！"
         }
         return s
     }
